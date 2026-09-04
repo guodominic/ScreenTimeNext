@@ -18,7 +18,7 @@ abstractions**.
 ## §9 High-level architecture
 
 ```text
-TransitionApp
+ScreenTimeNextApp
 ├── Parent UI
 ├── Child UI
 ├── ViewModels
@@ -42,7 +42,7 @@ DeviceActivityMonitorExtension
 2. Business logic belongs in services / state engines / view models — **not** in views.
 3. DeviceActivity is **not** a per-second countdown engine.
 4. The UI countdown must be reconstructed from **absolute timestamps**.
-5. ManagedSettings operations must be **scoped to Transition-managed settings**; never
+5. ManagedSettings operations must be **scoped to ScreenTimeNext-managed settings**; never
    indiscriminately clear all settings.
 6. The extension must **not** assume the main application is running.
 7. Apple framework API usage must match the **installed/current SDK**, never copied from outdated

@@ -14,7 +14,7 @@ Implement the parent-controlled temporary extension: +10 minutes, +20 minutes, a
 
 ## In scope
 - The §6.16 parent UI with the three options.
-- The §15 flow: update allowance → adjust monitoring → remove only Transition-managed shielding → resume active → reapply on expiry.
+- The §15 flow: update allowance → adjust monitoring → remove only ScreenTimeNext-managed shielding → resume active → reapply on expiry.
 - The `finished | shielded → extended → active` transitions from §11.
 - Reliable reapplication of protection when the extension window expires.
 
@@ -23,14 +23,14 @@ Implement the parent-controlled temporary extension: +10 minutes, +20 minutes, a
 
 ## PRD detail
 §6.16: offer **+10 minutes**, **+20 minutes**, and **Allow Once**. Extension must only modify
-Transition-managed protection and monitoring state.
+ScreenTimeNext-managed protection and monitoring state.
 
 §15 flow:
 ```text
 +10 / +20 / Allow Once
   → update local allowance / configuration
     → adjust monitoring as supported by the current SDK
-      → remove ONLY Transition-managed shielding
+      → remove ONLY ScreenTimeNext-managed shielding
         → resume active state
           → reapply protection when the extension expires
 ```
@@ -43,7 +43,7 @@ Transition-managed protection and monitoring state.
 - This is a **parent** surface. §7 rule 5 — make it deliberate; do not put it one tap from the child timer.
 
 ## Architecture rules in force
-- Rule 6 — remove only Transition-managed shielding.
+- Rule 6 — remove only ScreenTimeNext-managed shielding.
 - Rule 3 — expiry cannot depend on a per-second process.
 - Rule 5 — allowance state is shared with the extension.
 

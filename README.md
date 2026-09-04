@@ -1,11 +1,11 @@
-# Transition
+# ScreenTimeNext
 
 **Screen Time Transition Assistant + Parental Control** · iOS / iPadOS
 
 > Make screen time end peacefully.
 
 ## What it does
-Transition helps parents set a screen-time budget, select protected content, warn a child before
+ScreenTimeNext helps parents set a screen-time budget, select protected content, warn a child before
 time expires, guide the child toward a next activity, and enforce the end of selected screen time
 using Apple's Screen Time frameworks.
 
@@ -39,8 +39,9 @@ docs/
 │   └── 001…020-*.md      the 20 implementation tasks, in order
 ├── DECISIONS.md          why things are the way they are
 ├── BLOCKERS.md           what code cannot fix
+├── market-analysis.md    feasibility & market judgement
 └── reference/            the signed .docx PRD, archived
-Transition/               app source (see Transition/README.md)
+ScreenTimeNext/               app source (see ScreenTimeNext/README.md)
 Tests/                    unit tests
 ```
 

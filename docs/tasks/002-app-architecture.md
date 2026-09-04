@@ -15,7 +15,7 @@ Define the service protocols and dependency boundaries so that views never touch
 **Acceptance:** views contain no direct Screen Time framework calls.
 
 ## In scope
-- Five protocols in `Transition/Core/Services/`, all **framework-free**: `ScreenTimeAuthorizationService`, `ScreenTimeSelectionService`, `ScreenTimeMonitoringService`, `ScreenTimeShieldService`, `ScreenTimeStorageService`.
+- Five protocols in `ScreenTimeNext/Core/Services/`, all **framework-free**: `ScreenTimeAuthorizationService`, `ScreenTimeSelectionService`, `ScreenTimeMonitoringService`, `ScreenTimeShieldService`, `ScreenTimeStorageService`.
 - Domain-level enums the protocols speak in (e.g. an authorization status enum owned by this app, not re-exported from FamilyControls).
 - Mock implementations of all five, so Task 003 can build the whole onboarding flow without entitlements.
 - A dependency container / environment injection point so views resolve services rather than constructing them.
@@ -25,7 +25,7 @@ Define the service protocols and dependency boundaries so that views never touch
 - Persistence internals (→ Task 006).
 
 ## PRD detail
-§9 names the five services. §10 rules 1 and 2 are what this task exists to enforce: views call view models, view models call protocols, and only `Transition/ScreenTime/` implements those protocols against Apple frameworks.
+§9 names the five services. §10 rules 1 and 2 are what this task exists to enforce: views call view models, view models call protocols, and only `ScreenTimeNext/ScreenTime/` implements those protocols against Apple frameworks.
 
 The protocol surface must not leak framework types. A protocol returning `FamilyActivitySelection` would force `import FamilyControls` into the core layer and defeat the boundary — see `docs/DECISIONS.md` D-001 for how selection crosses this line.
 

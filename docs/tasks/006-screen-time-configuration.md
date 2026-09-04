@@ -13,7 +13,7 @@ prd_refs: ["§12", "§13", "§6.5", "§6.6"]
 Implement the configuration models, App Group persistence behind `ScreenTimeStorageService`, and unit tests for both.
 
 ## In scope
-- Models in `Transition/Core/Models/`: `ChildProfile`, `ScreenTimeConfiguration`, `DailyUsage`, `TransitionActivity`, `ScreenTimeState`, `ProtectionState`.
+- Models in `ScreenTimeNext/Core/Models/`: `ChildProfile`, `ScreenTimeConfiguration`, `DailyUsage`, `TransitionActivity`, `ScreenTimeState`, `ProtectionState`.
 - Concrete `ScreenTimeStorageService` writing to the App Group shared container.
 - Schema versioning so a future model change does not silently destroy a parent's configuration.
 - Unit tests for round-trip encode/decode, defaults, and migration of a missing/corrupt store.
@@ -32,6 +32,7 @@ Note the deliberate split — `ScreenTimeState` tracks the *session*, `Protectio
 *enforcement*. They are two axes and must not be collapsed into one enum. See `docs/DECISIONS.md` D-002.
 
 ## Implementation notes
+- **Prerequisite:** `docs/DECISIONS.md` D-006 (session-window vs. usage-accrual model) must be decided before this task starts. It changes what this task builds.
 - Both the app and the extension read this store. Assume concurrent access and write atomically.
 - The extension may write `ProtectionState` while the app is not running (§14) — the app must re-read on foreground rather than trusting its in-memory copy.
 - Store the budget in **seconds** as §12 specifies, and convert at the presentation layer only.

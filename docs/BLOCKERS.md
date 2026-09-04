@@ -39,7 +39,7 @@ The App Group identifier shared by the app and the extension requires a real Tea
 configured, Task 001 defines the constant with a marked placeholder.
 
 **Required manual step.** Configure the Apple Developer team in Xcode and register the App Group;
-replace the placeholder in `Transition/Shared/Constants/`.
+replace the placeholder in `ScreenTimeNext/Shared/Constants/`.
 
 ---
 

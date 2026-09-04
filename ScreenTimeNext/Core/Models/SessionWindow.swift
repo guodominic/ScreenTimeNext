@@ -1,8 +1,8 @@
 //  SessionWindow.swift
-//  Transition
+//  ScreenTimeNext
 //
 //  Encodes Rule 4 — absolute timestamps are the source of truth.
-//  Framework-free: imports Foundation only. See Transition/README.md.
+//  Framework-free: imports Foundation only. See ScreenTimeNext/README.md.
 
 import Foundation
 

@@ -1,7 +1,7 @@
-# Transition — Claude Code Instructions
+# ScreenTimeNext — Claude Code Instructions
 
 ## Mission
-Build Transition, a Screen Time Transition Assistant + Parental Control for iOS/iPadOS.
+Build ScreenTimeNext, a Screen Time Transition Assistant + Parental Control for iOS/iPadOS.
 
 Core promise: **Make screen time end peacefully.**
 
@@ -76,13 +76,14 @@ A UI-only timer is only a prototype.
 | `docs/tasks/0NN-*.md` | The 20 implementation tasks, in order |
 | `docs/DECISIONS.md` | Why things are the way they are |
 | `docs/BLOCKERS.md` | What code cannot fix (entitlements, approvals, device tests) |
+| `docs/market-analysis.md` | Feasibility and market judgement (for humans, not the agent) |
 | `docs/reference/` | The signed .docx PRD, archived |
-| `Transition/` | App source. See `Transition/README.md` for the import boundary. |
+| `ScreenTimeNext/` | App source. See `ScreenTimeNext/README.md` for the import boundary. |
 | `Tests/` | Unit tests |
 
 ## The import boundary
 `import FamilyControls`, `import DeviceActivity`, and `import ManagedSettings` may appear **only**
-under `Transition/ScreenTime/` and `Transition/DeviceActivityMonitorExtension/`.
+under `ScreenTimeNext/ScreenTime/` and `ScreenTimeNext/DeviceActivityMonitorExtension/`.
 
 Everything under `Core/`, `Features/`, and `Shared/` is framework-free and unit-testable without a
 device or an entitlement. This is what keeps the project moving while the entitlement is pending.

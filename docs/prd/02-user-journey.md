@@ -26,7 +26,7 @@ CHILD SESSION
 
 PARENT OVERRIDE (optional, any time after expiry)
   Parent may temporarily extend time  (+10 / +20 / Allow Once)
-    → shielding lifted for Transition-managed content only
+    → shielding lifted for ScreenTimeNext-managed content only
     → protection reapplied when the extension expires
 ```
 

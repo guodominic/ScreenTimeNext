@@ -1,8 +1,8 @@
 //  ScreenTimeState.swift
-//  Transition
+//  ScreenTimeNext
 //
 //  PRD §11, §12 — session state. See DECISIONS.md D-002.
-//  Framework-free: imports Foundation only. See Transition/README.md.
+//  Framework-free: imports Foundation only. See ScreenTimeNext/README.md.
 
 import Foundation
 

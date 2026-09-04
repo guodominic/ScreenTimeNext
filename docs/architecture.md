@@ -47,14 +47,14 @@ is current.
 
 ### ManagedSettings
 - Shield selected applications / categories / web domains
-- Remove **only** Transition-managed restrictions
+- Remove **only** ScreenTimeNext-managed restrictions
 
 ## The import boundary
 
 `import FamilyControls`, `import DeviceActivity`, `import ManagedSettings` may appear only under:
 
-- `Transition/ScreenTime/`
-- `Transition/DeviceActivityMonitorExtension/`
+- `ScreenTimeNext/ScreenTime/`
+- `ScreenTimeNext/DeviceActivityMonitorExtension/`
 
 One documented exception: the `FamilyActivityPicker` wrapper view (`docs/DECISIONS.md` D-001).
 

@@ -13,7 +13,7 @@ prd_refs: ["§6.4", "§13"]
 Present Apple's `FamilyActivityPicker` and persist the resulting `FamilyActivitySelection` as the source of truth for protected content.
 
 ## In scope
-- A thin wrapper view in `Transition/ScreenTime/Selection/` that hosts `FamilyActivityPicker`.
+- A thin wrapper view in `ScreenTimeNext/ScreenTime/Selection/` that hosts `FamilyActivityPicker`.
 - Concrete `ScreenTimeSelectionService` that serializes and restores the selection.
 - Replacing the Task 003 mocked selection step with the real one.
 - A display-safe summary (counts of apps / categories / web domains) for the parent dashboard.

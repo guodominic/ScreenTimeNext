@@ -15,11 +15,11 @@ Create the Xcode project, the SwiftUI app target, the DeviceActivityMonitor exte
 **Acceptance:** the project builds and the extension target exists.
 
 ## In scope
-- Xcode project `Transition.xcodeproj` with a SwiftUI app target named `Transition`.
+- Xcode project `ScreenTimeNext.xcodeproj` with a SwiftUI app target named `ScreenTimeNext`.
 - A DeviceActivity monitor extension target named `DeviceActivityMonitorExtension`.
 - A unit test target.
 - Xcode groups mirroring the on-disk layout in Appendix A (`Core/`, `Features/`, `ScreenTime/`, `Shared/`, `DeviceActivityMonitorExtension/`).
-- A single App Group identifier constant in `Transition/Shared/Constants/` shared by both targets.
+- A single App Group identifier constant in `ScreenTimeNext/Shared/Constants/` shared by both targets.
 - Capabilities added to both targets: App Groups; Family Controls where the account permits.
 
 ## Out of scope
@@ -28,7 +28,7 @@ Create the Xcode project, the SwiftUI app target, the DeviceActivityMonitor exte
 - Any UI beyond the default app shell (→ Task 003).
 
 ## PRD detail
-Appendix A defines the folder layout. The layout encodes one rule: `import FamilyControls`, `import DeviceActivity`, and `import ManagedSettings` may appear **only** under `Transition/ScreenTime/` and `Transition/DeviceActivityMonitorExtension/`.
+Appendix A defines the folder layout. The layout encodes one rule: `import FamilyControls`, `import DeviceActivity`, and `import ManagedSettings` may appear **only** under `ScreenTimeNext/ScreenTime/` and `ScreenTimeNext/DeviceActivityMonitorExtension/`.
 
 The repository already contains this directory skeleton with `.gitkeep` files — the task is to make Xcode reference it, not to invent a new layout.
 

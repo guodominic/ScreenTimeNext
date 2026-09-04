@@ -3,8 +3,8 @@
 ## Appendix A — Suggested project structure
 
 ```text
-Transition/
-├── TransitionApp/                     app entry point, root navigation
+ScreenTimeNext/
+├── ScreenTimeNextApp/                     app entry point, root navigation
 ├── Core/
 │   ├── Models/                        pure data models, no framework imports
 │   ├── Services/                      service PROTOCOLS (framework-free)
@@ -30,8 +30,8 @@ Transition/
 ```
 
 **The rule this layout encodes:** `import FamilyControls`, `import DeviceActivity`, and
-`import ManagedSettings` may appear **only** under `Transition/ScreenTime/` and
-`Transition/DeviceActivityMonitorExtension/`. Everywhere else is framework-free and unit-testable.
+`import ManagedSettings` may appear **only** under `ScreenTimeNext/ScreenTime/` and
+`ScreenTimeNext/DeviceActivityMonitorExtension/`. Everywhere else is framework-free and unit-testable.
 (One documented exception exists for the `FamilyActivityPicker` wrapper view — see
 `docs/DECISIONS.md` D-001.)
 

@@ -1,15 +1,15 @@
 //  ScreenTimeAuthorizationService.swift
-//  Transition
+//  ScreenTimeNext
 //
 //  PRD §6.3, §8 — protocol only. Real adapter: Task 004.
-//  Framework-free: imports Foundation only. See Transition/README.md.
+//  Framework-free: imports Foundation only. See ScreenTimeNext/README.md.
 
 import Foundation
 
 /// The app's own authorization vocabulary.
 ///
 /// Deliberately NOT a re-export of a FamilyControls type: Rule 1 keeps framework types out of the
-/// core layer. `Transition/ScreenTime/Authorization/` maps Apple's status onto this. Task 004.
+/// core layer. `ScreenTimeNext/ScreenTime/Authorization/` maps Apple's status onto this. Task 004.
 public enum ScreenTimeAuthorizationStatus: String, Codable, CaseIterable, Sendable {
     case notDetermined
     case approved

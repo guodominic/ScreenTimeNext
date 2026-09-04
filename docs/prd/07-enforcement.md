@@ -36,13 +36,13 @@ Therefore:
 +10 minutes / +20 minutes / Allow Once
    → update local allowance / configuration
        → adjust monitoring as supported by the current SDK
-           → remove ONLY Transition-managed shielding
+           → remove ONLY ScreenTimeNext-managed shielding
                → resume active state
                    → reapply protection when the extension expires
 ```
 
 ### Non-negotiables for this flow
-- Only Transition-managed restrictions are removed. Never clear the whole ManagedSettings store —
+- Only ScreenTimeNext-managed restrictions are removed. Never clear the whole ManagedSettings store —
   other parental-control software and Apple's own Screen Time settings may coexist on the device.
 - Shield/unshield operations must be **idempotent**: applying twice equals applying once.
 - Reapplication on expiry must be reliable even if the app was never reopened.

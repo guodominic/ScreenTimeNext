@@ -8,7 +8,7 @@ PRD section: §6.1–§6.16. This is the reference for **copy, defaults, and con
 
 ### §6.1 Welcome
 - **Headline:** "Make screen time end peacefully."
-- Explain that Transition helps a child move from screen time to what's next.
+- Explain that ScreenTimeNext helps a child move from screen time to what's next.
 - **CTA:** "Get Started"
 
 ### §6.2 Child Profile
@@ -62,7 +62,7 @@ Displays:
 
 ### §6.16 Parent Extension
 - Offers **+10 minutes**, **+20 minutes**, and **Allow Once**.
-- Extension must **only** modify Transition-managed protection and monitoring state.
+- Extension must **only** modify ScreenTimeNext-managed protection and monitoring state.
 
 ---
 

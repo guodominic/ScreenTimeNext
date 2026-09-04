@@ -23,7 +23,7 @@ Implement the full onboarding flow — Welcome → Child → Permission → App 
 
 ## PRD detail
 ### §6.1 Welcome
-Headline **"Make screen time end peacefully."** Explain that Transition helps a child move from screen time to what's next. CTA: **Get Started**.
+Headline **"Make screen time end peacefully."** Explain that ScreenTimeNext helps a child move from screen time to what's next. CTA: **Get Started**.
 
 ### §6.2 Child Profile
 Single child. First name only. Keep it lightweight — no age, no avatar, no account.

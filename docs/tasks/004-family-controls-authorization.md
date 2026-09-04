@@ -13,7 +13,7 @@ prd_refs: ["§6.3", "§8", "§18"]
 Implement the real `AuthorizationCenter` flow behind `ScreenTimeAuthorizationService`, including every authorization state. Do not invent APIs.
 
 ## In scope
-- Concrete `ScreenTimeAuthorizationService` in `Transition/ScreenTime/Authorization/`.
+- Concrete `ScreenTimeAuthorizationService` in `ScreenTimeNext/ScreenTime/Authorization/`.
 - Mapping Apple's authorization status into the app's own domain enum.
 - Graceful handling of: not determined, approved, denied, and revoked-while-running.
 - UI states in the §6.3 screen for each of the above, with a recovery path (open Settings / retry).

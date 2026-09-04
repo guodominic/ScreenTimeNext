@@ -1,8 +1,8 @@
 //  TransitionActivity.swift
-//  Transition
+//  ScreenTimeNext
 //
 //  PRD §6.7, §12 — the fixed V1 activity set.
-//  Framework-free: imports Foundation only. See Transition/README.md.
+//  Framework-free: imports Foundation only. See ScreenTimeNext/README.md.
 
 import Foundation
 

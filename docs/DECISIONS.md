@@ -19,7 +19,7 @@ Honoring Rule 1 literally would mean not using Apple's picker, which §6.4 requi
 the source of truth.
 
 **Decision.** Confine the framework import to a single thin wrapper view under
-`Transition/ScreenTime/Selection/`. That wrapper is the only view in the codebase permitted to
+`ScreenTimeNext/ScreenTime/Selection/`. That wrapper is the only view in the codebase permitted to
 import FamilyControls. Everything in `Features/` receives an opaque, serializable selection snapshot
 plus display-safe summary counts.
 
@@ -77,6 +77,54 @@ that gates presentation. A disabled warning is **entered but not shown**.
 cross every transition with every toggle combination — they test transitions once and presentation
 separately. Task 007 and Task 016 must both consult `shouldPresent` before rendering or scheduling a
 notification; entering `warning5` is not by itself permission to show or notify.
+
+---
+
+## D-005 — Product renamed from "Transition" to "ScreenTimeNext"
+**Date:** 2026-09-04 · **Status:** accepted
+
+**Context.** The PRD was signed under the working name "Transition". The product name was changed
+to **ScreenTimeNext** after the repository was restructured.
+
+**Decision.** Rename the *product* everywhere — targets, source tree (`ScreenTimeNext/`), test target,
+App Group identifier and storage keys (`group.PLACEHOLDER.screentimenext`, `screentimenext.*`), and
+every sentence where "Transition" was the subject. Keep every use of "transition" as a *concept*:
+the `TransitionActivity` type, the "Transition, not punishment" principle, the "Screen Time
+Transition Assistant" category, the §11 transition table, and the "transition experience" half of
+the Definition of Done. The archived `.docx` in `docs/reference/` still says "Transition" and is
+not edited — it is the signed record.
+
+**Consequences.** The App Store listing name is a separate decision (see
+`docs/market-analysis.md` on the "Screen Time" naming risk). If the App Group identifier has
+already been registered under the old name, B-002 covers re-registering it.
+
+---
+
+## D-006 — Session-window vs. usage-accrual budget model
+**Date:** 2026-09-04 · **Status:** proposed — MUST be decided before Task 006 and Task 010
+
+**Context.** The PRD defines the daily budget as a DeviceActivity *usage threshold* (§14), but
+requires the child's countdown to be derived from *absolute timestamps* (§6.10, Rule 4). These are
+two different clocks. The host app cannot read accrued usage — it only learns about it when a
+threshold callback fires in the extension, and those callbacks are documented by third-party
+developers as throttled, delayed or dropped without error (see `docs/market-analysis.md` §三.2).
+So the "7 minutes left" the child sees and the moment the system actually shields can diverge.
+
+**Options.**
+- **A — Session window.** The child taps Start; the budget is a wall-clock window from that
+  instant (`SessionWindow`). Countdown and 10/5/1 notifications are exact and local. DeviceActivity
+  is the enforcement backstop only. Cost: "budget" becomes "one session"; putting the iPad down
+  mid-session still burns time.
+- **B — Multi-threshold events.** Register DeviceActivity events at budget−600, budget−300,
+  budget−60 and budget; the extension writes a timestamp to the App Group and posts a local
+  notification on each. Faithful to the PRD, but stakes all three warnings on unreliable callbacks.
+
+**Recommendation.** Option A for V1: it makes the core experience controllable and confines the
+unreliable part to final enforcement. Revisit once real-device data on callback latency exists.
+
+**Consequences.** Task 006's `DailyUsage` semantics, Task 007's countdown source, Task 010's event
+design and Task 016's notification scheduling all depend on this. Record the choice here before
+starting any of them.
 
 <!-- Template for new entries:
 

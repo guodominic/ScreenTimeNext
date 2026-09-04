@@ -1,7 +1,7 @@
-# PRD — Transition V1
+# PRD — ScreenTimeNext V1
 
 Source of record: `docs/reference/Screen_Time_Transition_Assistant_V1_PRD_Technical_Specification.docx`
-(Working product name: **Transition** · Version 1.0 · September 2026)
+(Working product name: **ScreenTimeNext** — renamed from *Transition* after signing, see `docs/DECISIONS.md` D-005 · Version 1.0 · September 2026)
 
 This directory is the machine-readable split of that document. **Read these files, not the .docx.**
 If the .docx is revised, re-split it here and note the change in `docs/DECISIONS.md`.
@@ -20,6 +20,6 @@ If the .docx is revised, re-split it here and note the change in `docs/DECISIONS
 | [10-appendices.md](10-appendices.md) | Appendix A, B | Folder layout, agent operating rules |
 
 ## The one-line version
-Transition is **not another countdown timer**. It helps a child move from screen time to the
+ScreenTimeNext is **not another countdown timer**. It helps a child move from screen time to the
 next real-world activity with less conflict, and it enforces the end of screen time through
 Apple's Screen Time frameworks. A polished timer without real enforcement is a prototype, not V1.

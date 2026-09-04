@@ -1,8 +1,8 @@
 //  DailyUsage.swift
-//  Transition
+//  ScreenTimeNext
 //
 //  PRD §12 — one day's budget and accrued usage.
-//  Framework-free: imports Foundation only. See Transition/README.md.
+//  Framework-free: imports Foundation only. See ScreenTimeNext/README.md.
 
 import Foundation
 

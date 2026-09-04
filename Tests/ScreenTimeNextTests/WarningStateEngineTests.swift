@@ -1,11 +1,11 @@
 //  WarningStateEngineTests.swift
-//  TransitionTests
+//  ScreenTimeNextTests
 //
 //  Starting tests for the pure state logic. Task 008 must extend these to cover
 //  every transition in the PRD §11 table and every enabled/disabled warning combination.
 
 import XCTest
-@testable import Transition
+@testable import ScreenTimeNext
 
 final class WarningStateEngineTests: XCTestCase {
 

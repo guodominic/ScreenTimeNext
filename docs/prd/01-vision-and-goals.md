@@ -5,11 +5,11 @@ PRD sections: Document Purpose, §1 Executive Summary, §2 Vision & Positioning,
 
 ## Document purpose
 Defines the V1 product requirements, user experience, system architecture, data model,
-Apple Screen Time API integration, testing strategy, and implementation plan for **Transition** —
+Apple Screen Time API integration, testing strategy, and implementation plan for **ScreenTimeNext** —
 a child screen-time transition assistant combined with parental control enforcement.
 
 ## §1 Executive summary
-Transition is not intended to be another countdown timer. Its core promise is to help a child
+ScreenTimeNext is not intended to be another countdown timer. Its core promise is to help a child
 move from screen time to the next real-world activity with less conflict. V1 combines a gentle
 transition experience with Apple's FamilyControls, DeviceActivity, and ManagedSettings so the
 product can both **prepare** the child and **enforce** the end of selected screen time.

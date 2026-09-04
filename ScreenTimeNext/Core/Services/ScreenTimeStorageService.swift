@@ -1,8 +1,8 @@
 //  ScreenTimeStorageService.swift
-//  Transition
+//  ScreenTimeNext
 //
 //  PRD §13 — protocol only. Real adapter: Task 006.
-//  Framework-free: imports Foundation only. See Transition/README.md.
+//  Framework-free: imports Foundation only. See ScreenTimeNext/README.md.
 
 import Foundation
 

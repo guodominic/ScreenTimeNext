@@ -1,8 +1,8 @@
 //  ScreenTimeSelectionService.swift
-//  Transition
+//  ScreenTimeNext
 //
 //  PRD §6.4, §13 — protocol only. Real adapter: Task 005.
-//  Framework-free: imports Foundation only. See Transition/README.md.
+//  Framework-free: imports Foundation only. See ScreenTimeNext/README.md.
 
 import Foundation
 
@@ -30,7 +30,7 @@ public struct SelectionSummary: Codable, Equatable, Sendable {
 /// An opaque, serializable handle to a `FamilyActivitySelection`.
 ///
 /// Rule 7 — the Apple selection remains the source of truth; this wraps it, never replaces it.
-/// Rule 1 — `payload` stays opaque outside `Transition/ScreenTime/Selection/`, which is the only
+/// Rule 1 — `payload` stays opaque outside `ScreenTimeNext/ScreenTime/Selection/`, which is the only
 /// place that knows how to encode and decode it. Never build an app-name-to-bundle-ID map (PRD §13).
 public struct SelectionSnapshot: Codable, Equatable, Sendable {
     public let payload: Data

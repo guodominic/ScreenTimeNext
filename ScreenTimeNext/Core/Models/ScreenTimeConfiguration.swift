@@ -1,8 +1,8 @@
 //  ScreenTimeConfiguration.swift
-//  Transition
+//  ScreenTimeNext
 //
 //  PRD §12, §6.5, §6.6 — parent-configured settings.
-//  Framework-free: imports Foundation only. See Transition/README.md.
+//  Framework-free: imports Foundation only. See ScreenTimeNext/README.md.
 
 import Foundation
 

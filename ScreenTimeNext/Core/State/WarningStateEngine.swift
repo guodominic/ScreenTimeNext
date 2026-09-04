@@ -1,8 +1,8 @@
 //  WarningStateEngine.swift
-//  Transition
+//  ScreenTimeNext
 //
 //  PRD §11 — deterministic state transitions. Task 008.
-//  Framework-free: imports Foundation only. See Transition/README.md.
+//  Framework-free: imports Foundation only. See ScreenTimeNext/README.md.
 
 import Foundation
 

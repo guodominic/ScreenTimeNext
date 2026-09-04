@@ -1,8 +1,8 @@
 //  ScreenTimeMonitoringService.swift
-//  Transition
+//  ScreenTimeNext
 //
 //  PRD §14 — protocol only. Real adapter: Task 010.
-//  Framework-free: imports Foundation only. See Transition/README.md.
+//  Framework-free: imports Foundation only. See ScreenTimeNext/README.md.
 
 import Foundation
 

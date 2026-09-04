@@ -1,4 +1,4 @@
-# Transition — source layout
+# ScreenTimeNext — source layout
 
 This tree follows PRD Appendix A. The layout exists to enforce one rule.
 
@@ -7,7 +7,7 @@ This tree follows PRD Appendix A. The layout exists to enforce one rule.
 `import FamilyControls`, `import DeviceActivity`, and `import ManagedSettings` may appear **only** in:
 
 - `ScreenTime/` — the four adapter directories
-- `../Transition/DeviceActivityMonitorExtension/` — the monitor extension
+- `../ScreenTimeNext/DeviceActivityMonitorExtension/` — the monitor extension
 
 Everything else is framework-free. That is not stylistic: it is what lets `Core/`, `Features/` and
 `Shared/` build, run and unit-test **without an entitlement and without a device**, while the Family
@@ -20,7 +20,7 @@ One documented exception: the `FamilyActivityPicker` wrapper view under `ScreenT
 
 | Path | Contains | Imports |
 |---|---|---|
-| `TransitionApp/` | App entry point, root navigation | SwiftUI |
+| `ScreenTimeNextApp/` | App entry point, root navigation | SwiftUI |
 | `Core/Models/` | Pure data models (§12) | Foundation |
 | `Core/Services/` | Service **protocols** and domain enums | Foundation |
 | `Core/Repositories/` | Persistence-facing abstractions | Foundation |
