@@ -12,22 +12,33 @@ workaround or silently change the architecture around it.
 ---
 
 ## B-001 — Family Controls entitlement
-**Status:** open · **Owner:** — · **Raised:** 2026-09-04 · **Blocks:** 004, 005, 010, 011, 012, 019
+**Status:** in progress · **Owner:** Dominic · **Raised:** 2026-09-04 · **Blocks:** 004, 005, 010, 011, 012, 019 (distribution/TestFlight only — development entitlement is immediate)
 
 Family Controls distribution requires an Apple entitlement and approval process (§18). Without it,
-authorization, the picker, monitoring, and shielding cannot be exercised on a real build.
+TestFlight and App Store builds cannot ship. **Development entitlement is immediate** and unblocks
+real-device work on Tasks 004–013.
 
 **This is calendar time, not engineering time, and it is the largest schedule risk in V1.**
 
-**Required manual step.** Submit the entitlement request to Apple with a written justification of
-the legitimate parental-control purpose and a description of how FamilyControls, DeviceActivity, and
-ManagedSettings are each used. Verify the exact entitlement name against current Apple developer
-documentation before submitting.
+**Current state (2026-09-04).** No paid Apple Developer Program membership yet. No company is
+required — an individual account's Account Holder can request it. Full material package,
+paste-ready form answers and the ordered checklist are in `docs/entitlement-request.md`.
 
-**Meanwhile.** Tasks 003, 006, 007, 008, 009, 014, 015 do not need the entitlement. Keep the
-experience half moving — while remembering §22: that half alone is a prototype.
+**Required manual steps, in order.**
+1. Enroll in the Apple Developer Program as an individual ($99/yr, Apple Developer app, ID verification).
+2. Push the repository to GitHub (used as the "developer website").
+3. Register two App IDs + one App Group ID (`docs/entitlement-request.md` §三).
+4. Create the App Store Connect record; point its privacy policy URL at `PRIVACY.md`.
+5. Submit the distribution request **twice** — main app and DeviceActivityMonitor extension.
+6. Record submission date and case ID below; check Capability Requests weekly.
 
-**Request date:** —
+**Meanwhile.** Tasks 001–003, 006–009, 014, 015 need no entitlement; Tasks 004–013 can proceed on
+a physical device with the development entitlement. Remember §22: the experience half alone is a
+prototype.
+
+**Enrollment date:** —
+**Request submitted (main app):** —
+**Request submitted (extension):** —
 **Response date:** —
 
 ---

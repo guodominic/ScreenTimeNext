@@ -77,6 +77,8 @@ A UI-only timer is only a prototype.
 | `docs/DECISIONS.md` | Why things are the way they are |
 | `docs/BLOCKERS.md` | What code cannot fix (entitlements, approvals, device tests) |
 | `docs/market-analysis.md` | Feasibility and market judgement (for humans, not the agent) |
+| `docs/entitlement-request.md` | Family Controls entitlement: checklist + paste-ready form answers |
+| `PRIVACY.md` | Privacy policy — DRAFT until Task 018 audits it |
 | `docs/reference/` | The signed .docx PRD, archived |
 | `ScreenTimeNext/` | App source. See `ScreenTimeNext/README.md` for the import boundary. |
 | `Tests/` | Unit tests |

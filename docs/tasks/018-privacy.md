@@ -15,7 +15,7 @@ Audit all logging and data collection, then produce `PRIVACY.md` at the reposito
 ## In scope
 - A full sweep of logging, analytics, crash reporting, and any network call in the codebase.
 - Verification that no FamilyActivity tokens or selection contents are logged.
-- `PRIVACY.md` documenting App Group usage and each Screen Time API's purpose.
+- Audit and finalize the existing **draft** `PRIVACY.md` (written 2026-09-04 for the entitlement request and App Store Connect) against the shipped code; every statement in it is a commitment to verify, not a description to trust.
 - The data-collection answers needed for the App Store privacy questionnaire (used by Task 019).
 
 ## Out of scope

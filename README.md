@@ -40,7 +40,9 @@ docs/
 ├── DECISIONS.md          why things are the way they are
 ├── BLOCKERS.md           what code cannot fix
 ├── market-analysis.md    feasibility & market judgement
+├── entitlement-request.md  Family Controls entitlement checklist + form answers
 └── reference/            the signed .docx PRD, archived
+PRIVACY.md                privacy policy (DRAFT until Task 018)
 ScreenTimeNext/               app source (see ScreenTimeNext/README.md)
 Tests/                    unit tests
 ```
