@@ -1,0 +1,42 @@
+//  ReadyStepView.swift — PRD §6.8. The only step that persists anything.
+import SwiftUI
+import ScreenTimeNextCore
+
+struct ReadyStepView: View {
+    @Bindable var viewModel: OnboardingViewModel
+    let onComplete: () -> Void
+
+    private var name: String { viewModel.draft.trimmedChildName }
+    private var minutes: Int { viewModel.draft.dailyBudgetSeconds / 60 }
+
+    var body: some View {
+        OnboardingStepScaffold(
+            title: "\(name) is all set",
+            buttonTitle: "Finish",
+            action: {
+                if viewModel.finish() { onComplete() }
+            }
+        ) {
+            VStack(alignment: .leading, spacing: 16) {
+                Label("\(minutes) minutes of screen time each day", systemImage: "clock")
+                Label("Gentle warnings before time ends", systemImage: "bell")
+                Label("\(name) picks what to do next", systemImage: "sparkles")
+                if let activities = nonEmptyActivities {
+                    Text(activities)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .padding(.leading, 32)
+                }
+            }
+            if let error = viewModel.commitError {
+                Text(error).foregroundStyle(.red).font(.footnote)
+            }
+        }
+        .navigationBarBackButtonHidden(false)
+    }
+
+    private var nonEmptyActivities: String? {
+        let names = viewModel.draft.configuration.selectedActivities.map(\.displayName)
+        return names.isEmpty ? nil : names.joined(separator: " · ")
+    }
+}
