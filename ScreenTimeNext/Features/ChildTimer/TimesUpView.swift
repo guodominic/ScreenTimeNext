@@ -23,12 +23,17 @@ struct TimesUpView: View {
             if let activity = chosenActivity {
                 ZStack {
                     Sparkles(color: Theme.color(for: activity))
-                    Image(systemName: activity.symbolName)
-                        .font(.system(size: 56))
-                        .foregroundStyle(.white)
-                        .frame(width: 120, height: 120)
-                        .background(Circle().fill(Theme.color(for: activity)))
-                        .bounceIn(delay: 0.15)
+                    HStack(spacing: -14) {
+                        Mascot(mood: .cheering, size: 118, tint: Theme.color(for: activity))
+                        Image(systemName: activity.symbolName)
+                            .font(.system(size: 44))
+                            .foregroundStyle(.white)
+                            .frame(width: 92, height: 92)
+                            .background(Circle().fill(Theme.color(for: activity)))
+                            .overlay(Circle().stroke(.white.opacity(0.5), lineWidth: 2))
+                            .offset(y: 14)
+                    }
+                    .bounceIn(delay: 0.15)
                 }
                 .frame(height: 200)
                 Text("You chose \(activity.displayName).")
@@ -38,8 +43,13 @@ struct TimesUpView: View {
                     .font(.system(.title, design: .rounded).bold())
                     .bounceIn(delay: 0.4)
             } else if budgetSpentEarlier {
-                Image(systemName: "moon.stars.fill").font(.system(size: 64)).foregroundStyle(Theme.lavender)
-                    .floating().bounceIn(delay: 0.1)
+                ZStack(alignment: .topTrailing) {
+                    Mascot(mood: .sleepy, size: 128, tint: Theme.lavender)
+                    Image(systemName: "moon.stars.fill")
+                        .font(.title2).foregroundStyle(Theme.sun)
+                        .offset(x: 16, y: -6)
+                }
+                .bounceIn(delay: 0.1)
                 Text("You've used today's screen time.")
                     .font(.title3)
                     .foregroundStyle(.secondary)
@@ -50,9 +60,7 @@ struct TimesUpView: View {
             } else {
                 ZStack {
                     Sparkles()
-                    Image(systemName: "hands.clap.fill").font(.system(size: 56)).foregroundStyle(.white)
-                        .frame(width: 120, height: 120)
-                        .background(Circle().fill(Theme.mint))
+                    Mascot(mood: .cheering, size: 128, tint: Theme.mint)
                         .bounceIn(delay: 0.15)
                 }
                 .frame(height: 200)

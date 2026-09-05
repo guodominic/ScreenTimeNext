@@ -43,6 +43,9 @@ struct OnboardingStepScaffold<Content: View>: View {
     var subtitle: String? = nil
     var symbol: String = "sparkles"
     var color: Color = Theme.sky
+    /// When set, Pip appears instead of the symbol chip — used on the steps that talk *about* the
+    /// child, so the parent is looking at a character rather than an icon.
+    var mascot: MascotMood? = nil
     let buttonTitle: String
     var buttonEnabled: Bool = true
     let action: () -> Void
@@ -50,18 +53,22 @@ struct OnboardingStepScaffold<Content: View>: View {
 
     var body: some View {
         ZStack {
-            LinearGradient(colors: [color.opacity(0.25), Color(.systemGroupedBackground)],
+            LinearGradient(colors: [color.opacity(0.30), Color(.systemGroupedBackground)],
                            startPoint: .top, endPoint: .center)
                 .ignoresSafeArea()
+            PlayfulBackground(tint: color, intensity: 0.75)
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    Image(systemName: symbol)
-                        .font(.system(size: 34, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(width: 64, height: 64)
-                        .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(color))
-                        .padding(.bottom, 4)
-                        .bounceIn()
+                    Group {
+                        if let mascot {
+                            Mascot(mood: mascot, size: 104, tint: color)
+                                .frame(maxWidth: .infinity, alignment: .center)
+                        } else {
+                            IconChip(symbol: symbol, color: color, size: 64)
+                        }
+                    }
+                    .padding(.bottom, 4)
+                    .bounceIn()
                     Text(title)
                         .font(.system(.largeTitle, design: .rounded).bold())
                         .bounceIn(delay: 0.06)

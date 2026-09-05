@@ -10,6 +10,7 @@ struct WelcomeStepView: View {
             title: "Make screen time end peacefully.",
             symbol: "sun.max.fill",
             color: Theme.sky,
+            mascot: .happy,
             buttonTitle: "Get Started",
             action: { viewModel.advance(to: .childProfile) }
         ) {

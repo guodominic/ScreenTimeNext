@@ -24,12 +24,18 @@ struct ShieldCardView: View {
 
     var body: some View {
         VStack(spacing: 20) {
-            Image(systemName: presentation.symbolName)
-                .font(.system(size: 44, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: 96, height: 96)
-                .background(Circle().fill(tint))
-                .bounceIn()
+            ZStack(alignment: .bottomTrailing) {
+                Mascot(mood: presentation.primaryButtonContinues ? .thinking : .cheering,
+                       size: 104, tint: tint, animated: false)
+                Image(systemName: presentation.symbolName)
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 44, height: 44)
+                    .background(Circle().fill(tint))
+                    .overlay(Circle().stroke(.white, lineWidth: 2.5))
+                    .offset(x: 6, y: 2)
+            }
+            .bounceIn()
 
             Text(presentation.title)
                 .font(.system(.title2, design: .rounded).bold())

@@ -16,6 +16,7 @@ struct ReadyStepView: View {
             title: "\(name) is all set",
             symbol: "party.popper.fill",
             color: Theme.mint,
+            mascot: .cheering,
             buttonTitle: finishing ? "Finishing…" : "Finish",
             buttonEnabled: !finishing,
             action: {

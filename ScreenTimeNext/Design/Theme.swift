@@ -88,11 +88,53 @@ struct CardStyle: ViewModifier {
         content
             .padding(18)
             .background(
+                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                    .fill(Color(.secondarySystemGroupedBackground))
+                    .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous).fill(tint.opacity(0.14)))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 28, style: .continuous)
+                            .stroke(tint == .clear ? Color.primary.opacity(0.06) : tint.opacity(0.30), lineWidth: 2)
+                    )
+            )
+            .shadow(color: (tint == .clear ? Color.black : tint).opacity(0.10), radius: 10, y: 4)
+    }
+}
+
+/// A round, chunky icon chip — the friendlier replacement for a bare SF Symbol in a list row.
+struct IconChip: View {
+    let symbol: String
+    var color: Color = Theme.sky
+    var size: CGFloat = 34
+
+    var body: some View {
+        Image(systemName: symbol)
+            .font(.system(size: size * 0.5, weight: .bold))
+            .foregroundStyle(.white)
+            .frame(width: size, height: size)
+            .background(
+                Circle()
+                    .fill(LinearGradient(colors: [color, color.opacity(0.75)], startPoint: .top, endPoint: .bottom))
+            )
+            .overlay(Circle().stroke(.white.opacity(0.55), lineWidth: 1.5))
+            .shadow(color: color.opacity(0.35), radius: 3, y: 2)
+    }
+}
+
+/// A small speech bubble, so Pip can actually say things.
+struct SpeechBubble<Content: View>: View {
+    var color: Color = Theme.sky
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        content()
+            .padding(.horizontal, 18)
+            .padding(.vertical, 12)
+            .background(
                 RoundedRectangle(cornerRadius: 22, style: .continuous)
                     .fill(Color(.secondarySystemGroupedBackground))
-                    .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(tint.opacity(0.12)))
+                    .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).stroke(color.opacity(0.35), lineWidth: 2))
             )
-            .shadow(color: .black.opacity(0.05), radius: 8, y: 3)
+            .shadow(color: color.opacity(0.18), radius: 8, y: 3)
     }
 }
 
@@ -105,14 +147,20 @@ struct PillButtonStyle: ButtonStyle {
     var color: Color = Theme.sky
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.title3.bold())
+            .font(.system(.title3, design: .rounded).bold())
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
-            .background(Capsule().fill(color))
-            .opacity(configuration.isPressed ? 0.85 : 1)
-            .scaleEffect(configuration.isPressed ? 0.98 : 1)
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+            .padding(.vertical, 17)
+            .background(
+                Capsule()
+                    .fill(LinearGradient(colors: [color, color.opacity(0.82)], startPoint: .top, endPoint: .bottom))
+                    .overlay(Capsule().stroke(.white.opacity(0.35), lineWidth: 2))
+            )
+            .shadow(color: color.opacity(configuration.isPressed ? 0.15 : 0.40),
+                    radius: configuration.isPressed ? 3 : 10,
+                    y: configuration.isPressed ? 1 : 5)
+            .scaleEffect(configuration.isPressed ? 0.96 : 1)
+            .animation(.spring(response: 0.25, dampingFraction: 0.6), value: configuration.isPressed)
     }
 }
 

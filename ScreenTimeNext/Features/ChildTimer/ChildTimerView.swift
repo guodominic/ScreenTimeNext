@@ -25,7 +25,7 @@ struct ChildTimerView: View {
 
     var body: some View {
         ZStack {
-            Theme.gradient(for: snapshot.state).ignoresSafeArea()
+            ChildBackdrop(color: color)
             ScrollView {
                 VStack(spacing: 24) {
                     content
@@ -61,24 +61,30 @@ struct ChildTimerView: View {
     private var content: some View {
         switch snapshot.state {
         case .idle:
-            Spacer(minLength: 24)
-            Image(systemName: "sun.max.fill").font(.system(size: 72)).foregroundStyle(Theme.sun)
-                .floating()
-            headline("Hi \(name)!")
-            subline("You have \(minutesText(snapshot.remainingSeconds)) of screen time today.")
+            Spacer(minLength: 12)
+            Mascot(mood: .happy, size: 150 * sizeClass.controlScale, tint: Theme.sky)
+            SpeechBubble(color: Theme.sky) {
+                VStack(spacing: 6) {
+                    Text("Hi \(name)!").font(.system(.title, design: .rounded).bold())
+                    Text("You have \(minutesText(snapshot.remainingSeconds)) of screen time today.")
+                        .font(.title3).foregroundStyle(.secondary)
+                }
+            }
+            .bounceIn(delay: 0.1)
             Button { viewModel.start() } label: { Label("Start", systemImage: "play.fill") }
                 .buttonStyle(PillButtonStyle(color: Theme.mint))
                 .padding(.top, 8)
 
         case .active:
             ring(big: true)
-            subline("Enjoy your screen time, \(name).")
+            mascotRow(.playing, "Enjoy your screen time, \(name).")
 
         case .extended:
             ring(big: true)
-            subline("You've got some extra time, \(name)!")
+            mascotRow(.playing, "You've got some extra time, \(name)!")
 
         case .firstWarning:
+            Mascot(mood: .thinking, size: 108 * sizeClass.controlScale, tint: color)
             headline("\(remainingMinutesText) left 👋")
             subline("You're almost done. What do you want to do next?")
             WhatsNextChooser(
@@ -89,6 +95,7 @@ struct ChildTimerView: View {
             ring(big: false)
 
         case .secondWarning:
+            Mascot(mood: .playing, size: 100 * sizeClass.controlScale, tint: color)
             headline("\(remainingMinutesText) left")
             subline("Time to finish up what you're doing.")
             if let activity = snapshot.chosenActivity { ChosenActivityBadge(activity: activity) }
@@ -99,6 +106,7 @@ struct ChildTimerView: View {
             subline("Finish your game.")
             if let activity = snapshot.chosenActivity { ChosenActivityBadge(activity: activity) }
             ring(big: true).pulsing()
+            Mascot(mood: .hurrying, size: 92 * sizeClass.controlScale, tint: color)
 
         case .finished:
             TimesUpView(childName: name,
@@ -121,6 +129,17 @@ struct ChildTimerView: View {
 
     private func subline(_ text: String) -> some View {
         Text(text).font(.title3).foregroundStyle(.secondary)
+    }
+
+    /// Pip alongside a line of encouragement — used while time is simply running.
+    private func mascotRow(_ mood: MascotMood, _ text: String) -> some View {
+        HStack(spacing: 14) {
+            Mascot(mood: mood, size: 78 * sizeClass.controlScale, tint: color)
+            SpeechBubble(color: color) {
+                Text(text).font(.headline).foregroundStyle(.secondary)
+            }
+        }
+        .bounceIn(delay: 0.1)
     }
 
     /// Countdown inside a progress ring; the ring is remaining ÷ window total. Big and bold —

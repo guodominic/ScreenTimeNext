@@ -55,18 +55,6 @@ struct ParentDashboardView: View {
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active { viewModel.reload() }
             }
-            .confirmationDialog("End today's session now?", isPresented: $confirmEndSession, titleVisibility: .visible) {
-                Button("End session", role: .destructive) { viewModel.endSession() }
-                Button("Keep going", role: .cancel) {}
-            } message: {
-                Text("The time used so far counts toward today's budget.")
-            }
-            .confirmationDialog("Start over?", isPresented: $confirmReset, titleVisibility: .visible) {
-                Button("Erase and start over", role: .destructive) { onReset() }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("Erases \(name)'s profile and all settings on this device. This cannot be undone.")
-            }
             .sheet(isPresented: $showShieldPreview) {
                 ShieldPreviewView(childName: viewModel.profile?.name ?? "your child",
                                   activities: viewModel.configuration.selectedActivities.isEmpty
@@ -86,8 +74,8 @@ struct ParentDashboardView: View {
 
     private var heroSection: some View {
         Section {
-            HStack(spacing: 20) {
-                ZStack {
+            HStack(spacing: 16) {
+                ZStack(alignment: .bottomLeading) {
                     ProgressRing(fraction: viewModel.remainingFraction, lineWidth: 12, color: .white.opacity(0.95))
                     VStack(spacing: 0) {
                         Text(ChildTimerView.clock(viewModel.session.window != nil ? viewModel.session.remainingSeconds : viewModel.remainingTodaySeconds))
@@ -98,6 +86,8 @@ struct ParentDashboardView: View {
                             .font(.caption2.weight(.semibold))
                             .opacity(0.85)
                     }
+                    Mascot(mood: heroMood, size: 52, tint: .white, animated: false)
+                        .offset(x: -10, y: 8)
                 }
                 .frame(width: 120, height: 120)
 
@@ -120,6 +110,16 @@ struct ParentDashboardView: View {
         }
     }
 
+    private var heroMood: MascotMood {
+        switch viewModel.session.state {
+        case .idle: return .happy
+        case .finished: return .sleepy
+        case .firstWarning, .secondWarning: return .thinking
+        case .finalWarning: return .hurrying
+        default: return .playing
+        }
+    }
+
     private var sessionSymbol: String {
         switch viewModel.session.state {
         case .idle: return "pause.circle.fill"
@@ -139,20 +139,32 @@ struct ParentDashboardView: View {
     private var childSection: some View {
         Section {
             Button(action: onOpenTimer) {
-                Label("Open child timer", systemImage: "hourglass")
-                    .foregroundStyle(Theme.mint)
-                    .fontWeight(.semibold)
+                HStack(spacing: 12) {
+                    IconChip(symbol: "hourglass", color: Theme.mint)
+                    Text("Open child timer").fontWeight(.semibold).foregroundStyle(Theme.mint)
+                }
             }
             if viewModel.canExtend {
                 Button { showExtend = true } label: {
-                    Label("Extend time", systemImage: "plus.circle.fill")
-                        .foregroundStyle(Theme.lavender)
-                        .fontWeight(.semibold)
+                    HStack(spacing: 12) {
+                        IconChip(symbol: "plus", color: Theme.lavender)
+                        Text("Extend time").fontWeight(.semibold).foregroundStyle(Theme.lavender)
+                    }
                 }
             }
             if viewModel.sessionIsRunning {
                 Button(role: .destructive) { confirmEndSession = true } label: {
-                    Label("End session now", systemImage: "stop.circle.fill")
+                    HStack(spacing: 12) {
+                        IconChip(symbol: "stop.fill", color: .red)
+                        Text("End session now").fontWeight(.semibold).foregroundStyle(.red)
+                    }
+                }
+                // Anchored to the button so the iPad popover points at it (Dominic, 2026-09-05).
+                .confirmationDialog("End today's session now?", isPresented: $confirmEndSession, titleVisibility: .visible) {
+                    Button("End session", role: .destructive) { viewModel.endSession() }
+                    Button("Keep going", role: .cancel) {}
+                } message: {
+                    Text("The time used so far counts toward today's budget.")
                 }
             }
         } header: {
@@ -172,9 +184,10 @@ struct ParentDashboardView: View {
                     .listRowBackground(Color.clear)
             }
             Button { showShieldPreview = true } label: {
-                Label("Preview the transition screen", systemImage: "rectangle.inset.filled.and.person.filled")
-                    .foregroundStyle(Theme.coral)
-                    .fontWeight(.semibold)
+                HStack(spacing: 12) {
+                    IconChip(symbol: "sparkles", color: Theme.coral)
+                    Text("Preview the transition screen").fontWeight(.semibold).foregroundStyle(Theme.coral)
+                }
             }
         } header: {
             Text("Protected content")
@@ -189,9 +202,10 @@ struct ParentDashboardView: View {
                 Text("All activities offered").foregroundStyle(.secondary)
             } else {
                 ForEach(viewModel.configuration.selectedActivities) { activity in
-                    Label(activity.displayName, systemImage: activity.symbolName)
-                        .foregroundStyle(Theme.color(for: activity))
-                        .fontWeight(.medium)
+                    HStack(spacing: 12) {
+                        IconChip(symbol: activity.symbolName, color: Theme.color(for: activity), size: 30)
+                        Text(activity.displayName).fontWeight(.medium)
+                    }
                 }
             }
         }
@@ -223,7 +237,20 @@ struct ParentDashboardView: View {
 
     private var dangerSection: some View {
         Section {
-            Button("Start over", role: .destructive) { confirmReset = true }
+            Button(role: .destructive) { confirmReset = true } label: {
+                HStack(spacing: 12) {
+                    IconChip(symbol: "arrow.counterclockwise", color: .red)
+                    Text("Start over").fontWeight(.semibold).foregroundStyle(.red)
+                }
+            }
+            // Anchored here, not on the List: on iPad an unanchored confirmationDialog drifts to
+            // the screen edge instead of pointing at the button.
+            .confirmationDialog("Start over?", isPresented: $confirmReset, titleVisibility: .visible) {
+                Button("Erase and start over", role: .destructive) { onReset() }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Erases \(name)'s profile and all settings on this device. This cannot be undone.")
+            }
         } footer: {
             Text("Erases the child profile and all settings on this device.")
         }
@@ -240,6 +267,7 @@ struct ExtendTimeSheet: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 20) {
+                Mascot(mood: .cheering, size: 84, tint: Theme.lavender)
                 Text("Give \(childName) more time")
                     .font(.system(.title2, design: .rounded).bold())
                 MinuteDial(minutes: $minutes, range: 2...120, step: 2, color: Theme.lavender)

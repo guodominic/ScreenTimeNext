@@ -12,6 +12,7 @@ struct ChildProfileStepView: View {
             subtitle: "Just a first name. It stays on this device.",
             symbol: "face.smiling.fill",
             color: Theme.lavender,
+            mascot: .thinking,
             buttonTitle: "Continue",
             buttonEnabled: viewModel.draft.isChildNameValid,
             action: { viewModel.advance(to: .permission) }
