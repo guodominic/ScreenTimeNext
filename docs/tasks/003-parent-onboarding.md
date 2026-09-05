@@ -1,7 +1,7 @@
 ---
 task: "003"
 title: Parent Onboarding
-status: not_started        # not_started | in_progress | blocked | done
+status: done               # not_started | in_progress | blocked | done  (QA-01 manual walkthrough pending)
 depends_on: ["002"]
 qa_criteria: ["QA-01"]
 prd_refs: ["§6.1–§6.8", "§5", "§7"]
@@ -63,15 +63,27 @@ Show the child's name and the configured daily budget. Explain that the app will
 - [ ] No view imports a Screen Time framework.
 
 ## Completion report
-Append the result here when the task finishes. Do not edit earlier tasks' reports.
 
-- **Files changed:**
-- **Build result:**
-- **Tests run:**
-- **Verdict:** PASS / FAIL / BLOCKED / NEEDS MANUAL DEVICE TEST
-- **Platform limitations or manual steps:**
-- **Follow-up work:**
+**2026-09-05 — Claude; verified by Dominic (`./scripts/test.sh`, `./scripts/build.sh`).**
 
-> After finishing: update `status:` in this file's front-matter, update
-> `docs/tasks/PROGRESS.md`, and log any new decision in `docs/DECISIONS.md`
-> or new blocker in `docs/BLOCKERS.md`.
+- **Files changed:** package `State/OnboardingDraft.swift` (+ `OnboardingDraftTests`, 6 tests);
+  app `Features/Onboarding/{OnboardingViewModel,OnboardingFlow}.swift` and `Steps/` (8 step views
+  with §6.1–§6.8 copy and defaults); `Features/ParentDashboard/HomePlaceholderView.swift`
+  (placeholder until Task 014); `ScreenTimeNextApp/RootView.swift` (routes onboarding vs home).
+- **Build result:** `./scripts/build.sh` — BUILD OK.
+- **Tests run:** `./scripts/test.sh` — **32 tests, 0 failures**.
+- **Verdict:** **PASS** (automated) · **NEEDS MANUAL DEVICE TEST** for the QA-01 end-to-end walkthrough
+  (⌘R, Welcome → Finish, including going back to change the name and confirming it is kept).
+- **Platform limitations or manual steps:** Phase 0 storage is in-memory, so relaunching the app
+  restarts onboarding — by design until Task 006 adds local persistence. The picker step is a
+  sample-selection button; Task 005 replaces `SelectionPickerButton` with the FamilyActivityPicker
+  wrapper (D-001) without touching the step's data flow.
+- **Follow-up work:** Task 006 (persist across relaunch, then "resume partial setup" becomes
+  meaningful); Task 009 defines the empty-activities fallback (onboarding only hints, does not block).
+
+### DoD status
+- [ ] **QA-01** — a parent can complete onboarding end to end — *manual walkthrough pending*
+- [x] All eight screens match §6.1–§6.8 defaults and copy.
+- [x] Back navigation preserves entered data (single draft held by the view model behind a NavigationStack).
+- [x] Flow works with mock services only — no entitlement required to run it.
+- [x] No view imports a Screen Time framework (`scripts/check-imports.sh`).
