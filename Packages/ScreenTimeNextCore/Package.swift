@@ -14,7 +14,7 @@ import PackageDescription
 let package = Package(
     name: "ScreenTimeNextCore",
     platforms: [
-        .iOS(.v18),
+        .iOS("18.0"),
     ],
     products: [
         .library(name: "ScreenTimeNextCore", targets: ["ScreenTimeNextCore"]),
