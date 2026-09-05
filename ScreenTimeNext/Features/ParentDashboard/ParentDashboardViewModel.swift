@@ -67,6 +67,17 @@ final class ParentDashboardViewModel {
         refreshSession()
     }
 
+    /// Task 013 (session half, D-010). Phase 1 adds: remove ScreenTimeNext-managed shield,
+    /// adjust monitoring, reapply on expiry — all through the same protocols.
+    func extend(minutes: Int) {
+        guard (try? controller.extend(bySeconds: minutes * 60)) != nil else { return }
+        _ = try? services.shield.removeShield()
+        try? services.storage.save(ProtectionState.temporarilyExtended)
+        reload()
+    }
+
+    var canExtend: Bool { session.window != nil }
+
     // MARK: Presentation helpers
 
     var sessionStatusText: String {

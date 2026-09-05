@@ -210,6 +210,33 @@ stored, and what the child sees if the parent approved no activities in §6.7.
 `activity.invitation`. If a future version wants the child to pick earlier (during `active`), that
 is a UI change only.
 
+---
+
+## D-010 — Parent extension: +10/+20 in Phase 0 as window extensions; Allow Once deferred
+**Date:** 2026-09-05 · **Status:** accepted (Task 013, session half)
+
+**Context.** PRD §6.16 offers +10, +20 and Allow Once. Under the session-window model (D-006), +N
+is simply "move the window's end forward" — pure logic, no entitlement, and exactly what a family in
+Phase 0 validation will ask for. Allow Once, by contrast, only means something with a real shield
+("let this shielded app open once"); it cannot be defined honestly without ManagedSettings.
+
+**Decision.**
+- Phase 0 implements **+10 / +20 minutes** via `SessionController.extend(bySeconds:)`. Stacking is
+  allowed (each grant adds). The session state passes through `.extended` and resumes at the natural
+  stage; notifications are re-derived from the new end. Extending a *finished* session reopens it —
+  the child is told they've got extra time.
+- Extensions count against nothing: they are explicitly parent-granted time beyond the budget.
+  `remainingBudgetSeconds()` clamps at zero, so the dashboard shows "Remaining today: 0:00" while
+  the child timer shows the extra minutes.
+- **Allow Once is deferred to Phase 1** (Task 013's shield half). Proposed definition to confirm
+  then: a single re-open of one shielded app, ending when that app is closed or after 5 minutes,
+  whichever is first; once per day.
+- Reapplying protection on expiry is Phase 1 (rides on DeviceActivity, Rule 3).
+
+**Consequences.** The dashboard's "Extend time" row becomes a menu (+10 / +20) behind a
+confirmation; the mock shield's state is set to `temporarilyExtended` for the duration so the
+Phase 1 swap is a service change only.
+
 <!-- Template for new entries:
 
 ## D-NNN — <short imperative title>

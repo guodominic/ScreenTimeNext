@@ -22,10 +22,10 @@ in the same commit as the work. If this file and a task's front-matter disagree,
 | 010 | [Device Activity Monitor](010-device-activity-monitor.md) | not_started | 005, 006 | — | — | likely device-test only |
 | 011 | [Managed Settings Shield](011-managed-settings-shield.md) | not_started | 005 | QA-10 | — | |
 | 012 | [Enforcement Integration](012-enforcement-integration.md) | not_started | 010, 011 | QA-09 | — | **the V1 make-or-break task** |
-| 013 | [Parent Extension](013-parent-extension.md) | not_started | 012 | QA-11 | — | |
+| 013 | [Parent Extension](013-parent-extension.md) | in_progress | 012 | QA-11 | PASS (session half) / BLOCKED by gate (shield half) | +10/+20 in Phase 0; Allow Once deferred (D-010) |
 | 014 | [Parent Dashboard](014-parent-dashboard.md) | done | 006, 011 | — | PASS | + SettingsView; Extend row disabled until 013; batched run |
 | 015 | [Time's Up Experience](015-times-up-experience.md) | done | 009 | — | PASS | TimesUpView; batched run |
-| 016 | [Notifications & Background](016-notifications-background.md) | not_started | 008, 012 | — | — | |
+| 016 | [Notifications & Background](016-notifications-background.md) | done | 008, 012 | — | PASS / device check pending | local notifications — needed in Phase 0 |
 | 017 | [Edge Cases](017-edge-cases.md) | not_started | 012, 013, 016 | QA-12, QA-13, QA-14 | — | |
 | 018 | [Privacy Audit](018-privacy.md) | not_started | 017 | QA-15 | — | produces `PRIVACY.md` |
 | 019 | [App Store Readiness](019-app-store-readiness.md) | not_started | 018 | — | — | entitlement gate |
@@ -80,7 +80,7 @@ but remember §22: that half alone is a prototype, not V1.
 
 | Half | State |
 |---|---|
-| Coherent transition experience | Phase 0 feature-complete pending device check: 001–003, 006–009, 014, 015 done |
+| Coherent transition experience | Phase 0 feature-complete pending device check: 001–003, 006–009, 013 (session half), 014–016 done |
 | Real Screen Time enforcement | not started |
 
 Both must be complete. Neither alone is V1.

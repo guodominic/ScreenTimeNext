@@ -62,9 +62,13 @@ struct ChildTimerView: View {
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
 
-        case .active, .extended:
+        case .active:
             bigTime(snapshot.remainingSeconds)
             subline("Enjoy your screen time, \(name).")
+
+        case .extended:
+            bigTime(snapshot.remainingSeconds)
+            subline("You've got some extra time, \(name)!")
 
         case .warning10:
             headline("10 minutes left 👋")

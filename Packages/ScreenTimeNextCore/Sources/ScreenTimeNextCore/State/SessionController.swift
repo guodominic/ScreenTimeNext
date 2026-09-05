@@ -139,6 +139,22 @@ public final class SessionController: @unchecked Sendable {
         }
     }
 
+    /// PRD §6.16 / §15 — a parent grants +N seconds. Only meaningful with a window from today
+    /// (running or finished). Returns nil when there is nothing to extend.
+    /// State goes through `.extended` and resumes at the natural stage (§11). Stacking is allowed:
+    /// each grant adds to the window's end. Notifications are re-derived from the new end.
+    @discardableResult
+    public func extend(bySeconds seconds: Int) throws -> ChildSessionSnapshot? {
+        try lock.withLock {
+            guard seconds > 0, let window = try currentWindowLocked() else { return nil }
+            let extended = window.extended(bySeconds: seconds)
+            try storage.save(extended)
+            lastState = WarningStateEngine.grantExtension()
+            try scheduleNotificationsLocked(for: extended)
+            return try snapshotLocked(for: extended, at: now())
+        }
+    }
+
     /// Re-derive notifications for the current window (e.g. after Settings changed the toggles).
     public func rescheduleNotifications() throws {
         try lock.withLock {

@@ -1,7 +1,7 @@
 ---
 task: "013"
 title: Parent Extension (+10 / +20 / Allow Once)
-status: not_started        # not_started | in_progress | blocked | done
+status: in_progress        # not_started | in_progress | blocked | done  (session half done in Phase 0; shield half at Phase 1 gate)
 depends_on: ["012"]
 qa_criteria: ["QA-11"]
 prd_refs: ["§6.16", "§15"]
@@ -56,15 +56,25 @@ ScreenTimeNext-managed protection and monitoring state.
 - [ ] The control is not reachable from the child UI.
 
 ## Completion report
-Append the result here when the task finishes. Do not edit earlier tasks' reports.
 
-- **Files changed:**
-- **Build result:**
-- **Tests run:**
-- **Verdict:** PASS / FAIL / BLOCKED / NEEDS MANUAL DEVICE TEST
-- **Platform limitations or manual steps:**
-- **Follow-up work:**
+**2026-09-05 — Claude, session half only (D-010). Verified in the batched run with 016.**
 
-> After finishing: update `status:` in this file's front-matter, update
-> `docs/tasks/PROGRESS.md`, and log any new decision in `docs/DECISIONS.md`
-> or new blocker in `docs/BLOCKERS.md`.
+- **Files changed:** package `SessionController.extend(bySeconds:)` (stacking, `.extended` → natural
+  stage, notifications re-derived); app dashboard "Extend time" menu (+10 / +20) behind a
+  confirmation, mock shield released and `ProtectionState.temporarilyExtended` recorded; child timer
+  copy for `.extended`. Tests: `ParentExtensionTests` (7). Decision D-010.
+- **Verdict:** **PASS** for the session half · **BLOCKED (by gate)** for: removing the real
+  ScreenTimeNext-managed shield, adjusting monitoring, reapplying protection on expiry, Allow Once.
+- **Design notes:** extensions are beyond the budget; "Remaining today" stays 0 while the child
+  timer shows the extra minutes. Extending a finished session reopens it. Not reachable from the
+  child UI (§7.5).
+- **Follow-up work (Phase 1):** wire `services.shield` / `services.monitoring` for real; define and
+  build Allow Once; reapply on expiry via a DeviceActivity schedule (Rule 3), not an in-app timer.
+
+### DoD status
+- [x] **QA-11** — the parent extension works after expiration (session half; shield half at gate).
+- [ ] All three options behave as documented, and Allow Once has a written definition — **+10/+20 done; Allow Once deferred with a proposed definition (D-010)**.
+- [ ] Protection is reapplied on expiry with the app closed — **Phase 1**.
+- [x] Stacked extensions have defined, tested behavior.
+- [x] No unrelated ManagedSettings are touched (mock; Task 011 enforces for real).
+- [x] The control is not reachable from the child UI.

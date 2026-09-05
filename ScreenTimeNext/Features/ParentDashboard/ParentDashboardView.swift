@@ -15,6 +15,7 @@ struct ParentDashboardView: View {
     @Environment(\.openURL) private var openURL
     @State private var viewModel: ParentDashboardViewModel
     @State private var confirmEndSession = false
+    @State private var pendingExtension: Int?
     let onReset: () -> Void
 
     init(services: ServiceContainer, onReset: @escaping () -> Void) {
@@ -124,13 +125,31 @@ struct ParentDashboardView: View {
             } else {
                 LabeledContent("Notifications", value: "On")
             }
-            LabeledContent("Extend time") {
-                Text("Coming with Screen Time access").foregroundStyle(.secondary)
+            if viewModel.canExtend {
+                Menu {
+                    Button("+10 minutes") { pendingExtension = 10 }
+                    Button("+20 minutes") { pendingExtension = 20 }
+                } label: {
+                    Label("Extend time", systemImage: "plus.circle")
+                }
+            } else {
+                LabeledContent("Extend time") {
+                    Text("No session today yet").foregroundStyle(.secondary)
+                }
             }
         } header: {
             Text("Parent")
         } footer: {
-            Text("+10 / +20 minutes and Allow Once arrive in Phase 1.")
+            Text("Extra minutes are beyond today's budget. Allow Once arrives with Screen Time access.")
+        }
+        .confirmationDialog("Give \(viewModel.profile?.name ?? "your child") \(pendingExtension ?? 0) more minutes?",
+                            isPresented: Binding(get: { pendingExtension != nil }, set: { if !$0 { pendingExtension = nil } }),
+                            titleVisibility: .visible) {
+            Button("Add \(pendingExtension ?? 0) minutes") {
+                if let m = pendingExtension { viewModel.extend(minutes: m) }
+                pendingExtension = nil
+            }
+            Button("Cancel", role: .cancel) { pendingExtension = nil }
         }
     }
 }
