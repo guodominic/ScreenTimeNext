@@ -101,7 +101,7 @@ already been registered under the old name, B-002 covers re-registering it.
 ---
 
 ## D-006 — Session-window vs. usage-accrual budget model
-**Date:** 2026-09-04 · **Status:** proposed — MUST be decided before Task 006 and Task 010
+**Date:** 2026-09-04 · **Status:** accepted 2026-09-05 — **Option A (session window)** chosen by Dominic
 
 **Context.** The PRD defines the daily budget as a DeviceActivity *usage threshold* (§14), but
 requires the child's countdown to be derived from *absolute timestamps* (§6.10, Rule 4). These are
@@ -119,8 +119,10 @@ So the "7 minutes left" the child sees and the moment the system actually shield
   budget−60 and budget; the extension writes a timestamp to the App Group and posts a local
   notification on each. Faithful to the PRD, but stakes all three warnings on unreliable callbacks.
 
-**Recommendation.** Option A for V1: it makes the core experience controllable and confines the
-unreliable part to final enforcement. Revisit once real-device data on callback latency exists.
+**Decision.** Option A for V1: it makes the core experience controllable and confines the
+unreliable part to final enforcement. `SessionWindow` (absolute start/end timestamps) is the source
+of truth for the countdown; `DailyUsage.usedSeconds` is derived from completed session windows, not
+from DeviceActivity. Revisit once real-device data on callback latency exists (Phase 1).
 
 **Consequences.** Task 006's `DailyUsage` semantics, Task 007's countdown source, Task 010's event
 design and Task 016's notification scheduling all depend on this. Record the choice here before

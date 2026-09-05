@@ -28,7 +28,7 @@ Implement the DeviceActivity schedule and the daily-budget threshold, and the ex
 **Critical limitation:** extension execution must not be treated as a continuous per-second process. Do not design anything that requires the extension to be alive at a specific second, or that assumes the main app is running.
 
 ## Implementation notes
-- **Prerequisite:** `docs/DECISIONS.md` D-006 (session-window vs. usage-accrual model) must be decided before this task starts. It changes what this task builds.
+- **D-006 decided (Option A, session window):** the countdown and the 10/5/1 warnings come from `SessionWindow` timestamps; DeviceActivity is the enforcement backstop only.
 - Verify `DeviceActivitySchedule`, `DeviceActivityName`, `DeviceActivityEvent`, and the monitor's callback signatures against the **installed SDK**. This is the area where outdated tutorials are most likely to be wrong.
 - There are documented platform limits on the number of concurrent activities and events. Look up the current limits before designing around them, and record what you find in `docs/DECISIONS.md`.
 - The schedule must cover a **daily** window and repeat. Decide how the window boundary relates to midnight and note it — Task 017 tests day rollover against this decision.

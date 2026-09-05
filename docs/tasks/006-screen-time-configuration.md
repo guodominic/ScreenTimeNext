@@ -32,7 +32,7 @@ Note the deliberate split — `ScreenTimeState` tracks the *session*, `Protectio
 *enforcement*. They are two axes and must not be collapsed into one enum. See `docs/DECISIONS.md` D-002.
 
 ## Implementation notes
-- **Prerequisite:** `docs/DECISIONS.md` D-006 (session-window vs. usage-accrual model) must be decided before this task starts. It changes what this task builds.
+- **D-006 decided (Option A, session window):** the countdown and the 10/5/1 warnings come from `SessionWindow` timestamps; DeviceActivity is the enforcement backstop only.
 - **Phase 0 / free account (D-007):** App Groups are unavailable, so ship a `LocalStorageService` (app container) first. The App Group implementation comes in Phase 1 behind the same `ScreenTimeStorageService` protocol — the switch must be a one-line DI change, nothing else.
 - Both the app and the extension read this store. Assume concurrent access and write atomically.
 - The extension may write `ProtectionState` while the app is not running (§14) — the app must re-read on foreground rather than trusting its in-memory copy.
