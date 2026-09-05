@@ -1,9 +1,7 @@
-//
 //  ScreenTimeNextWidgetsBundle.swift
 //  ScreenTimeNextWidgets
 //
-//  Created by apple on 9/5/26.
-//
+//  D-014. The widget bundle exists only to host the Live Activity.
 
 import WidgetKit
 import SwiftUI
@@ -11,8 +9,6 @@ import SwiftUI
 @main
 struct ScreenTimeNextWidgetsBundle: WidgetBundle {
     var body: some Widget {
-        ScreenTimeNextWidgets()
-        ScreenTimeNextWidgetsControl()
-        ScreenTimeNextWidgetsLiveActivity()
+        ScreenTimeNextLiveActivity()
     }
 }

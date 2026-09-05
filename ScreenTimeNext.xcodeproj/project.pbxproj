@@ -10,6 +10,7 @@
 		18862832304BDB6500CB1A52 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 18862831304BDB6500CB1A52 /* WidgetKit.framework */; };
 		18862834304BDB6500CB1A52 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 18862833304BDB6500CB1A52 /* SwiftUI.framework */; };
 		18862843304BDB6700CB1A52 /* ScreenTimeNextWidgetsExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 1886282F304BDB6500CB1A52 /* ScreenTimeNextWidgetsExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		18862896304BDC9B00CB1A52 /* ScreenTimeNextCore in Frameworks */ = {isa = PBXBuildFile; productRef = 18862895304BDC9B00CB1A52 /* ScreenTimeNextCore */; };
 		18CD1D74304BBA47006BAE45 /* ScreenTimeNextCore in Frameworks */ = {isa = PBXBuildFile; productRef = 18CD1D73304BBA47006BAE45 /* ScreenTimeNextCore */; };
 /* End PBXBuildFile section */
 
@@ -79,6 +80,7 @@
 			isa = PBXFrameworksBuildPhase;
 			files = (
 				18862834304BDB6500CB1A52 /* SwiftUI.framework in Frameworks */,
+				18862896304BDC9B00CB1A52 /* ScreenTimeNextCore in Frameworks */,
 				18862832304BDB6500CB1A52 /* WidgetKit.framework in Frameworks */,
 			);
 		};
@@ -155,6 +157,9 @@
 				18862835304BDB6500CB1A52 /* ScreenTimeNextWidgets */,
 			);
 			name = ScreenTimeNextWidgetsExtension;
+			packageProductDependencies = (
+				18862895304BDC9B00CB1A52 /* ScreenTimeNextCore */,
+			);
 			productName = ScreenTimeNextWidgetsExtension;
 			productReference = 1886282F304BDB6500CB1A52 /* ScreenTimeNextWidgetsExtension.appex */;
 			productType = "com.apple.product-type.app-extension";
@@ -455,7 +460,7 @@
 				INFOPLIST_FILE = ScreenTimeNextWidgets/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = ScreenTimeNextWidgets;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -487,7 +492,7 @@
 				INFOPLIST_FILE = ScreenTimeNextWidgets/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = ScreenTimeNextWidgets;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -545,6 +550,11 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		18862895304BDC9B00CB1A52 /* ScreenTimeNextCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 18CD1D72304BBA47006BAE45 /* XCLocalSwiftPackageReference "Packages/ScreenTimeNextCore" */;
+			productName = ScreenTimeNextCore;
+		};
 		18CD1D73304BBA47006BAE45 /* ScreenTimeNextCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = ScreenTimeNextCore;
