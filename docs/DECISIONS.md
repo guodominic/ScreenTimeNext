@@ -126,6 +126,40 @@ unreliable part to final enforcement. Revisit once real-device data on callback 
 design and Task 016's notification scheduling all depend on this. Record the choice here before
 starting any of them.
 
+---
+
+## D-007 — Phase 0 on a free Apple account; the $99 membership is a gated decision
+**Date:** 2026-09-05 · **Status:** accepted
+
+**Context.** Dominic does not want to pay the $99/yr Apple Developer Program fee before the idea
+is validated. A free Personal Team can run apps on up to 3 of his own devices (10 App IDs, 7-day
+expiry, reinstall from Xcode weekly) — but Apple's membership comparison and a DTS engineer on the
+forums both confirm that **Family Controls and App Groups are not available to free accounts**,
+with "no supported way" around it. So Tasks 004–013 cannot run on a device without paying.
+
+**Decision.** Split V1 into two phases with an explicit gate between them.
+
+- **Phase 0 — free.** Tasks 001, 002, 003, 006 (local storage only), 007, 008, 009, 014, 015,
+  all against mock services, running on Dominic's own device. Then a small human validation:
+  a few families use the prototype for a week while the parent enforces manually. The question
+  is PRD §21's second one — does a child who chooses the next activity transition more calmly?
+- **Gate.** Pay the $99 and submit the entitlement request (`docs/entitlement-request.md`) only
+  if Phase 0's answer is yes. If it is no, stop, with almost nothing spent.
+- **Phase 1 — paid.** Tasks 004, 005, 010–013, 016–020: real authorization, picker, monitoring,
+  shielding, extension, then distribution.
+
+**Consequences.**
+- `ScreenTimeStorageService` needs a *local-container* implementation for Phase 0, since App
+  Groups are unavailable; the App Group implementation is added in Phase 1 behind the same
+  protocol. This is exactly what Rule 2 is for.
+- Task 001 on a free account: no Family Controls capability, no App Group capability, and the
+  extension target can be created but not signed for a device. Mark those parts BLOCKED-by-gate,
+  not failed.
+- PRD §22 still stands: Phase 0's output is a prototype, not V1. Nobody should mistake a working
+  Phase 0 for a shippable product.
+- Free provisioning expires every 7 days, so validation families need the app reinstalled weekly
+  — or the validation runs on Dominic's own devices only.
+
 <!-- Template for new entries:
 
 ## D-NNN — <short imperative title>

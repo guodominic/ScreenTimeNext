@@ -51,6 +51,14 @@ in the same commit as the work. If this file and a task's front-matter disagree,
 | QA-14 | Authorization revocation handled | 017 | — |
 | QA-15 | No child usage data sent to a backend | 018 | — |
 
+## Phases (D-007)
+
+| Phase | Account | Tasks | Exit condition |
+|---|---|---|---|
+| **0 — experience half** | free Personal Team | 001, 002, 003, 006 (local storage), 007, 008, 009, 014, 015 | Prototype runs on Dominic's device; a few families used it for a week; §21 Q2 ("does choosing the next activity help?") has an answer |
+| **Gate** | — | pay $99, submit entitlement request ×2 | Only if Phase 0 says yes |
+| **1 — enforcement half** | paid | 004, 005, 010, 011, 012, 013, 016, 017, 018, 019, 020 | §22 Definition of Done |
+
 ## Critical path
 
 ```text

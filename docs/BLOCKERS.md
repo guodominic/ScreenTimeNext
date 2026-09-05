@@ -20,9 +20,14 @@ real-device work on Tasks 004–013.
 
 **This is calendar time, not engineering time, and it is the largest schedule risk in V1.**
 
-**Current state (2026-09-04).** No paid Apple Developer Program membership yet. No company is
-required — an individual account's Account Holder can request it. Full material package,
-paste-ready form answers and the ordered checklist are in `docs/entitlement-request.md`.
+**Current state (2026-09-05).** No paid Apple Developer Program membership, by decision: D-007
+puts the $99 behind a validation gate at the end of Phase 0. Nothing here is actionable until
+that gate passes. No company is required — an individual account's Account Holder can request
+it. Full material package, paste-ready form answers and the ordered checklist are in
+`docs/entitlement-request.md`.
+
+**Free-account limits that apply until then:** no Family Controls, no App Groups, 3 devices,
+10 App IDs, 7-day expiry (reinstall from Xcode weekly).
 
 **Required manual steps, in order.**
 1. Enroll in the Apple Developer Program as an individual ($99/yr, Apple Developer app, ID verification).
