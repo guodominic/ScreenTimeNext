@@ -43,8 +43,10 @@ docs/
 ├── entitlement-request.md  Family Controls entitlement checklist + form answers
 └── reference/            the signed .docx PRD, archived
 PRIVACY.md                privacy policy (DRAFT until Task 018)
-ScreenTimeNext/               app source (see ScreenTimeNext/README.md)
-Tests/                    unit tests
+ScreenTimeNext.xcodeproj  Xcode project
+ScreenTimeNext/           app target (SwiftUI + Screen Time adapters)
+Packages/ScreenTimeNextCore/  framework-free core package + its tests
+DeviceActivityMonitorExtension/  extension target (Phase 1)
 ```
 
 ## Getting started

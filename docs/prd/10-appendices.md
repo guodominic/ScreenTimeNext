@@ -2,6 +2,10 @@
 
 ## Appendix A — Suggested project structure
 
+> **Superseded in practice by `docs/source-layout.md` (D-008):** the core became a local Swift
+> package and the extension folder moved beside the app folder, because Xcode 26 synchronized
+> folders compile everything under the app folder recursively. Kept here as the PRD's record.
+
 ```text
 ScreenTimeNext/
 ├── ScreenTimeNextApp/                     app entry point, root navigation
@@ -31,7 +35,7 @@ ScreenTimeNext/
 
 **The rule this layout encodes:** `import FamilyControls`, `import DeviceActivity`, and
 `import ManagedSettings` may appear **only** under `ScreenTimeNext/ScreenTime/` and
-`ScreenTimeNext/DeviceActivityMonitorExtension/`. Everywhere else is framework-free and unit-testable.
+`DeviceActivityMonitorExtension/`. Everywhere else is framework-free and unit-testable.
 (One documented exception exists for the `FamilyActivityPicker` wrapper view — see
 `docs/DECISIONS.md` D-001.)
 

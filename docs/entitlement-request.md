@@ -33,7 +33,7 @@
 
 | 方案 | 主 app | Extension | App Group |
 |---|---|---|---|
-| **A · GitHub 命名空间(推荐)** | `io.github.<username>.screentimenext` | `io.github.<username>.screentimenext.monitor` | `group.io.github.<username>.screentimenext` |
+| **A · GitHub 命名空间(推荐)** | `io.github.guodominic.screentimenext` | `io.github.guodominic.screentimenext.monitor` | `group.io.github.guodominic.screentimenext` |
 | B · 个人名 | `com.xiachenguo.screentimenext` | `com.xiachenguo.screentimenext.monitor` | `group.com.xiachenguo.screentimenext` |
 
 Bundle ID 注册后**不可更改**,而且它与 App Store 展示名无关 —— 所以即便展示名以后改掉 "ScreenTimeNext",Bundle ID 保持不变没有问题。
@@ -49,17 +49,17 @@ ScreenTimeNext
 
 ### Developer / company website
 ```
-https://github.com/<username>/ScreenTimeNext
+https://github.com/guodominic/ScreenTimeNext
 ```
 
 ### Bundle ID — 第一次提交(主 app)
 ```
-io.github.<username>.screentimenext
+io.github.guodominic.screentimenext
 ```
 
 ### Bundle ID — 第二次提交(extension)
 ```
-io.github.<username>.screentimenext.monitor
+io.github.guodominic.screentimenext.monitor
 ```
 
 ### Which Screen Time frameworks does your app use?
@@ -89,7 +89,7 @@ How each framework is used:
 - DeviceActivity: to register a daily monitoring schedule with a usage threshold equal
   to the configured budget. When the system reports the threshold has been reached,
   our DeviceActivityMonitor extension (bundle ID
-  io.github.<username>.screentimenext.monitor, submitted as a separate request) applies
+  io.github.guodominic.screentimenext.monitor, submitted as a separate request) applies
   shielding. The app does not need to be running for enforcement to work.
 
 - ManagedSettings: to shield the parent-selected applications, categories and web
@@ -112,7 +112,7 @@ cannot perform its function.
 ### Describe your app and how it uses Family Controls(extension 用)
 ```
 This bundle is the DeviceActivityMonitor app extension of ScreenTimeNext
-(main app bundle ID io.github.<username>.screentimenext, submitted separately).
+(main app bundle ID io.github.guodominic.screentimenext, submitted separately).
 
 ScreenTimeNext is a parental control app that helps a child end screen time calmly:
 a parent sets a daily budget for one child on the child's device and selects the

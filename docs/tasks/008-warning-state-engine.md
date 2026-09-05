@@ -10,7 +10,7 @@ prd_refs: ["§11", "§6.6", "§6.11–§6.13"]
 # Task 008 — Warning State Engine
 
 ## Objective
-Implement deterministic 10/5/1-minute boundary logic as pure, fully-tested code in `ScreenTimeNext/Core/State/`.
+Implement deterministic 10/5/1-minute boundary logic as pure, fully-tested code in `Packages/ScreenTimeNextCore/Sources/ScreenTimeNextCore/State/`.
 
 ## In scope
 - A pure function/engine: given `(remainingSeconds, configuration, currentState)` → next `ScreenTimeState`.

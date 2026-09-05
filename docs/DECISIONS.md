@@ -160,6 +160,31 @@ with "no supported way" around it. So Tasks 004–013 cannot run on a device wit
 - Free provisioning expires every 7 days, so validation families need the app reinstalled weekly
   — or the validation runs on Dominic's own devices only.
 
+---
+
+## D-008 — Project layout: local package for the core, extension folder beside the app, iOS 18+
+**Date:** 2026-09-05 · **Status:** accepted (Task 001)
+
+**Context.** Xcode 26.3 generated the project with synchronized folders (everything on disk under
+the target folder is compiled — recursively), a multiplatform target (iOS/macOS/visionOS), a
+placeholder bundle id, iOS 27 as deployment target, and no test target. Appendix A nests the
+extension folder and the shared code inside the app folder, which synchronized folders make
+impossible without per-file exceptions.
+
+**Decision.**
+- Framework-free code (`Core/`, `Shared/`) becomes a local Swift package, `Packages/ScreenTimeNextCore`,
+  linked by the app target (and by the extension in Phase 1). Its tests are the package's tests.
+- `DeviceActivityMonitorExtension/` sits beside `ScreenTimeNext/`, not inside it.
+- Target is iOS/iPadOS only (`SUPPORTED_PLATFORMS = iphoneos iphonesimulator`, device family 1,2).
+- Deployment target **iOS 18.0** — broad enough for a child's hand-me-down iPad, new enough for
+  every API V1 needs. Raise only when a specific API requires it, and record why here.
+- Bundle id `io.github.guodominic.screentimenext`; App Group `group.io.github.guodominic.screentimenext`.
+- No `.gitkeep` or README inside the app's synchronized folder — they would ship as bundle resources.
+
+**Consequences.** `docs/source-layout.md` is the layout of record; Appendix A stays as the PRD's
+original suggestion. Task file paths updated. `@testable import ScreenTimeNextCore` in tests.
+The package must stay Foundation-only; the import-boundary check (Task 002) covers it.
+
 <!-- Template for new entries:
 
 ## D-NNN — <short imperative title>

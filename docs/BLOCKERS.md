@@ -48,14 +48,17 @@ prototype.
 
 ---
 
-## B-002 — Apple Developer Team ID for the App Group identifier
-**Status:** open · **Owner:** — · **Raised:** 2026-09-04 · **Blocks:** 001, 006, 012
+## B-002 — App Groups capability (needs the paid membership)
+**Status:** open — behind the D-007 gate · **Owner:** Dominic · **Raised:** 2026-09-04 · **Blocks:** 006 (App Group impl), 012
 
-The App Group identifier shared by the app and the extension requires a real Team ID. Until one is
-configured, Task 001 defines the constant with a marked placeholder.
+The App Group identifier is now fixed at `group.io.github.guodominic.screentimenext`
+(`Packages/ScreenTimeNextCore/Sources/ScreenTimeNextCore/Constants/AppGroup.swift`), but the
+App Groups capability cannot be enabled on a free Personal Team, so the container cannot be
+resolved in Phase 0.
 
-**Required manual step.** Configure the Apple Developer team in Xcode and register the App Group;
-replace the placeholder in `ScreenTimeNext/Shared/Constants/`.
+**Required manual step.** After the paid membership exists: enable App Groups on the app target
+(and the extension target) in Signing & Capabilities with that identifier. Task 006's
+`ScreenTimeStorageService` then gets its App Group implementation behind the same protocol.
 
 ---
 

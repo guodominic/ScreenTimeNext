@@ -50,5 +50,5 @@ Apple's platform, not ScreenTimeNext, decides what a child can and cannot bypass
 to block every possible workaround.
 
 ## Contact
-Questions about this policy: open an issue at https://github.com/<username>/ScreenTimeNext
+Questions about this policy: open an issue at https://github.com/guodominic/ScreenTimeNext
 or email guoxiachen@gmail.com.

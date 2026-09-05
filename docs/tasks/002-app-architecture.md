@@ -15,7 +15,7 @@ Define the service protocols and dependency boundaries so that views never touch
 **Acceptance:** views contain no direct Screen Time framework calls.
 
 ## In scope
-- Five protocols in `ScreenTimeNext/Core/Services/`, all **framework-free**: `ScreenTimeAuthorizationService`, `ScreenTimeSelectionService`, `ScreenTimeMonitoringService`, `ScreenTimeShieldService`, `ScreenTimeStorageService`.
+- Five protocols in `Packages/ScreenTimeNextCore/Sources/ScreenTimeNextCore/Services/`, all **framework-free**: `ScreenTimeAuthorizationService`, `ScreenTimeSelectionService`, `ScreenTimeMonitoringService`, `ScreenTimeShieldService`, `ScreenTimeStorageService`.
 - Domain-level enums the protocols speak in (e.g. an authorization status enum owned by this app, not re-exported from FamilyControls).
 - Mock implementations of all five, so Task 003 can build the whole onboarding flow without entitlements.
 - A dependency container / environment injection point so views resolve services rather than constructing them.
@@ -43,7 +43,7 @@ The protocol surface must not leak framework types. A protocol returning `Family
 ## Definition of Done
 - [ ] All five protocols exist and compile with no Screen Time framework imports.
 - [ ] Mock implementations exist for all five, including failure modes.
-- [ ] No file under `Core/`, `Features/`, or `Shared/` imports FamilyControls, DeviceActivity, or ManagedSettings.
+- [ ] No file under `Packages/ScreenTimeNextCore/` or `ScreenTimeNext/Features/` imports FamilyControls, DeviceActivity, or ManagedSettings.
 - [ ] A test or script enforces the previous line automatically.
 - [ ] Dependency injection point exists and is used by at least one view.
 

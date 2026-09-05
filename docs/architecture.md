@@ -54,11 +54,11 @@ is current.
 `import FamilyControls`, `import DeviceActivity`, `import ManagedSettings` may appear only under:
 
 - `ScreenTimeNext/ScreenTime/`
-- `ScreenTimeNext/DeviceActivityMonitorExtension/`
+- `DeviceActivityMonitorExtension/`
 
 One documented exception: the `FamilyActivityPicker` wrapper view (`docs/DECISIONS.md` D-001).
 
-Everything under `Core/`, `Features/`, `Shared/` is framework-free — which means it builds, runs and
+Everything under `Packages/ScreenTimeNextCore/` and `ScreenTimeNext/Features/` is framework-free — which means it builds, runs and
 tests without an entitlement or a device.
 
 ## State machine

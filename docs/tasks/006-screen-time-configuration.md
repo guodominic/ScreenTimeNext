@@ -13,7 +13,7 @@ prd_refs: ["§12", "§13", "§6.5", "§6.6"]
 Implement the configuration models, App Group persistence behind `ScreenTimeStorageService`, and unit tests for both.
 
 ## In scope
-- Models in `ScreenTimeNext/Core/Models/`: `ChildProfile`, `ScreenTimeConfiguration`, `DailyUsage`, `TransitionActivity`, `ScreenTimeState`, `ProtectionState`.
+- Models in `Packages/ScreenTimeNextCore/Sources/ScreenTimeNextCore/Models/`: `ChildProfile`, `ScreenTimeConfiguration`, `DailyUsage`, `TransitionActivity`, `ScreenTimeState`, `ProtectionState`.
 - Concrete `ScreenTimeStorageService` writing to the App Group shared container.
 - Schema versioning so a future model change does not silently destroy a parent's configuration.
 - Unit tests for round-trip encode/decode, defaults, and migration of a missing/corrupt store.

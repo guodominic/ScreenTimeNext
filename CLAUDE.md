@@ -48,6 +48,10 @@ A UI-only timer is only a prototype.
 3. Open the single task file you are about to implement. Implement **only** that task (Rule 9).
 
 ### While working
+- Xcode 26 synchronized folders: a `.swift` file written under `ScreenTimeNext/` or the package's
+  `Sources/` is compiled automatically. Never put non-source files (README, .gitkeep) under
+  `ScreenTimeNext/` — they would ship inside the app bundle.
+- Run the package tests from Terminal: `cd Packages/ScreenTimeNextCore && swift test`.
 - The task file's **PRD detail** section is authoritative for behavior; `docs/prd/` has the full text.
 - Do not silently change architecture to work around an API limitation. If an Apple API is
   unavailable or entitlement-gated, mark the task **BLOCKED**, write the required manual step into
@@ -80,12 +84,15 @@ A UI-only timer is only a prototype.
 | `docs/entitlement-request.md` | Family Controls entitlement: checklist + paste-ready form answers |
 | `PRIVACY.md` | Privacy policy — DRAFT until Task 018 audits it |
 | `docs/reference/` | The signed .docx PRD, archived |
-| `ScreenTimeNext/` | App source. See `ScreenTimeNext/README.md` for the import boundary. |
-| `Tests/` | Unit tests |
+| `ScreenTimeNext.xcodeproj` | Xcode project (synchronized folders — files on disk are picked up automatically) |
+| `ScreenTimeNext/` | App target: SwiftUI + the `ScreenTime/` framework adapters. See `docs/source-layout.md`. |
+| `Packages/ScreenTimeNextCore/` | Local Swift package: models, service protocols, state engine, constants — Foundation only. Its `Tests/` are the unit tests. |
+| `DeviceActivityMonitorExtension/` | Extension target folder — empty until Phase 1 |
 
 ## The import boundary
 `import FamilyControls`, `import DeviceActivity`, and `import ManagedSettings` may appear **only**
-under `ScreenTimeNext/ScreenTime/` and `ScreenTimeNext/DeviceActivityMonitorExtension/`.
+under `ScreenTimeNext/ScreenTime/` and `DeviceActivityMonitorExtension/`. `Packages/ScreenTimeNextCore/`
+is Foundation-only by construction.
 
-Everything under `Core/`, `Features/`, and `Shared/` is framework-free and unit-testable without a
+Everything under `Packages/ScreenTimeNextCore/` and `ScreenTimeNext/Features/` is framework-free and unit-testable without a
 device or an entitlement. This is what keeps the project moving while the entitlement is pending.
