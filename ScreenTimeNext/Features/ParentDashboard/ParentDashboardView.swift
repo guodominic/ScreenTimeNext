@@ -106,6 +106,7 @@ struct ParentDashboardView: View {
             .foregroundStyle(.white)
             .padding(20)
             .background(RoundedRectangle(cornerRadius: 24, style: .continuous).fill(Theme.heroGradient))
+            .bounceIn()
             .listRowInsets(EdgeInsets())
             .listRowBackground(Color.clear)
         }

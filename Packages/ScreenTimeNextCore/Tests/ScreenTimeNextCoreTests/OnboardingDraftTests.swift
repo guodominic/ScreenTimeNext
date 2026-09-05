@@ -28,6 +28,26 @@ final class OnboardingDraftTests: XCTestCase {
         XCTAssertEqual(draft.childProfile.name, "Ivy")
     }
 
+    /// Defaults follow the budget until the parent touches the dials.
+    func testReminderDefaultsFollowTheBudget() {
+        var draft = OnboardingDraft()
+        XCTAssertEqual(draft.warningMinutes, [10, 5, 1])
+        draft.dailyBudgetSeconds = 4 * 60
+        XCTAssertEqual(draft.warningMinutes, [2, 1, 0])
+        draft.dailyBudgetSeconds = 8 * 60
+        XCTAssertEqual(draft.warningMinutes, [4, 1, 0])
+        draft.dailyBudgetSeconds = 3 * 60
+        XCTAssertEqual(draft.warningMinutes, [1, 0, 0])
+        draft.dailyBudgetSeconds = 12 * 60
+        XCTAssertEqual(draft.warningMinutes, [10, 5, 1])
+        XCTAssertFalse(draft.hasCustomizedWarnings)
+        // Once customized, they stick.
+        draft.warningMinutes = [6, 0, 0]
+        draft.dailyBudgetSeconds = 60 * 60
+        XCTAssertEqual(draft.warningMinutes, [6, 0, 0])
+        XCTAssertTrue(draft.hasCustomizedWarnings)
+    }
+
     /// Budget lowered after reminders were set: reminders are clamped to budget − 1 minute.
     func testRemindersAreClampedToTheBudget() {
         var draft = OnboardingDraft()

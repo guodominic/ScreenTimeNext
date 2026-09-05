@@ -17,31 +17,52 @@ struct TimesUpView: View {
     var body: some View {
         VStack(spacing: 20) {
             Text("Screen time is finished ❤️")
-                .font(.largeTitle.bold())
+                .font(.system(.largeTitle, design: .rounded).bold())
+                .bounceIn()
 
             if let activity = chosenActivity {
-                Image(systemName: activity.symbolName)
-                    .font(.system(size: 56))
-                    .foregroundStyle(.white)
-                    .frame(width: 120, height: 120)
-                    .background(Circle().fill(Theme.color(for: activity)))
-                    .padding(.top, 8)
+                ZStack {
+                    Sparkles(color: Theme.color(for: activity))
+                    Image(systemName: activity.symbolName)
+                        .font(.system(size: 56))
+                        .foregroundStyle(.white)
+                        .frame(width: 120, height: 120)
+                        .background(Circle().fill(Theme.color(for: activity)))
+                        .bounceIn(delay: 0.15)
+                }
+                .frame(height: 200)
                 Text("You chose \(activity.displayName).")
                     .font(.title2)
+                    .bounceIn(delay: 0.3)
                 Text(activity.invitation)
-                    .font(.title.bold())
+                    .font(.system(.title, design: .rounded).bold())
+                    .bounceIn(delay: 0.4)
             } else if budgetSpentEarlier {
+                Image(systemName: "moon.stars.fill").font(.system(size: 64)).foregroundStyle(Theme.lavender)
+                    .floating().bounceIn(delay: 0.1)
                 Text("You've used today's screen time.")
                     .font(.title3)
                     .foregroundStyle(.secondary)
+                    .bounceIn(delay: 0.2)
                 Text("See you tomorrow, \(childName)!")
-                    .font(.title.bold())
+                    .font(.system(.title, design: .rounded).bold())
+                    .bounceIn(delay: 0.3)
             } else {
+                ZStack {
+                    Sparkles()
+                    Image(systemName: "hands.clap.fill").font(.system(size: 56)).foregroundStyle(.white)
+                        .frame(width: 120, height: 120)
+                        .background(Circle().fill(Theme.mint))
+                        .bounceIn(delay: 0.15)
+                }
+                .frame(height: 200)
                 Text("Nice job, \(childName).")
                     .font(.title3)
                     .foregroundStyle(.secondary)
+                    .bounceIn(delay: 0.3)
                 Text("Let's do something else now.")
-                    .font(.title.bold())
+                    .font(.system(.title, design: .rounded).bold())
+                    .bounceIn(delay: 0.4)
             }
         }
         .multilineTextAlignment(.center)

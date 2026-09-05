@@ -51,6 +51,15 @@ public struct ScreenTimeConfiguration: Codable, Equatable, Sendable {
         min(max(seconds, budgetRangeSeconds.lowerBound), budgetRangeSeconds.upperBound)
     }
 
+    /// Sensible reminder defaults for a budget (D-013):
+    /// ≥ 12 min → 10 / 5 / 1; 4–11 min → halfway + last minute; 2–3 min → last minute only.
+    public static func defaultWarningOffsets(forBudgetSeconds budget: Int) -> [Int] {
+        let minutes = budget / 60
+        if minutes >= 12 { return [600, 300, 60] }
+        if minutes >= 4 { return [(minutes / 2) * 60, 60] }
+        return [60]
+    }
+
     /// The reminders that can actually fire for a window of `windowSeconds`: strictly shorter than
     /// the window (a reminder at or beyond the window's length would fire at Start or never).
     /// Every consumer — engine, notifications, UI summaries — must use this, never the raw list.

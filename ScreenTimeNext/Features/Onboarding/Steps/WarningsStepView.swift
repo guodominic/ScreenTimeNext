@@ -10,7 +10,7 @@ struct WarningsStepView: View {
     var body: some View {
         OnboardingStepScaffold(
             title: "Gentle reminders",
-            subtitle: "\(name) will get a friendly heads-up before time ends. Set up to three, minutes before the end. Turn a dial to Off to skip it.",
+            subtitle: "\(name) will get a friendly heads-up before time ends. We've suggested reminders for a \(viewModel.draft.dailyBudgetSeconds / 60)-minute budget — turn a dial to change it, or to Off to skip it.",
             symbol: "bell.badge.fill",
             color: Theme.sun,
             buttonTitle: "Continue",

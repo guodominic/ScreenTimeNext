@@ -61,15 +61,19 @@ struct OnboardingStepScaffold<Content: View>: View {
                         .frame(width: 64, height: 64)
                         .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(color))
                         .padding(.bottom, 4)
+                        .bounceIn()
                     Text(title)
                         .font(.system(.largeTitle, design: .rounded).bold())
+                        .bounceIn(delay: 0.06)
                     if let subtitle {
                         Text(subtitle)
                             .font(.body)
                             .foregroundStyle(.secondary)
+                            .bounceIn(delay: 0.1)
                     }
                     content()
                         .padding(.top, 8)
+                        .bounceIn(delay: 0.16)
                 }
                 .padding(24)
             }

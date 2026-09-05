@@ -46,6 +46,7 @@ struct MinuteDial: View {
                 }
             }
             .frame(width: size, height: size)
+            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: minutes)
             .contentShape(Circle())
             .gesture(
                 DragGesture(minimumDistance: 0)

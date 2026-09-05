@@ -21,8 +21,27 @@ public struct OnboardingDraft: Equatable, Sendable {
     /// §6.5 — default 60 minutes.
     public var dailyBudgetSeconds: Int = ScreenTimeConfiguration.defaultBudgetSeconds
 
-    /// §6.6 / D-013 — up to three reminders, minutes before the end; 0 = off. Default 10 / 5 / 1.
-    public var warningMinutes: [Int] = [10, 5, 1]
+    /// §6.6 / D-013 — up to three reminders, minutes before the end; 0 = off.
+    /// Until the parent touches the dials, the defaults follow the budget (4-minute budget → 2 / 1),
+    /// so going back to change the budget re-derives them; once customized they are kept (and
+    /// clamped to the budget at commit).
+    public var customWarningMinutes: [Int]? = nil
+
+    public var warningMinutes: [Int] {
+        get {
+            customWarningMinutes ?? Self.defaultWarningMinutes(forBudgetSeconds: dailyBudgetSeconds)
+        }
+        set { customWarningMinutes = newValue }
+    }
+
+    public var hasCustomizedWarnings: Bool { customWarningMinutes != nil }
+
+    /// Three slots (0 = off) from the configuration-level defaults.
+    public static func defaultWarningMinutes(forBudgetSeconds budget: Int) -> [Int] {
+        var mins = ScreenTimeConfiguration.defaultWarningOffsets(forBudgetSeconds: budget).map { $0 / 60 }
+        while mins.count < ScreenTimeConfiguration.maxWarnings { mins.append(0) }
+        return mins
+    }
 
     /// §6.7 — activities the child may choose from.
     public var selectedActivities: Set<TransitionActivity> = []

@@ -28,6 +28,9 @@ struct ChildTimerView: View {
             ScrollView {
                 VStack(spacing: 24) {
                     content
+                        .id(snapshot.state)   // new state = new view → transition below runs
+                        .transition(.asymmetric(insertion: .scale(scale: 0.92).combined(with: .opacity),
+                                                removal: .opacity))
                     if let error = viewModel.errorText {
                         Text(error).font(.footnote).foregroundStyle(.secondary)
                     }
@@ -38,7 +41,7 @@ struct ChildTimerView: View {
                 .multilineTextAlignment(.center)
             }
         }
-        .animation(.easeInOut, value: snapshot.state)
+        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: snapshot.state)
         .onAppear { viewModel.appeared() }
         .onDisappear { viewModel.disappeared() }
         .onChange(of: scenePhase) { _, phase in
@@ -59,7 +62,8 @@ struct ChildTimerView: View {
         switch snapshot.state {
         case .idle:
             Spacer(minLength: 24)
-            Image(systemName: "sun.max.fill").font(.system(size: 64)).foregroundStyle(Theme.sun)
+            Image(systemName: "sun.max.fill").font(.system(size: 72)).foregroundStyle(Theme.sun)
+                .floating()
             headline("Hi \(name)!")
             subline("You have \(minutesText(snapshot.remainingSeconds)) of screen time today.")
             Button { viewModel.start() } label: { Label("Start", systemImage: "play.fill") }
@@ -94,7 +98,7 @@ struct ChildTimerView: View {
             headline(snapshot.remainingSeconds <= 60 ? "One more minute!" : "\(remainingMinutesText) left!")
             subline("Finish your game.")
             if let activity = snapshot.chosenActivity { ChosenActivityBadge(activity: activity) }
-            ring(big: true)
+            ring(big: true).pulsing()
 
         case .finished:
             TimesUpView(childName: name,
