@@ -1,7 +1,7 @@
 ---
 task: "008"
 title: Warning State Engine
-status: not_started        # not_started | in_progress | blocked | done
+status: done               # not_started | in_progress | blocked | done
 depends_on: ["006"]
 qa_criteria: ["QA-07"]
 prd_refs: ["§11", "§6.6", "§6.11–§6.13"]
@@ -51,15 +51,21 @@ Warning copy the engine's states drive:
 - [ ] The engine imports nothing but Foundation.
 
 ## Completion report
-Append the result here when the task finishes. Do not edit earlier tasks' reports.
 
-- **Files changed:**
-- **Build result:**
-- **Tests run:**
-- **Verdict:** PASS / FAIL / BLOCKED / NEEDS MANUAL DEVICE TEST
-- **Platform limitations or manual steps:**
-- **Follow-up work:**
+**2026-09-05 — Claude. Verified in the batched run with 009/014/015 (see PROGRESS).**
 
-> After finishing: update `status:` in this file's front-matter, update
-> `docs/tasks/PROGRESS.md`, and log any new decision in `docs/DECISIONS.md`
-> or new blocker in `docs/BLOCKERS.md`.
+- **Files changed:** engine itself was written in Task 001 (`State/WarningStateEngine.swift`) and
+  exercised by Task 007; this task adds `WarningStateTransitionTableTests` (13 tests): every §11 row,
+  the override path, a large-jump case, monotonicity from every state against every earlier stage,
+  all 8 toggle combinations, and a source check that the engine imports only Foundation.
+- **Build / tests:** batched run — see PROGRESS row.
+- **Verdict:** **PASS**
+- **Decisions:** boundaries are inclusive (`<=`); D-004 — toggles gate presentation, not transitions.
+- **Follow-up work:** none.
+
+### DoD status
+- [x] **QA-07** (logic half) — 10/5/1 warning states are computed correctly.
+- [x] Every transition in the §11 table has a passing test.
+- [x] Exact-boundary seconds (600/300/60) and negative remaining are tested.
+- [x] Every combination of enabled/disabled warnings is tested.
+- [x] The engine imports nothing but Foundation (asserted by a test).
