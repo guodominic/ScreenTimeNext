@@ -23,67 +23,58 @@ public struct PlannedNotification: Equatable, Sendable {
     }
 }
 
-public enum NotificationKind: String, CaseIterable, Sendable {
-    case warning10 = "screentimenext.warning10"
-    case warning5  = "screentimenext.warning5"
-    case warning1  = "screentimenext.warning1"
-    case finished  = "screentimenext.finished"
-
-    public var secondsBeforeEnd: Int {
-        switch self {
-        case .warning10: return WarningStateEngine.Threshold.warning10
-        case .warning5:  return WarningStateEngine.Threshold.warning5
-        case .warning1:  return WarningStateEngine.Threshold.warning1
-        case .finished:  return 0
-        }
-    }
+/// Stable identifiers: three warning slots (earliest-first) plus the expiry.
+public enum NotificationIdentifier {
+    public static func warning(_ index: Int) -> String { "screentimenext.warning.\(index)" }
+    public static let finished = "screentimenext.finished"
+    /// Everything ScreenTimeNext might have scheduled — used to cancel/replace.
+    public static let all: [String] = (0..<ScreenTimeConfiguration.maxWarnings).map(warning) + [finished]
 }
 
 public enum NotificationPlan {
 
-    /// Notifications for a window, honoring the parent's toggles (§6.6) and dropping anything
-    /// already in the past. Copy per §6.11–§6.14, §7 — child-facing, no app names (§16).
+    /// Notifications for a window, honoring the parent's warning offsets (D-013) and dropping
+    /// anything already in the past. Copy per §6.11–§6.14, §7 — child-facing, no app names (§16).
     public static func make(for window: SessionWindow,
                             configuration: ScreenTimeConfiguration,
                             childName: String,
                             now: Date) -> [PlannedNotification] {
         var result: [PlannedNotification] = []
-        for kind in NotificationKind.allCases {
-            guard isEnabled(kind, configuration) else { continue }
-            let fireDate = window.endsAt.addingTimeInterval(-TimeInterval(kind.secondsBeforeEnd))
+        let offsets = configuration.warningOffsetsSeconds
+        for (index, offset) in offsets.enumerated() {
+            let fireDate = window.endsAt.addingTimeInterval(-TimeInterval(offset))
             guard fireDate > now else { continue }
-            let (title, body) = copy(for: kind, childName: childName, chosen: window.chosenActivity)
-            result.append(PlannedNotification(identifier: kind.rawValue, fireDate: fireDate, title: title, body: body))
+            let role = WarningStateEngine.role(ofWarningAt: index, count: offsets.count)
+            let (title, body) = warningCopy(role: role, minutes: max(1, offset / 60), childName: childName, chosen: window.chosenActivity)
+            result.append(PlannedNotification(identifier: NotificationIdentifier.warning(index), fireDate: fireDate, title: title, body: body))
+        }
+        if window.endsAt > now {
+            let (title, body) = finishedCopy(childName: childName, chosen: window.chosenActivity)
+            result.append(PlannedNotification(identifier: NotificationIdentifier.finished, fireDate: window.endsAt, title: title, body: body))
         }
         return result
     }
 
-    static func isEnabled(_ kind: NotificationKind, _ config: ScreenTimeConfiguration) -> Bool {
-        switch kind {
-        case .warning10: return config.warning10Enabled
-        case .warning5:  return config.warning5Enabled
-        case .warning1:  return config.warning1Enabled
-        case .finished:  return true
+    public static func warningCopy(role: ScreenTimeState, minutes: Int, childName: String, chosen: TransitionActivity?) -> (String, String) {
+        let left = minutes == 1 ? "1 minute left" : "\(minutes) minutes left"
+        switch role {
+        case .firstWarning:
+            return ("\(left) 👋", "You're almost done, \(childName). What do you want to do next?")
+        case .secondWarning:
+            if let chosen { return (left, "Time to finish up. Next: \(chosen.displayName).") }
+            return (left, "Time to finish up what you're doing.")
+        default:
+            let title = minutes == 1 ? "One more minute!" : "\(left)!"
+            if let chosen { return (title, "Finish your game, \(childName). Then: \(chosen.displayName)!") }
+            return (title, "Finish your game, \(childName).")
         }
     }
 
-    static func copy(for kind: NotificationKind, childName: String, chosen: TransitionActivity?) -> (String, String) {
-        switch kind {
-        case .warning10:
-            return ("10 minutes left 👋", "You're almost done, \(childName). What do you want to do next?")
-        case .warning5:
-            if let chosen {
-                return ("5 minutes left", "Time to finish up. Next: \(chosen.displayName).")
-            }
-            return ("5 minutes left", "Time to finish up what you're doing.")
-        case .warning1:
-            return ("One more minute!", "Finish your game, \(childName).")
-        case .finished:
-            if let chosen {
-                return ("Screen time is finished ❤️", "You chose \(chosen.displayName). \(chosen.invitation)")
-            }
-            return ("Screen time is finished ❤️", "Nice job, \(childName). Let's do something else now.")
+    public static func finishedCopy(childName: String, chosen: TransitionActivity?) -> (String, String) {
+        if let chosen {
+            return ("Screen time is finished ❤️", "You chose \(chosen.displayName). \(chosen.invitation)")
         }
+        return ("Screen time is finished ❤️", "Nice job, \(childName). Let's do something else now.")
     }
 }
 

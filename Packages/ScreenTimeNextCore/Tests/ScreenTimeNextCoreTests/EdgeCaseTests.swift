@@ -60,7 +60,7 @@ final class EdgeCaseTests: XCTestCase {
     }
 
     func testRestartInEveryStageRestoresThatStage() throws {
-        for (elapsed, expected) in [(0, ScreenTimeState.active), (700, .warning10), (950, .warning5), (1150, .warning1), (1200, .finished)] {
+        for (elapsed, expected) in [(0, ScreenTimeState.active), (700, .firstWarning), (950, .secondWarning), (1150, .finalWarning), (1200, .finished)] {
             try? FileManager.default.removeItem(at: directory)
             clock = Clock(Calendar.current.startOfDay(for: Date()).addingTimeInterval(12 * 3600))
             let (a, _) = try boot()
@@ -80,7 +80,7 @@ final class EdgeCaseTests: XCTestCase {
         try c.start()
         clock.now = midnight.addingTimeInterval(5 * 60)     // 00:05 — 15 of 20 minutes elapsed
         let snap = try c.tick()
-        XCTAssertEqual(snap.state, .warning5)
+        XCTAssertEqual(snap.state, .secondWarning)
         XCTAssertEqual(snap.remainingSeconds, 300)
     }
 

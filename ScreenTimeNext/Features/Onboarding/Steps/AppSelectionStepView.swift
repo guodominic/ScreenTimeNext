@@ -15,6 +15,8 @@ struct AppSelectionStepView: View {
         OnboardingStepScaffold(
             title: "Choose what counts",
             subtitle: "Pick the apps, categories and websites that count toward \(name)'s screen time.",
+            symbol: "square.grid.2x2.fill",
+            color: Theme.coral,
             buttonTitle: viewModel.draft.hasSelection ? "Continue" : "Skip for now",
             action: { viewModel.advance(to: .budget) }
         ) {
@@ -43,7 +45,7 @@ struct SelectionSummaryView: View {
         }
         .padding()
         .frame(maxWidth: .infinity)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color.accentColor.opacity(0.1)))
+        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Theme.coral.opacity(0.12)))
     }
 
     private func stat(_ count: Int, _ label: String) -> some View {

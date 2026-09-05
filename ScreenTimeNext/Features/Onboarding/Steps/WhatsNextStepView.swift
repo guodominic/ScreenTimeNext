@@ -12,6 +12,8 @@ struct WhatsNextStepView: View {
         OnboardingStepScaffold(
             title: "What can \(name) do next?",
             subtitle: "Pick the activities \(name) can choose from when screen time ends.",
+            symbol: "star.fill",
+            color: Theme.lavender,
             buttonTitle: "Continue",
             action: { viewModel.advance(to: .ready) }
         ) {
@@ -25,18 +27,20 @@ struct WhatsNextStepView: View {
                             viewModel.draft.selectedActivities.insert(activity)
                         }
                     } label: {
-                        HStack {
-                            Text(activity.displayName)
+                        HStack(spacing: 10) {
+                            Image(systemName: activity.symbolName)
+                                .foregroundStyle(selected ? .white : Theme.color(for: activity))
+                            Text(activity.displayName).fontWeight(.semibold)
                             Spacer()
-                            if selected {
-                                Image(systemName: "checkmark.circle.fill")
-                            }
+                            if selected { Image(systemName: "checkmark.circle.fill") }
                         }
-                        .padding(.vertical, 10)
+                        .padding(.vertical, 12).padding(.horizontal, 12)
                         .frame(maxWidth: .infinity)
+                        .foregroundStyle(selected ? .white : .primary)
+                        .background(RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .fill(selected ? Theme.color(for: activity) : Theme.color(for: activity).opacity(0.12)))
                     }
-                    .buttonStyle(.bordered)
-                    .tint(selected ? Color.accentColor : Color.secondary)
+                    .buttonStyle(.plain)
                 }
             }
             if viewModel.draft.selectedActivities.isEmpty {

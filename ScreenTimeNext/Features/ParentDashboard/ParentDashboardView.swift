@@ -2,8 +2,8 @@
 //  ScreenTimeNext
 //
 //  Task 014 — PRD §6.9: today's budget, remaining time, protection status, selected content,
-//  selected activities. Parent controls are explicit and deliberate (§7.5); nothing here is one
-//  tap from the child timer.
+//  selected activities. Parent controls are explicit and deliberate (§7.5). Extend time is a dial
+//  (D-013); Start over lives at the bottom of this screen.
 
 import SwiftUI
 import UIKit
@@ -15,7 +15,8 @@ struct ParentDashboardView: View {
     @Environment(\.openURL) private var openURL
     @State private var viewModel: ParentDashboardViewModel
     @State private var confirmEndSession = false
-    @State private var pendingExtension: Int?
+    @State private var confirmReset = false
+    @State private var showExtend = false
     let onOpenTimer: () -> Void
     let onReset: () -> Void
 
@@ -25,21 +26,27 @@ struct ParentDashboardView: View {
         self.onReset = onReset
     }
 
+    private var name: String { viewModel.profile?.name ?? "your child" }
+
     var body: some View {
         NavigationStack {
             List {
-                todaySection
+                heroSection
                 childSection
                 contentSection
                 whatsNextSection
                 parentSection
+                dangerSection
             }
-            .navigationTitle(viewModel.profile.map { "\($0.name)'s screen time" } ?? "ScreenTimeNext")
+            .listSectionSpacing(14)
+            .scrollContentBackground(.hidden)
+            .background(Color(.systemGroupedBackground))
+            .navigationTitle("ScreenTimeNext")
             .toolbar {
                 NavigationLink {
-                    SettingsView(services: services, onSaved: { viewModel.reload() }, onReset: onReset)
+                    SettingsView(services: services, onSaved: { viewModel.reload() })
                 } label: {
-                    Label("Settings", systemImage: "gearshape")
+                    Label("Settings", systemImage: "gearshape.fill")
                 }
             }
             .onAppear { viewModel.appeared() }
@@ -53,37 +60,96 @@ struct ParentDashboardView: View {
             } message: {
                 Text("The time used so far counts toward today's budget.")
             }
+            .confirmationDialog("Start over?", isPresented: $confirmReset, titleVisibility: .visible) {
+                Button("Erase and start over", role: .destructive) { onReset() }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Erases \(name)'s profile and all settings on this device. This cannot be undone.")
+            }
+            .sheet(isPresented: $showExtend) {
+                ExtendTimeSheet(childName: name) { minutes in
+                    viewModel.extend(minutes: minutes)
+                }
+                .presentationDetents([.medium, .large])
+            }
         }
     }
 
     // MARK: Sections
 
-    private var todaySection: some View {
-        Section("Today") {
-            LabeledContent("Daily budget", value: "\(viewModel.configuration.dailyBudgetSeconds / 60) min")
-            LabeledContent("Remaining today", value: ChildTimerView.clock(viewModel.remainingTodaySeconds))
-            LabeledContent("Session", value: viewModel.sessionStatusText)
-            LabeledContent("Protection", value: viewModel.protectionText)
-            LabeledContent("Screen Time access", value: viewModel.authorizationText)
+    private var heroSection: some View {
+        Section {
+            HStack(spacing: 20) {
+                ZStack {
+                    ProgressRing(fraction: viewModel.remainingFraction, lineWidth: 12, color: .white.opacity(0.95))
+                    VStack(spacing: 0) {
+                        Text(ChildTimerView.clock(viewModel.session.window != nil ? viewModel.session.remainingSeconds : viewModel.remainingTodaySeconds))
+                            .font(.system(size: 26, weight: .bold, design: .rounded))
+                            .monospacedDigit()
+                            .contentTransition(.numericText())
+                        Text(viewModel.session.window != nil ? "in session" : "left today")
+                            .font(.caption2.weight(.semibold))
+                            .opacity(0.85)
+                    }
+                }
+                .frame(width: 120, height: 120)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(name)
+                        .font(.system(.title2, design: .rounded).bold())
+                    statChip("clock.fill", "\(viewModel.configuration.dailyBudgetSeconds / 60) min a day")
+                    statChip(sessionSymbol, viewModel.sessionStatusText)
+                    statChip("shield.lefthalf.filled", viewModel.protectionText)
+                }
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(.white)
+            .padding(20)
+            .background(RoundedRectangle(cornerRadius: 24, style: .continuous).fill(Theme.heroGradient))
+            .listRowInsets(EdgeInsets())
+            .listRowBackground(Color.clear)
         }
+    }
+
+    private var sessionSymbol: String {
+        switch viewModel.session.state {
+        case .idle: return "pause.circle.fill"
+        case .finished: return "checkmark.circle.fill"
+        case .firstWarning, .secondWarning, .finalWarning: return "bell.badge.fill"
+        default: return "play.circle.fill"
+        }
+    }
+
+    private func statChip(_ symbol: String, _ text: String) -> some View {
+        Label(text, systemImage: symbol)
+            .font(.subheadline.weight(.semibold))
+            .padding(.horizontal, 10).padding(.vertical, 5)
+            .background(Capsule().fill(.white.opacity(0.18)))
     }
 
     private var childSection: some View {
         Section {
             Button(action: onOpenTimer) {
                 Label("Open child timer", systemImage: "hourglass")
+                    .foregroundStyle(Theme.mint)
+                    .fontWeight(.semibold)
+            }
+            if viewModel.canExtend {
+                Button { showExtend = true } label: {
+                    Label("Extend time", systemImage: "plus.circle.fill")
+                        .foregroundStyle(Theme.lavender)
+                        .fontWeight(.semibold)
+                }
             }
             if viewModel.sessionIsRunning {
-                Button(role: .destructive) {
-                    confirmEndSession = true
-                } label: {
-                    Label("End session now", systemImage: "stop.circle")
+                Button(role: .destructive) { confirmEndSession = true } label: {
+                    Label("End session now", systemImage: "stop.circle.fill")
                 }
             }
         } header: {
-            Text("Child")
+            Text("Session")
         } footer: {
-            Text("Hand the device to \(viewModel.profile?.name ?? "your child") on the timer screen. While a session runs, opening the app shows the timer; press and hold \u{201C}Parents\u{201D} to come back here.")
+            Text("Hand the device to \(name) on the timer screen. While a session runs, opening the app shows the timer; press and hold \u{201C}Parents\u{201D} to come back here.")
         }
     }
 
@@ -110,6 +176,8 @@ struct ParentDashboardView: View {
             } else {
                 ForEach(viewModel.configuration.selectedActivities) { activity in
                     Label(activity.displayName, systemImage: activity.symbolName)
+                        .foregroundStyle(Theme.color(for: activity))
+                        .fontWeight(.medium)
                 }
             }
         }
@@ -121,36 +189,56 @@ struct ParentDashboardView: View {
                 Button {
                     if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
                 } label: {
-                    Label("Notifications are off — warnings only show in the app", systemImage: "bell.slash")
+                    Label("Notifications are off — reminders only show in the app", systemImage: "bell.slash")
                 }
             } else {
                 LabeledContent("Notifications", value: "On")
             }
-            if viewModel.canExtend {
-                Menu {
-                    Button("+10 minutes") { pendingExtension = 10 }
-                    Button("+20 minutes") { pendingExtension = 20 }
-                } label: {
-                    Label("Extend time", systemImage: "plus.circle")
-                }
-            } else {
-                LabeledContent("Extend time") {
-                    Text("No session today yet").foregroundStyle(.secondary)
-                }
-            }
+            LabeledContent("Screen Time access", value: viewModel.authorizationText)
+            LabeledContent("Reminders", value: reminderSummary)
         } header: {
-            Text("Parent")
-        } footer: {
-            Text("Extra minutes are beyond today's budget. Allow Once arrives with Screen Time access.")
+            Text("Status")
         }
-        .confirmationDialog("Give \(viewModel.profile?.name ?? "your child") \(pendingExtension ?? 0) more minutes?",
-                            isPresented: Binding(get: { pendingExtension != nil }, set: { if !$0 { pendingExtension = nil } }),
-                            titleVisibility: .visible) {
-            Button("Add \(pendingExtension ?? 0) minutes") {
-                if let m = pendingExtension { viewModel.extend(minutes: m) }
-                pendingExtension = nil
+    }
+
+    private var reminderSummary: String {
+        let mins = viewModel.configuration.warningOffsetsSeconds.map { "\($0 / 60)" }
+        return mins.isEmpty ? "Finish only" : mins.joined(separator: " / ") + " min"
+    }
+
+    private var dangerSection: some View {
+        Section {
+            Button("Start over", role: .destructive) { confirmReset = true }
+        } footer: {
+            Text("Erases the child profile and all settings on this device.")
+        }
+    }
+}
+
+/// D-013: extension minutes on a dial, 2–120 in 2-minute steps.
+struct ExtendTimeSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let childName: String
+    let onExtend: (Int) -> Void
+    @State private var minutes = 10
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 20) {
+                Text("Give \(childName) more time")
+                    .font(.system(.title2, design: .rounded).bold())
+                MinuteDial(minutes: $minutes, range: 2...120, step: 2, color: Theme.lavender)
+                Text("Extra minutes are beyond today's budget.")
+                    .font(.footnote).foregroundStyle(.secondary)
+                Button { onExtend(minutes); dismiss() } label: { Text("Add \(minutes) minutes") }
+                    .buttonStyle(PillButtonStyle(color: Theme.lavender))
+                    .padding(.horizontal, 24)
             }
-            Button("Cancel", role: .cancel) { pendingExtension = nil }
+            .padding(.top, 20)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+            }
         }
     }
 }

@@ -1,9 +1,8 @@
 //  SettingsView.swift
 //  ScreenTimeNext
 //
-//  Task 014 — parent settings after onboarding: name, budget (§6.5 presets), warnings (§6.6),
-//  activities (§6.7), protected content (§6.4, mocked in Phase 0), and "start over".
-//  Edits are held locally and written on Save, through the same protocols onboarding used.
+//  Task 014 / D-013 — parent settings after onboarding: name, budget dial, reminder dials,
+//  activities, protected content (mocked in Phase 0). "Start over" lives on the dashboard.
 
 import SwiftUI
 import ScreenTimeNextCore
@@ -12,17 +11,13 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     let services: ServiceContainer
     let onSaved: () -> Void
-    let onReset: () -> Void
 
     @State private var childName = ""
-    @State private var budgetSeconds = ScreenTimeConfiguration.defaultBudgetSeconds
-    @State private var warning10 = true
-    @State private var warning5 = true
-    @State private var warning1 = true
+    @State private var budgetMinutes = ScreenTimeConfiguration.defaultBudgetSeconds / 60
+    @State private var warningMinutes: [Int] = [10, 5, 1]
     @State private var activities: Set<TransitionActivity> = []
     @State private var selection: SelectionSnapshot?
     @State private var existingProfileID: UUID?
-    @State private var confirmReset = false
     @State private var errorText: String?
 
     var body: some View {
@@ -34,19 +29,26 @@ struct SettingsView: View {
             }
 
             Section {
-                Picker("Daily budget", selection: $budgetSeconds) {
-                    ForEach(ScreenTimeConfiguration.budgetPresetsSeconds, id: \.self) { seconds in
-                        Text("\(seconds / 60) minutes").tag(seconds)
-                    }
+                HStack {
+                    Spacer()
+                    MinuteDial(minutes: $budgetMinutes, range: 2...120, step: 2, color: Theme.mint, size: 200)
+                    Spacer()
                 }
+                .listRowBackground(Color.clear)
+            } header: {
+                Text("Daily budget")
             } footer: {
                 Text("Changes apply from the next session.")
             }
 
-            Section("Gentle warnings") {
-                Toggle("10 minutes left", isOn: $warning10)
-                Toggle("5 minutes left", isOn: $warning5)
-                Toggle("1 minute left", isOn: $warning1)
+            Section {
+                WarningDials(minutes: $warningMinutes)
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
+            } header: {
+                Text("Reminders (minutes before the end)")
+            } footer: {
+                Text("Up to three. Off skips that reminder. A finish notification is always sent.")
             }
 
             Section {
@@ -56,10 +58,11 @@ struct SettingsView: View {
                     } label: {
                         HStack {
                             Label(activity.displayName, systemImage: activity.symbolName)
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(Theme.color(for: activity))
+                                .fontWeight(.medium)
                             Spacer()
                             if activities.contains(activity) {
-                                Image(systemName: "checkmark").foregroundStyle(Color.accentColor)
+                                Image(systemName: "checkmark.circle.fill").foregroundStyle(Theme.color(for: activity))
                             }
                         }
                     }
@@ -83,12 +86,6 @@ struct SettingsView: View {
                 Text("Protected content")
             }
 
-            Section {
-                Button("Start over", role: .destructive) { confirmReset = true }
-            } footer: {
-                Text("Erases the child profile and all settings on this device.")
-            }
-
             if let errorText {
                 Section { Text(errorText).foregroundStyle(.red) }
             }
@@ -100,12 +97,6 @@ struct SettingsView: View {
                 Button("Save") { save() }
                     .disabled(childName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
-        }
-        .confirmationDialog("Start over?", isPresented: $confirmReset, titleVisibility: .visible) {
-            Button("Erase and start over", role: .destructive) { onReset() }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This cannot be undone.")
         }
         .onAppear(perform: load)
     }
@@ -119,10 +110,10 @@ struct SettingsView: View {
             existingProfileID = profile.id
         }
         let config = (try? storage.loadConfiguration()) ?? .default
-        budgetSeconds = config.dailyBudgetSeconds
-        warning10 = config.warning10Enabled
-        warning5 = config.warning5Enabled
-        warning1 = config.warning1Enabled
+        budgetMinutes = config.dailyBudgetSeconds / 60
+        var mins = config.warningOffsetsSeconds.map { $0 / 60 }
+        while mins.count < ScreenTimeConfiguration.maxWarnings { mins.append(0) }
+        warningMinutes = mins
         activities = Set(config.selectedActivities)
         selection = try? services.selection.loadSelection()
     }
@@ -131,10 +122,8 @@ struct SettingsView: View {
         let name = childName.trimmingCharacters(in: .whitespacesAndNewlines)
         let profile = ChildProfile(id: existingProfileID ?? UUID(), name: name)
         let config = ScreenTimeConfiguration(
-            dailyBudgetSeconds: budgetSeconds,
-            warning10Enabled: warning10,
-            warning5Enabled: warning5,
-            warning1Enabled: warning1,
+            dailyBudgetSeconds: budgetMinutes * 60,
+            warningOffsetsSeconds: warningMinutes.map { $0 * 60 },
             selectedActivities: TransitionActivity.allCases.filter { activities.contains($0) }
         )
         do {
@@ -157,6 +146,6 @@ struct SettingsView: View {
 
 #Preview {
     NavigationStack {
-        SettingsView(services: .mocks(), onSaved: {}, onReset: {})
+        SettingsView(services: .mocks(), onSaved: {})
     }
 }

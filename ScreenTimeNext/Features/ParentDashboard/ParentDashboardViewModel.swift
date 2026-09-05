@@ -87,12 +87,20 @@ final class ParentDashboardViewModel {
     var sessionStatusText: String {
         switch session.state {
         case .idle:      return "Not started"
-        case .active, .extended: return "In progress"
-        case .warning10: return "10-minute warning"
-        case .warning5:  return "5-minute warning"
-        case .warning1:  return "1-minute warning"
+        case .active:    return "In progress"
+        case .extended:  return "Extended"
+        case .firstWarning, .secondWarning, .finalWarning:
+            if let m = session.activeWarningMinutes { return "\(m)-minute reminder" }
+            return "Reminder"
         case .finished:  return "Finished"
         }
+    }
+
+    /// Remaining ÷ budget for the hero ring (0…1). During a session, the live window counts.
+    var remainingFraction: Double {
+        let budget = max(1, configuration.dailyBudgetSeconds)
+        let shown = session.window != nil ? session.remainingSeconds : remainingTodaySeconds
+        return min(1, Double(shown) / Double(budget))
     }
 
     var sessionIsRunning: Bool { session.window != nil && session.state != .finished }

@@ -14,7 +14,7 @@ import ScreenTimeNextCore
 nonisolated final class UserNotificationScheduler: NSObject, NotificationScheduling, UNUserNotificationCenterDelegate, @unchecked Sendable {
 
     private let center = UNUserNotificationCenter.current()
-    private let identifiers = NotificationKind.allCases.map(\.rawValue)
+    private let identifiers = NotificationIdentifier.all
 
     override init() {
         super.init()

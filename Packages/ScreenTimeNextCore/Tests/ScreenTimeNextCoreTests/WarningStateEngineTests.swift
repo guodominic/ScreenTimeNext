@@ -1,104 +1,106 @@
 //  WarningStateEngineTests.swift
 //  ScreenTimeNextCoreTests
 //
-//  Starting tests for the pure state logic. Task 008 must extend these to cover
-//  every transition in the PRD §11 table and every enabled/disabled warning combination.
+//  Task 008 / D-013 — configurable warning offsets. Default offsets 600/300/60.
 
 import XCTest
 @testable import ScreenTimeNextCore
 
 final class WarningStateEngineTests: XCTestCase {
 
-    // MARK: - Natural stage from remaining time
+    private let d = ScreenTimeConfiguration.defaultWarningOffsets   // [600, 300, 60]
 
-    func testStageAboveTenMinutesIsActive() {
-        XCTAssertEqual(WarningStateEngine.stage(remainingSeconds: 601), .active)
-        XCTAssertEqual(WarningStateEngine.stage(remainingSeconds: 3600), .active)
+    func testStageAboveFirstWarningIsActive() {
+        XCTAssertEqual(WarningStateEngine.stage(remainingSeconds: 601, warningOffsets: d), .active)
+        XCTAssertEqual(WarningStateEngine.stage(remainingSeconds: 3600, warningOffsets: d), .active)
     }
 
-    /// Boundaries are inclusive. This is the decision Task 008 must not silently change.
     func testExactBoundariesAreInclusive() {
-        XCTAssertEqual(WarningStateEngine.stage(remainingSeconds: 600), .warning10)
-        XCTAssertEqual(WarningStateEngine.stage(remainingSeconds: 300), .warning5)
-        XCTAssertEqual(WarningStateEngine.stage(remainingSeconds: 60), .warning1)
-        XCTAssertEqual(WarningStateEngine.stage(remainingSeconds: 0), .finished)
+        XCTAssertEqual(WarningStateEngine.stage(remainingSeconds: 600, warningOffsets: d), .firstWarning)
+        XCTAssertEqual(WarningStateEngine.stage(remainingSeconds: 300, warningOffsets: d), .secondWarning)
+        XCTAssertEqual(WarningStateEngine.stage(remainingSeconds: 60, warningOffsets: d), .finalWarning)
+        XCTAssertEqual(WarningStateEngine.stage(remainingSeconds: 0, warningOffsets: d), .finished)
     }
 
     func testOneSecondAboveEachBoundaryStaysInPreviousStage() {
-        XCTAssertEqual(WarningStateEngine.stage(remainingSeconds: 601), .active)
-        XCTAssertEqual(WarningStateEngine.stage(remainingSeconds: 301), .warning10)
-        XCTAssertEqual(WarningStateEngine.stage(remainingSeconds: 61), .warning5)
-        XCTAssertEqual(WarningStateEngine.stage(remainingSeconds: 1), .warning1)
+        XCTAssertEqual(WarningStateEngine.stage(remainingSeconds: 301, warningOffsets: d), .firstWarning)
+        XCTAssertEqual(WarningStateEngine.stage(remainingSeconds: 61, warningOffsets: d), .secondWarning)
+        XCTAssertEqual(WarningStateEngine.stage(remainingSeconds: 1, warningOffsets: d), .finalWarning)
     }
 
     func testNegativeRemainingIsFinished() {
-        XCTAssertEqual(WarningStateEngine.stage(remainingSeconds: -1), .finished)
-        XCTAssertEqual(WarningStateEngine.stage(remainingSeconds: -99_999), .finished)
+        XCTAssertEqual(WarningStateEngine.stage(remainingSeconds: -1, warningOffsets: d), .finished)
     }
 
-    // MARK: - Monotonic progression
+    // MARK: Roles with fewer warnings (D-013)
+
+    func testTwoWarningsSkipTheMiddleRole() {
+        let two = [600, 60]
+        XCTAssertEqual(WarningStateEngine.stage(remainingSeconds: 400, warningOffsets: two), .firstWarning)
+        XCTAssertEqual(WarningStateEngine.stage(remainingSeconds: 30, warningOffsets: two), .finalWarning)
+    }
+
+    func testOneWarningIsTheFirstWarning() {
+        XCTAssertEqual(WarningStateEngine.stage(remainingSeconds: 200, warningOffsets: [300]), .firstWarning)
+        XCTAssertEqual(WarningStateEngine.stage(remainingSeconds: 2, warningOffsets: [300]), .firstWarning)
+    }
+
+    func testNoWarningsGoesStraightToFinished() {
+        XCTAssertEqual(WarningStateEngine.stage(remainingSeconds: 1, warningOffsets: []), .active)
+        XCTAssertEqual(WarningStateEngine.stage(remainingSeconds: 0, warningOffsets: []), .finished)
+    }
+
+    func testUnsortedOrDuplicateOffsetsAreNormalized() {
+        let messy = [60, 600, 600, 300, 0, -5, 5000]   // 5000 clamps to 900
+        XCTAssertEqual(ScreenTimeConfiguration.normalizedOffsets(messy), [900, 600, 300])
+        XCTAssertEqual(WarningStateEngine.stage(remainingSeconds: 700, warningOffsets: messy), .firstWarning)
+    }
+
+    func testActiveWarningOffsetForCopy() {
+        XCTAssertEqual(WarningStateEngine.activeWarningOffset(remainingSeconds: 250, warningOffsets: d), 300)
+        XCTAssertNil(WarningStateEngine.activeWarningOffset(remainingSeconds: 700, warningOffsets: d))
+    }
+
+    // MARK: Monotonic progression
 
     func testSessionNeverStepsBackwardOnJitter() {
-        // A one-second clock jitter must not move warning5 back to warning10.
-        let result = WarningStateEngine.next(current: .warning5, remainingSeconds: 305)
-        XCTAssertEqual(result, .warning5)
+        XCTAssertEqual(WarningStateEngine.next(current: .secondWarning, remainingSeconds: 305, warningOffsets: d), .secondWarning)
     }
 
     func testIdleStaysIdleUntilExplicitlyStarted() {
-        XCTAssertEqual(WarningStateEngine.next(current: .idle, remainingSeconds: 3600), .idle)
-        XCTAssertEqual(WarningStateEngine.start(remainingSeconds: 3600), .active)
+        XCTAssertEqual(WarningStateEngine.next(current: .idle, remainingSeconds: 3600, warningOffsets: d), .idle)
+        XCTAssertEqual(WarningStateEngine.start(remainingSeconds: 3600, warningOffsets: d), .active)
     }
 
-    /// Starting a session that is already inside a warning window enters that window directly.
     func testStartingLateEntersTheCorrectStage() {
-        XCTAssertEqual(WarningStateEngine.start(remainingSeconds: 100), .warning5)
-        XCTAssertEqual(WarningStateEngine.start(remainingSeconds: 30), .warning1)
+        XCTAssertEqual(WarningStateEngine.start(remainingSeconds: 100, warningOffsets: d), .secondWarning)
+        XCTAssertEqual(WarningStateEngine.start(remainingSeconds: 30, warningOffsets: d), .finalWarning)
     }
 
     func testExtendedResumesIntoNaturalStage() {
-        XCTAssertEqual(WarningStateEngine.next(current: .extended, remainingSeconds: 1200), .active)
-        XCTAssertEqual(WarningStateEngine.next(current: .extended, remainingSeconds: 400), .warning10)
+        XCTAssertEqual(WarningStateEngine.next(current: .extended, remainingSeconds: 1200, warningOffsets: d), .active)
+        XCTAssertEqual(WarningStateEngine.next(current: .extended, remainingSeconds: 400, warningOffsets: d), .firstWarning)
     }
 
     func testFinishedStaysFinishedWithoutAnExtension() {
-        XCTAssertEqual(WarningStateEngine.next(current: .finished, remainingSeconds: 0), .finished)
+        XCTAssertEqual(WarningStateEngine.next(current: .finished, remainingSeconds: 0, warningOffsets: d), .finished)
     }
 
     func testDayRolloverReturnsToIdle() {
         XCTAssertEqual(WarningStateEngine.dayRollover(), .idle)
     }
-
-    // MARK: - Presentation toggles do not affect the state machine
-
-    func testDisabledWarningIsEnteredButNotPresented() {
-        var config = ScreenTimeConfiguration.default
-        config.warning5Enabled = false
-
-        let state = WarningStateEngine.stage(remainingSeconds: 300)
-        XCTAssertEqual(state, .warning5, "The state machine must be config-independent")
-        XCTAssertFalse(WarningStateEngine.shouldPresent(state, configuration: config))
-    }
-
-    func testEnabledWarningIsPresented() {
-        let config = ScreenTimeConfiguration.default
-        XCTAssertTrue(WarningStateEngine.shouldPresent(.warning10, configuration: config))
-        XCTAssertTrue(WarningStateEngine.shouldPresent(.warning1, configuration: config))
-    }
 }
 
 final class SessionWindowTests: XCTestCase {
 
-    /// Rule 4 — remaining time is derived from absolute timestamps, never from a Timer.
     func testRemainingIsDerivedFromTimestamps() {
         let start = Date(timeIntervalSince1970: 1_000_000)
         let window = SessionWindow(startedAt: start, budgetSeconds: 3600)
-
         XCTAssertEqual(window.remainingSeconds(at: start), 3600)
         XCTAssertEqual(window.remainingSeconds(at: start.addingTimeInterval(600)), 3000)
         XCTAssertEqual(window.remainingSeconds(at: start.addingTimeInterval(3600)), 0)
     }
 
-    /// Backgrounding for 20 minutes and returning must show correct time immediately (QA-06).
     func testLongGapComputesCorrectlyWithNoCatchUp() {
         let start = Date(timeIntervalSince1970: 1_000_000)
         let window = SessionWindow(startedAt: start, budgetSeconds: 3600)

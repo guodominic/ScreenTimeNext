@@ -37,34 +37,51 @@ struct OnboardingFlow: View {
 
 // MARK: - Shared step chrome
 
-/// Consistent layout for every onboarding step: title, optional subtitle, content, primary button.
+/// Consistent layout for every onboarding step: icon, title, optional subtitle, content, pill button.
 struct OnboardingStepScaffold<Content: View>: View {
     let title: String
     var subtitle: String? = nil
+    var symbol: String = "sparkles"
+    var color: Color = Theme.sky
     let buttonTitle: String
     var buttonEnabled: Bool = true
     let action: () -> Void
     @ViewBuilder let content: () -> Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text(title)
-                .font(.title.bold())
-            if let subtitle {
-                Text(subtitle)
-                    .foregroundStyle(.secondary)
+        ZStack {
+            LinearGradient(colors: [color.opacity(0.25), Color(.systemGroupedBackground)],
+                           startPoint: .top, endPoint: .center)
+                .ignoresSafeArea()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    Image(systemName: symbol)
+                        .font(.system(size: 34, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 64, height: 64)
+                        .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(color))
+                        .padding(.bottom, 4)
+                    Text(title)
+                        .font(.system(.largeTitle, design: .rounded).bold())
+                    if let subtitle {
+                        Text(subtitle)
+                            .font(.body)
+                            .foregroundStyle(.secondary)
+                    }
+                    content()
+                        .padding(.top, 8)
+                }
+                .padding(24)
             }
-            content()
-            Spacer(minLength: 0)
-            Button(action: action) {
-                Text(buttonTitle)
-                    .frame(maxWidth: .infinity)
+            .safeAreaInset(edge: .bottom) {
+                Button(action: action) { Text(buttonTitle) }
+                    .buttonStyle(PillButtonStyle(color: color))
+                    .disabled(!buttonEnabled)
+                    .opacity(buttonEnabled ? 1 : 0.5)
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 12)
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .disabled(!buttonEnabled)
         }
-        .padding(24)
         .navigationBarTitleDisplayMode(.inline)
     }
 }

@@ -14,7 +14,7 @@ final class NotificationPlanTests: XCTestCase {
     func testFullPlanForFreshWindow() {
         let window = SessionWindow(startedAt: start, budgetSeconds: 1200)
         let plan = NotificationPlan.make(for: window, configuration: .default, childName: "Ivy", now: start)
-        XCTAssertEqual(plan.map(\.identifier), NotificationKind.allCases.map(\.rawValue))
+        XCTAssertEqual(plan.map(\.identifier), [NotificationIdentifier.warning(0), NotificationIdentifier.warning(1), NotificationIdentifier.warning(2), NotificationIdentifier.finished])
         XCTAssertEqual(plan.map { Int($0.fireDate.timeIntervalSince(start)) }, [600, 900, 1140, 1200])
         XCTAssertTrue(plan[0].body.contains("Ivy"))
         XCTAssertFalse(plan.contains { $0.title.uppercased().contains("TIME'S UP") })
@@ -22,18 +22,18 @@ final class NotificationPlanTests: XCTestCase {
 
     func testDisabledWarningsAreOmittedButExpiryStays() {
         var config = ScreenTimeConfiguration.default
-        config.warning10Enabled = false
-        config.warning1Enabled = false
+        config.warningOffsetsSeconds = [300]
         let window = SessionWindow(startedAt: start, budgetSeconds: 1200)
         let plan = NotificationPlan.make(for: window, configuration: config, childName: "Ivy", now: start)
-        XCTAssertEqual(plan.map(\.identifier), [NotificationKind.warning5.rawValue, NotificationKind.finished.rawValue])
+        XCTAssertEqual(plan.map(\.identifier), [NotificationIdentifier.warning(0), NotificationIdentifier.finished])
+        XCTAssertTrue(plan[0].title.contains("5 minutes left"), "a single warning is the first warning and says its minutes")
     }
 
     func testPastNotificationsAreDropped() {
         let window = SessionWindow(startedAt: start, budgetSeconds: 1200)
         let later = start.addingTimeInterval(950)   // past the 10- and 5-minute marks
         let plan = NotificationPlan.make(for: window, configuration: .default, childName: "Ivy", now: later)
-        XCTAssertEqual(plan.map(\.identifier), [NotificationKind.warning1.rawValue, NotificationKind.finished.rawValue])
+        XCTAssertEqual(plan.map(\.identifier), [NotificationIdentifier.warning(2), NotificationIdentifier.finished])
     }
 
     func testChosenActivityAppearsInLaterCopy() {
@@ -47,7 +47,7 @@ final class NotificationPlanTests: XCTestCase {
         let window = SessionWindow(startedAt: start, budgetSeconds: 300)   // 5 minutes total
         let plan = NotificationPlan.make(for: window, configuration: .default, childName: "Ivy", now: start)
         // 10-minute mark is before start → dropped; 5-minute mark == now → not strictly future → dropped.
-        XCTAssertEqual(plan.map(\.identifier), [NotificationKind.warning1.rawValue, NotificationKind.finished.rawValue])
+        XCTAssertEqual(plan.map(\.identifier), [NotificationIdentifier.warning(2), NotificationIdentifier.finished])
     }
 
     // MARK: Controller integration
@@ -88,7 +88,7 @@ final class NotificationPlanTests: XCTestCase {
         let (controller, storage) = try makeController(scheduler) { clock.now }
         try controller.start()
         var config = try storage.loadConfiguration()
-        config.warning10Enabled = false
+        config.warningOffsetsSeconds = [300, 60]
         try storage.save(config)
         try controller.rescheduleNotifications()
         XCTAssertEqual(scheduler.latestPlan?.count, 3)

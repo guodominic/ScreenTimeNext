@@ -282,6 +282,54 @@ warning marks, whose reliability Phase 1 must measure on device (D-006's known l
 configuration + ShieldAction extension targets (two more bundle IDs in the entitlement request —
 `docs/entitlement-request.md` must list them). Copy for the shield goes through the §7 checklist.
 
+---
+
+## D-013 — Configurable reminders and dial controls (deviates from PRD §6.6)
+**Date:** 2026-09-05 · **Status:** accepted (Dominic)
+
+**Context.** PRD §6.6 fixed the warnings at 10/5/1 minutes with toggles and said "no custom
+intervals in V1". Dominic wants dials: budget and extensions 2–120 minutes in 2-minute steps,
+and up to three reminders each 0–15 minutes before the end (0 = off), 1-minute steps.
+
+**Decision.**
+- `ScreenTimeConfiguration.warningOffsetsSeconds: [Int]` replaces the three toggles: normalized
+  (unique, clamped 60…900, earliest-first, ≤ 3). Legacy JSON with the toggle shape still decodes.
+- `ScreenTimeState` warning cases are now ROLES — `firstWarning` (earliest; carries the activity
+  chooser), `secondWarning` (middle, skipped with two reminders), `finalWarning` (last). One reminder
+  is `firstWarning`. No reminders → `active` straight to `finished`.
+- `WarningStateEngine` is offsets-driven; D-004's "entered but not shown" is superseded — a
+  reminder the parent turned off does not exist as a stage.
+- Notification identifiers are per slot (`screentimenext.warning.0/1/2`) + finished.
+- `MinuteDial` is the shared control (drag around the ring, snaps to step, haptics, ± buttons,
+  VoiceOver adjustable). Budget: 2–120 step 2 (the 1-minute floor was not adopted — say so if it
+  should be). Extension: same dial, default 10. Reminders: three 0–15 dials.
+
+**Consequences.** PRD §6.6 / §6.11–§6.13 copy is now computed from the configured minutes.
+Task 008 tests rewritten around offsets and roles. Docs that say "10/5/1" describe the defaults.
+
+---
+
+## D-014 — Live Activity for the countdown (Widget extension)
+**Date:** 2026-09-05 · **Status:** accepted; target creation pending in Xcode
+
+**Context.** Banners are missable and iOS cannot foreground the app (D-012). A Live Activity is
+the one always-visible surface Apple offers: Dynamic Island / status area on iPhone, Lock Screen
+on iPhone and iPad. No entitlement; a free Personal Team can ship a widget extension.
+
+**Decision.** `SessionPresenting` (package protocol) is driven by `SessionController` exactly like
+notifications; the app implements it on ActivityKit (`LiveActivityPresenter`); the widget renders
+`ScreenTimeActivityAttributes` (package, `#if canImport(ActivityKit)`) with `Text(timerInterval:)`
+so the countdown ticks without any process. Content (state line, chosen activity) updates when the
+app updates the activity — start, choose, extend, and any tick while the app is open.
+
+**Limits.** On an unlocked iPad in use, nothing is visible until the lock screen. The state line
+does not advance while the app is closed (the timer does). Phase 1 can update the activity from
+the DeviceActivity extension at warning marks.
+
+**Consequences.** New target `ScreenTimeNextWidgets` (folder beside the app), linking the package;
+`NSSupportsLiveActivities = YES` on the app target. Two more bundle IDs are NOT needed for the
+entitlement request (no Screen Time API in the widget).
+
 <!-- Template for new entries:
 
 ## D-NNN — <short imperative title>

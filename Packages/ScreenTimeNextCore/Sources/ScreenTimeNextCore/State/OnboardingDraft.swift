@@ -21,10 +21,8 @@ public struct OnboardingDraft: Equatable, Sendable {
     /// §6.5 — default 60 minutes.
     public var dailyBudgetSeconds: Int = ScreenTimeConfiguration.defaultBudgetSeconds
 
-    /// §6.6 — all three default on.
-    public var warning10Enabled: Bool = true
-    public var warning5Enabled: Bool = true
-    public var warning1Enabled: Bool = true
+    /// §6.6 / D-013 — up to three reminders, minutes before the end; 0 = off. Default 10 / 5 / 1.
+    public var warningMinutes: [Int] = [10, 5, 1]
 
     /// §6.7 — activities the child may choose from.
     public var selectedActivities: Set<TransitionActivity> = []
@@ -49,9 +47,7 @@ public struct OnboardingDraft: Equatable, Sendable {
     public var configuration: ScreenTimeConfiguration {
         ScreenTimeConfiguration(
             dailyBudgetSeconds: dailyBudgetSeconds,
-            warning10Enabled: warning10Enabled,
-            warning5Enabled: warning5Enabled,
-            warning1Enabled: warning1Enabled,
+            warningOffsetsSeconds: warningMinutes.map { $0 * 60 },
             selectedActivities: TransitionActivity.allCases.filter { selectedActivities.contains($0) }
         )
     }

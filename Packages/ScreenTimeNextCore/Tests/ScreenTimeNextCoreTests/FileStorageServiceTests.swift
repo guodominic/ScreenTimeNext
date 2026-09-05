@@ -38,7 +38,7 @@ final class FileStorageServiceTests: XCTestCase {
         try first.save(ChildProfile(name: "Ivy"))
         var config = ScreenTimeConfiguration.default
         config.dailyBudgetSeconds = 2700
-        config.warning1Enabled = false
+        config.warningOffsetsSeconds = [600, 300]
         config.selectedActivities = [.lego, .outside]
         try first.save(config)
         let start = Date(timeIntervalSince1970: 1_700_000_000)

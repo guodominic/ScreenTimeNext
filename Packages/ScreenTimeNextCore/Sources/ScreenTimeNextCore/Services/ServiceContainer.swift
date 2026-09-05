@@ -14,6 +14,7 @@ public struct ServiceContainer: Sendable {
     public let shield: any ScreenTimeShieldService
     public let storage: any ScreenTimeStorageService
     public let notifications: any NotificationScheduling
+    public let presence: any SessionPresenting
 
     public init(
         authorization: any ScreenTimeAuthorizationService,
@@ -21,7 +22,8 @@ public struct ServiceContainer: Sendable {
         monitoring: any ScreenTimeMonitoringService,
         shield: any ScreenTimeShieldService,
         storage: any ScreenTimeStorageService,
-        notifications: any NotificationScheduling = MockNotificationScheduler()
+        notifications: any NotificationScheduling = MockNotificationScheduler(),
+        presence: any SessionPresenting = MockSessionPresenter()
     ) {
         self.authorization = authorization
         self.selection = selection
@@ -29,12 +31,13 @@ public struct ServiceContainer: Sendable {
         self.shield = shield
         self.storage = storage
         self.notifications = notifications
+        self.presence = presence
     }
 
     /// A SessionController on this container's storage and notification scheduler.
     /// Every view model uses this so there is exactly one way to build one.
     public func makeSessionController() -> SessionController {
-        SessionController(storage: storage, notifications: notifications)
+        SessionController(storage: storage, notifications: notifications, presence: presence)
     }
 
     /// Everything mocked. This is what Phase 0 runs on (D-007) and what previews use.
@@ -56,7 +59,8 @@ public struct ServiceContainer: Sendable {
     /// What the app actually runs on before the paid membership exists: the four Screen Time
     /// services mocked, persistence real (app container). Falls back to in-memory storage only if
     /// the container cannot be opened — and reports that through `storageIsVolatile`.
-    public static func phase0(notifications: any NotificationScheduling = MockNotificationScheduler()) -> ServiceContainer {
+    public static func phase0(notifications: any NotificationScheduling = MockNotificationScheduler(),
+                              presence: any SessionPresenting = MockSessionPresenter()) -> ServiceContainer {
         let storage: any ScreenTimeStorageService
         if let file = try? FileStorageService.appContainer() {
             storage = file
@@ -69,7 +73,8 @@ public struct ServiceContainer: Sendable {
             monitoring: MockScreenTimeMonitoringService(),
             shield: MockScreenTimeShieldService(),
             storage: storage,
-            notifications: notifications
+            notifications: notifications,
+            presence: presence
         )
     }
 

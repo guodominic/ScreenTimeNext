@@ -12,7 +12,7 @@ final class OnboardingDraftTests: XCTestCase {
     func testDefaultsMatchThePRD() {
         let draft = OnboardingDraft()
         XCTAssertEqual(draft.dailyBudgetSeconds, 3600)
-        XCTAssertTrue(draft.warning10Enabled && draft.warning5Enabled && draft.warning1Enabled)
+        XCTAssertEqual(draft.warningMinutes, [10, 5, 1])
         XCTAssertTrue(draft.selectedActivities.isEmpty)
         XCTAssertNil(draft.selection)
         XCTAssertFalse(draft.isChildNameValid)
@@ -42,7 +42,7 @@ final class OnboardingDraftTests: XCTestCase {
         var draft = OnboardingDraft()
         draft.childName = "Athan"
         draft.dailyBudgetSeconds = 1800
-        draft.warning5Enabled = false
+        draft.warningMinutes = [10, 0, 1]   // middle reminder off
         draft.selectedActivities = [.drawing]
         draft.selection = MockScreenTimeSelectionService.sampleSnapshot()
 
@@ -51,7 +51,7 @@ final class OnboardingDraftTests: XCTestCase {
         XCTAssertEqual(try storage.loadChildProfile()?.name, "Athan")
         let config = try storage.loadConfiguration()
         XCTAssertEqual(config.dailyBudgetSeconds, 1800)
-        XCTAssertFalse(config.warning5Enabled)
+        XCTAssertEqual(config.warningOffsetsSeconds, [600, 60])
         XCTAssertEqual(config.selectedActivities, [.drawing])
         XCTAssertEqual(try selection.loadSelection(), draft.selection)
     }

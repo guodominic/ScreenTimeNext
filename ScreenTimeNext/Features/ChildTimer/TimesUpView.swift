@@ -21,8 +21,10 @@ struct TimesUpView: View {
 
             if let activity = chosenActivity {
                 Image(systemName: activity.symbolName)
-                    .font(.system(size: 64))
-                    .foregroundStyle(Color.accentColor)
+                    .font(.system(size: 56))
+                    .foregroundStyle(.white)
+                    .frame(width: 120, height: 120)
+                    .background(Circle().fill(Theme.color(for: activity)))
                     .padding(.top, 8)
                 Text("You chose \(activity.displayName).")
                     .font(.title2)

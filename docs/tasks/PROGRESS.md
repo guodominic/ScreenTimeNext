@@ -64,6 +64,13 @@ Tasks 008, 009, 014, 015 were written and committed separately but verified in O
 `test.sh` + `build.sh` run on 2026-09-05 (Dominic's call, low-risk Phase 0 work). Rule 9/10 stays the
 default; batching is acceptable for mock-backed experience tasks when errors are file-attributable.
 
+## 2026-09-05 late changes (Dominic's review of the first device build)
+- D-013 configurable reminders + dials (budget, extension, 3 reminders); engine/notifications/UI reworked.
+- D-014 Live Activity — code in place; **Widget Extension target must be created in Xcode** (see Staging/).
+- Bug fixed: dashboard showed "Session: Not started" during a session (fresh controller stayed idle).
+- Theme pass (Theme.swift, cards, rings, colorful activity tiles); Start over moved to the dashboard.
+- Time Sensitive notifications: flagged in code; effective only with the capability (B-004).
+
 ## Critical path
 
 ```text

@@ -10,6 +10,8 @@ struct ChildProfileStepView: View {
         OnboardingStepScaffold(
             title: "What's your child's first name?",
             subtitle: "Just a first name. It stays on this device.",
+            symbol: "face.smiling.fill",
+            color: Theme.lavender,
             buttonTitle: "Continue",
             buttonEnabled: viewModel.draft.isChildNameValid,
             action: { viewModel.advance(to: .permission) }

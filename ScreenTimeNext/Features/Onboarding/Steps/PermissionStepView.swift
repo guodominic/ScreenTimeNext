@@ -12,6 +12,8 @@ struct PermissionStepView: View {
         OnboardingStepScaffold(
             title: "Screen Time access",
             subtitle: "ScreenTimeNext needs Screen Time access to:",
+            symbol: "checkmark.shield.fill",
+            color: Theme.sky,
             buttonTitle: "Continue",
             buttonEnabled: viewModel.canContinuePastPermission,
             action: { viewModel.advance(to: .appSelection) }
@@ -33,7 +35,7 @@ struct PermissionStepView: View {
             Text(number)
                 .font(.headline)
                 .frame(width: 28, height: 28)
-                .background(Circle().fill(Color.accentColor.opacity(0.15)))
+                .background(Circle().fill(Theme.sky.opacity(0.18)))
             Text(text)
         }
     }

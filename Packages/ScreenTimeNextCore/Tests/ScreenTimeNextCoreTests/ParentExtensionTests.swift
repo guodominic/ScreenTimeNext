@@ -37,7 +37,7 @@ final class ParentExtensionTests: XCTestCase {
         clock.advance(900)
         XCTAssertEqual(try controller.tick().state, .finished)
         let snap = try controller.extend(bySeconds: 600)
-        XCTAssertEqual(snap?.state, .warning10, "+10 at zero lands exactly on the 10-minute boundary")
+        XCTAssertEqual(snap?.state, .firstWarning, "+10 at zero lands exactly on the first (10-minute) warning")
         XCTAssertEqual(snap?.remainingSeconds, 600)
         clock.advance(1)
         XCTAssertEqual(try controller.tick().remainingSeconds, 599)

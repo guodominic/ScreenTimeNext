@@ -18,32 +18,31 @@ import Foundation
 public struct ChildSessionSnapshot: Equatable, Sendable {
     public let state: ScreenTimeState
     public let remainingSeconds: Int
-    /// False when the parent disabled this warning (§6.6) — render as plain `active` instead.
-    public let presentsWarning: Bool
+    /// Seconds-before-end of the warning currently in force (for "5 minutes left" copy).
+    public let activeWarningSeconds: Int?
     public let window: SessionWindow?
 
-    public init(state: ScreenTimeState, remainingSeconds: Int, presentsWarning: Bool, window: SessionWindow?) {
+    public init(state: ScreenTimeState, remainingSeconds: Int, activeWarningSeconds: Int? = nil, window: SessionWindow?) {
         self.state = state
         self.remainingSeconds = remainingSeconds
-        self.presentsWarning = presentsWarning
+        self.activeWarningSeconds = activeWarningSeconds
         self.window = window
     }
 
-    public static let idle = ChildSessionSnapshot(state: .idle, remainingSeconds: 0, presentsWarning: false, window: nil)
-
-    /// The state to *render*: a disabled warning shows as `.active`.
-    public var displayState: ScreenTimeState {
-        state.isWarning && !presentsWarning ? .active : state
-    }
+    public static let idle = ChildSessionSnapshot(state: .idle, remainingSeconds: 0, window: nil)
 
     /// PRD §6.11–§6.14: the child's pick, if any, for this session.
     public var chosenActivity: TransitionActivity? { window?.chosenActivity }
+
+    /// Whole minutes of the active warning, e.g. 5 for a 300-second offset.
+    public var activeWarningMinutes: Int? { activeWarningSeconds.map { max(1, $0 / 60) } }
 }
 
 public final class SessionController: @unchecked Sendable {
 
     private let storage: any ScreenTimeStorageService
     private let notifications: (any NotificationScheduling)?
+    private let presence: (any SessionPresenting)?
     private let now: @Sendable () -> Date
     private let calendar: Calendar
     private let lock = NSLock()
@@ -53,10 +52,12 @@ public final class SessionController: @unchecked Sendable {
 
     public init(storage: any ScreenTimeStorageService,
                 notifications: (any NotificationScheduling)? = nil,
+                presence: (any SessionPresenting)? = nil,
                 calendar: Calendar = .current,
                 now: @escaping @Sendable () -> Date = { Date() }) {
         self.storage = storage
         self.notifications = notifications
+        self.presence = presence
         self.calendar = calendar
         self.now = now
     }
@@ -80,7 +81,9 @@ public final class SessionController: @unchecked Sendable {
             }
             let current = now()
             // Relaunch: the natural stage is the best knowledge we have.
-            lastState = WarningStateEngine.start(remainingSeconds: window.remainingSeconds(at: current))
+            let config = try storage.loadConfiguration()
+            lastState = WarningStateEngine.start(remainingSeconds: window.remainingSeconds(at: current),
+                                                 warningOffsets: config.warningOffsetsSeconds)
             return try snapshotLocked(for: window, at: current)
         }
     }
@@ -97,11 +100,12 @@ public final class SessionController: @unchecked Sendable {
             let current = now()
             guard remaining > 0 else {
                 lastState = .finished
-                return ChildSessionSnapshot(state: .finished, remainingSeconds: 0, presentsWarning: false, window: nil)
+                return ChildSessionSnapshot(state: .finished, remainingSeconds: 0, window: nil)
             }
             let window = SessionWindow(startedAt: current, budgetSeconds: remaining)
             try storage.save(window)
-            lastState = WarningStateEngine.start(remainingSeconds: remaining)
+            let config = try storage.loadConfiguration()
+            lastState = WarningStateEngine.start(remainingSeconds: remaining, warningOffsets: config.warningOffsetsSeconds)
             try scheduleNotificationsLocked(for: window)
             return try snapshotLocked(for: window, at: current)
         }
@@ -201,15 +205,22 @@ public final class SessionController: @unchecked Sendable {
         try recordUsageLocked(seconds: elapsed, on: window.startedAt)
         try storage.clearSessionWindow()
         notifications?.cancelAll()
+        presence?.hide()
     }
 
     /// Task 016 — (re)derive every pending notification from the window's absolute timestamps.
     private func scheduleNotificationsLocked(for window: SessionWindow) throws {
-        guard let notifications else { return }
         let config = try storage.loadConfiguration()
         let name = try storage.loadChildProfile()?.name ?? ""
-        let plan = NotificationPlan.make(for: window, configuration: config, childName: name, now: now())
-        notifications.replaceAll(with: plan)
+        if let notifications {
+            let plan = NotificationPlan.make(for: window, configuration: config, childName: name, now: now())
+            notifications.replaceAll(with: plan)
+        }
+        presence?.show(SessionPresenceState(childName: name,
+                                            startedAt: window.startedAt,
+                                            endsAt: window.endsAt,
+                                            chosenActivity: window.chosenActivity,
+                                            stateName: lastState.rawValue))
     }
 
     private func remainingBudgetSecondsLocked() throws -> Int {
@@ -227,17 +238,25 @@ public final class SessionController: @unchecked Sendable {
         let remaining = try remainingBudgetSecondsLocked()
         // No budget left today: the idle screen should say so rather than offer a Start that fails.
         let state: ScreenTimeState = remaining > 0 ? .idle : .finished
-        return ChildSessionSnapshot(state: state, remainingSeconds: remaining, presentsWarning: false, window: nil)
+        return ChildSessionSnapshot(state: state, remainingSeconds: remaining, window: nil)
     }
 
     private func snapshotLocked(for window: SessionWindow, at current: Date) throws -> ChildSessionSnapshot {
         let remaining = window.remainingSeconds(at: current)
-        lastState = WarningStateEngine.next(current: lastState, remainingSeconds: remaining)
-        let config = try storage.loadConfiguration()
+        let offsets = try storage.loadConfiguration().warningOffsetsSeconds
+        // A controller that did not open this window (dashboard, root routing, relaunch) must adopt
+        // it rather than stay idle — this was the "Session: Not started" bug.
+        if lastState == .idle {
+            lastState = WarningStateEngine.start(remainingSeconds: remaining, warningOffsets: offsets)
+        } else {
+            lastState = WarningStateEngine.next(current: lastState, remainingSeconds: remaining, warningOffsets: offsets)
+        }
         return ChildSessionSnapshot(
             state: lastState,
             remainingSeconds: remaining,
-            presentsWarning: WarningStateEngine.shouldPresent(lastState, configuration: config),
+            activeWarningSeconds: lastState.isWarning
+                ? WarningStateEngine.activeWarningOffset(remainingSeconds: remaining, warningOffsets: offsets)
+                : nil,
             window: window
         )
     }

@@ -1,9 +1,9 @@
 //  ChildTimerView.swift
 //  ScreenTimeNext
 //
-//  Task 007 — PRD §6.10–§6.14, §7. Large remaining time, minimal controls, friendly language,
-//  state-driven. No settings, no authorization detail, nothing technical on this screen.
-//  Task 009 fills the "what's next" slot; Task 015 expands the finished state.
+//  Task 007/009/015 — PRD §6.10–§6.14, §7. Large remaining time, minimal controls, friendly
+//  language, state-driven, colorful. No settings, no authorization detail, nothing technical.
+//  D-013: warning copy uses the parent's configured minutes.
 
 import SwiftUI
 import ScreenTimeNextCore
@@ -20,22 +20,25 @@ struct ChildTimerView: View {
 
     private var snapshot: ChildSessionSnapshot { viewModel.snapshot }
     private var name: String { viewModel.childName }
+    private var color: Color { Theme.color(for: snapshot.state) }
 
     var body: some View {
         ZStack {
-            stateColor.opacity(0.12).ignoresSafeArea()
-            VStack(spacing: 24) {
-                Spacer()
-                content
-                Spacer()
-                if let error = viewModel.errorText {
-                    Text(error).font(.footnote).foregroundStyle(.secondary)
+            Theme.gradient(for: snapshot.state).ignoresSafeArea()
+            ScrollView {
+                VStack(spacing: 24) {
+                    content
+                    if let error = viewModel.errorText {
+                        Text(error).font(.footnote).foregroundStyle(.secondary)
+                    }
                 }
+                .padding(28)
+                .frame(maxWidth: 560)
+                .frame(maxWidth: .infinity)
+                .multilineTextAlignment(.center)
             }
-            .padding(32)
-            .multilineTextAlignment(.center)
         }
-        .animation(.easeInOut, value: snapshot.displayState)
+        .animation(.easeInOut, value: snapshot.state)
         .onAppear { viewModel.appeared() }
         .onDisappear { viewModel.disappeared() }
         .onChange(of: scenePhase) { _, phase in
@@ -44,9 +47,7 @@ struct ChildTimerView: View {
         .navigationBarBackButtonHidden(true)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                // D-011: the way back is for parents. A press-and-hold is enough friction for a
-                // 5–12-year-old without making a parent dig for it (§7.5 / §7.6).
-                ParentGateButton { dismiss() }
+                ParentGateButton { dismiss() }   // D-011
             }
         }
     }
@@ -55,51 +56,45 @@ struct ChildTimerView: View {
 
     @ViewBuilder
     private var content: some View {
-        switch snapshot.displayState {
+        switch snapshot.state {
         case .idle:
+            Spacer(minLength: 24)
+            Image(systemName: "sun.max.fill").font(.system(size: 64)).foregroundStyle(Theme.sun)
             headline("Hi \(name)!")
-            subline("You have \(minutes(snapshot.remainingSeconds)) of screen time today.")
-            Button {
-                viewModel.start()
-            } label: {
-                Text("Start")
-                    .font(.title2.bold())
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
+            subline("You have \(minutesText(snapshot.remainingSeconds)) of screen time today.")
+            Button { viewModel.start() } label: { Label("Start", systemImage: "play.fill") }
+                .buttonStyle(PillButtonStyle(color: Theme.mint))
+                .padding(.top, 8)
 
         case .active:
-            bigTime(snapshot.remainingSeconds)
+            ring(big: true)
             subline("Enjoy your screen time, \(name).")
 
         case .extended:
-            bigTime(snapshot.remainingSeconds)
+            ring(big: true)
             subline("You've got some extra time, \(name)!")
 
-        case .warning10:
-            headline("10 minutes left 👋")
+        case .firstWarning:
+            headline("\(warningMinutes) left 👋")
             subline("You're almost done. What do you want to do next?")
             WhatsNextChooser(
                 activities: viewModel.availableActivities,
                 chosen: snapshot.chosenActivity,
                 onChoose: { viewModel.choose($0) }
             )
-            smallTime(snapshot.remainingSeconds)
+            ring(big: false)
 
-        case .warning5:
-            headline("5 minutes left")
+        case .secondWarning:
+            headline("\(warningMinutes) left")
             subline("Time to finish up what you're doing.")
-            if let activity = snapshot.chosenActivity {
-                ChosenActivityBadge(activity: activity)
-            }
-            smallTime(snapshot.remainingSeconds)
+            if let activity = snapshot.chosenActivity { ChosenActivityBadge(activity: activity) }
+            ring(big: false)
 
-        case .warning1:
-            headline("One more minute!")
+        case .finalWarning:
+            headline(snapshot.activeWarningMinutes == 1 ? "One more minute!" : "\(warningMinutes) left!")
             subline("Finish your game.")
-            bigTime(snapshot.remainingSeconds)
+            if let activity = snapshot.chosenActivity { ChosenActivityBadge(activity: activity) }
+            ring(big: true)
 
         case .finished:
             TimesUpView(childName: name,
@@ -110,30 +105,36 @@ struct ChildTimerView: View {
 
     // MARK: Pieces
 
+    private var warningMinutes: String { minutesText((snapshot.activeWarningMinutes ?? 1) * 60) }
+
     private func headline(_ text: String) -> some View {
-        Text(text).font(.largeTitle.bold())
+        Text(text).font(.system(.largeTitle, design: .rounded).bold())
     }
 
     private func subline(_ text: String) -> some View {
         Text(text).font(.title3).foregroundStyle(.secondary)
     }
 
-    private func bigTime(_ seconds: Int) -> some View {
-        Text(Self.clock(seconds))
-            .font(.system(size: 88, weight: .bold, design: .rounded))
-            .monospacedDigit()
-            .contentTransition(.numericText())
+    /// Countdown inside a progress ring; the ring is remaining ÷ window total.
+    private func ring(big: Bool) -> some View {
+        let total = max(1, snapshot.window?.totalSeconds ?? 1)
+        let fraction = Double(snapshot.remainingSeconds) / Double(total)
+        let size: CGFloat = big ? 280 : 180
+        return ZStack {
+            ProgressRing(fraction: fraction, lineWidth: big ? 18 : 12, color: color)
+            VStack(spacing: 4) {
+                Text(Self.clock(snapshot.remainingSeconds))
+                    .font(.system(size: big ? 64 : 40, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .contentTransition(.numericText())
+                Text("left").font(.headline).foregroundStyle(.secondary)
+            }
+        }
+        .frame(width: size, height: size)
+        .padding(.vertical, 8)
     }
 
-    private func smallTime(_ seconds: Int) -> some View {
-        Text(Self.clock(seconds))
-            .font(.system(size: 44, weight: .semibold, design: .rounded))
-            .monospacedDigit()
-            .contentTransition(.numericText())
-            .foregroundStyle(.secondary)
-    }
-
-    private func minutes(_ seconds: Int) -> String {
+    private func minutesText(_ seconds: Int) -> String {
         let m = seconds / 60
         return m == 1 ? "1 minute" : "\(m) minutes"
     }
@@ -144,18 +145,9 @@ struct ChildTimerView: View {
         let h = s / 3600, m = (s % 3600) / 60, sec = s % 60
         return h > 0 ? String(format: "%d:%02d:%02d", h, m, sec) : String(format: "%d:%02d", m, sec)
     }
-
-    private var stateColor: Color {
-        switch snapshot.displayState {
-        case .idle, .active, .extended: return .accentColor
-        case .warning10: return .yellow
-        case .warning5, .warning1: return .orange
-        case .finished: return .pink
-        }
-    }
 }
 
-/// A "Parents" control that opens on press-and-hold. A tap only shows the hint.
+/// A "Parents" control that opens on press-and-hold. A tap only shows the hint. (D-011)
 struct ParentGateButton: View {
     let onUnlock: () -> Void
     @State private var showHint = false
@@ -174,14 +166,12 @@ struct ParentGateButton: View {
                     showHint = false
                 }
             }
-            .onLongPressGesture(minimumDuration: 1.0) {
-                onUnlock()
-            }
+            .onLongPressGesture(minimumDuration: 1.0) { onUnlock() }
             .accessibilityLabel("Parents. Press and hold to go back.")
     }
 }
 
-/// PRD §6.11 — one tap to choose. Big tiles, no text entry, no scrolling for eight items.
+/// PRD §6.11 — one tap to choose. Big colorful tiles, no text entry.
 struct WhatsNextChooser: View {
     let activities: [TransitionActivity]
     let chosen: TransitionActivity?
@@ -193,27 +183,28 @@ struct WhatsNextChooser: View {
         LazyVGrid(columns: columns, spacing: 10) {
             ForEach(activities) { activity in
                 let isChosen = chosen == activity
-                Button {
-                    onChoose(activity)
-                } label: {
+                let tint = Theme.color(for: activity)
+                Button { onChoose(activity) } label: {
                     VStack(spacing: 6) {
-                        Image(systemName: activity.symbolName)
-                            .font(.title2)
-                        Text(activity.displayName)
-                            .font(.headline)
+                        Image(systemName: activity.symbolName).font(.title)
+                        Text(activity.displayName).font(.headline)
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                }
-                .buttonStyle(.bordered)
-                .tint(isChosen ? Color.accentColor : Color.secondary)
-                .overlay(alignment: .topTrailing) {
-                    if isChosen {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(Color.accentColor)
-                            .padding(6)
+                    .padding(.vertical, 14)
+                    .foregroundStyle(isChosen ? .white : tint)
+                    .background(RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .fill(isChosen ? tint : tint.opacity(0.15)))
+                    .overlay(alignment: .topTrailing) {
+                        if isChosen {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(.white)
+                                .padding(8)
+                        }
                     }
+                    .scaleEffect(isChosen ? 1.03 : 1)
                 }
+                .buttonStyle(.plain)
+                .animation(.spring(duration: 0.25), value: isChosen)
             }
         }
     }
@@ -226,8 +217,9 @@ struct ChosenActivityBadge: View {
     var body: some View {
         Label("Next: \(activity.displayName)", systemImage: activity.symbolName)
             .font(.headline)
+            .foregroundStyle(.white)
             .padding(.horizontal, 20).padding(.vertical, 12)
-            .background(Capsule().fill(Color.accentColor.opacity(0.15)))
+            .background(Capsule().fill(Theme.color(for: activity)))
     }
 }
 

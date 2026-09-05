@@ -51,11 +51,11 @@ final class SessionControllerTests: XCTestCase {
         clock.advance(599)   // 601 left
         XCTAssertEqual(try controller.tick().state, .active)
         clock.advance(1)     // 600 left — inclusive boundary
-        XCTAssertEqual(try controller.tick().state, .warning10)
+        XCTAssertEqual(try controller.tick().state, .firstWarning)
         clock.advance(300)   // 300 left
-        XCTAssertEqual(try controller.tick().state, .warning5)
+        XCTAssertEqual(try controller.tick().state, .secondWarning)
         clock.advance(240)   // 60 left
-        XCTAssertEqual(try controller.tick().state, .warning1)
+        XCTAssertEqual(try controller.tick().state, .finalWarning)
         clock.advance(60)    // 0 left
         let done = try controller.tick()
         XCTAssertEqual(done.state, .finished)
@@ -71,7 +71,7 @@ final class SessionControllerTests: XCTestCase {
         let relaunched = SessionController(storage: storage, now: { c.now })
         let snap = try relaunched.restore()
         XCTAssertEqual(snap.remainingSeconds, 500)
-        XCTAssertEqual(snap.state, .warning10)
+        XCTAssertEqual(snap.state, .firstWarning)
     }
 
     func testFinishedWindowCountsAgainstBudgetEvenBeforeFinalization() throws {
@@ -134,21 +134,34 @@ final class SessionControllerTests: XCTestCase {
 
     func testSessionNeverStepsBackwardOnJitter() throws {
         try controller.start()
-        clock.advance(900)   // 300 left → warning5
-        XCTAssertEqual(try controller.tick().state, .warning5)
+        clock.advance(900)   // 300 left → secondWarning
+        XCTAssertEqual(try controller.tick().state, .secondWarning)
         clock.advance(-2)    // tiny jitter back to 302
-        XCTAssertEqual(try controller.tick().state, .warning5)
+        XCTAssertEqual(try controller.tick().state, .secondWarning)
     }
 
-    func testDisabledWarningIsEnteredButDisplayedAsActive() throws {
+    /// D-013 — a warning the parent removed simply does not exist as a stage.
+    func testRemovedWarningIsNotAStage() throws {
         var config = try storage.loadConfiguration()
-        config.warning10Enabled = false
+        config.warningOffsetsSeconds = [300, 60]
         try storage.save(config)
         try controller.start()
-        clock.advance(650)   // 550 left → warning10
+        clock.advance(650)   // 550 left → would have been the 10-minute warning
         let snap = try controller.tick()
-        XCTAssertEqual(snap.state, .warning10)
-        XCTAssertFalse(snap.presentsWarning)
-        XCTAssertEqual(snap.displayState, .active)
+        XCTAssertEqual(snap.state, .active)
+        XCTAssertNil(snap.activeWarningSeconds)
+        clock.advance(300)   // 250 left → first configured warning (300)
+        let warn = try controller.tick()
+        XCTAssertEqual(warn.state, .firstWarning)
+        XCTAssertEqual(warn.activeWarningMinutes, 5)
+    }
+
+    /// The "Session: Not started" bug — a fresh controller must adopt an existing window on tick.
+    func testFreshControllerAdoptsRunningWindowOnTick() throws {
+        try controller.start()
+        clock.advance(100)
+        let c = clock!
+        let other = SessionController(storage: storage, now: { c.now })
+        XCTAssertEqual(try other.tick().state, .active, "not idle")
     }
 }
