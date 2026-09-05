@@ -6,6 +6,7 @@ cd "$(dirname "$0")/.."
 XCODE="/Users/apple/Downloads/Xcode-beta.app"
 [ -d "$XCODE" ] || XCODE="$(mdfind "kMDItemCFBundleIdentifier == 'com.apple.dt.Xcode'" | head -1)"
 echo "Using $XCODE"
+xattr -cr ScreenTimeNext Packages 2>/dev/null || true
 DEVELOPER_DIR="$XCODE/Contents/Developer" xcodebuild \
   -project ScreenTimeNext.xcodeproj -scheme ScreenTimeNext \
   -destination 'generic/platform=iOS Simulator' \

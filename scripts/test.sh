@@ -19,4 +19,8 @@ if [ -z "$XCODE" ] || [ ! -d "$XCODE" ]; then
   echo "error: could not find Xcode.app" >&2; exit 1
 fi
 echo "Using $XCODE"
+# Strip Finder/provenance extended attributes: codesign refuses bundles that carry them
+# ("resource fork, Finder information, or similar detritus not allowed"). Files written
+# through the Claude desktop mount tend to pick these up.
+xattr -cr . 2>/dev/null || true
 DEVELOPER_DIR="$XCODE/Contents/Developer" swift test "$@" 2>&1 | tail -40
