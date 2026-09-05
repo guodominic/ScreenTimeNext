@@ -1,7 +1,7 @@
 ---
 task: "002"
 title: App Architecture
-status: not_started        # not_started | in_progress | blocked | done
+status: done               # not_started | in_progress | blocked | done
 depends_on: ["001"]
 qa_criteria: []
 prd_refs: ["§9", "§10", "§12"]
@@ -48,15 +48,29 @@ The protocol surface must not leak framework types. A protocol returning `Family
 - [ ] Dependency injection point exists and is used by at least one view.
 
 ## Completion report
-Append the result here when the task finishes. Do not edit earlier tasks' reports.
 
-- **Files changed:**
-- **Build result:**
-- **Tests run:**
-- **Verdict:** PASS / FAIL / BLOCKED / NEEDS MANUAL DEVICE TEST
-- **Platform limitations or manual steps:**
-- **Follow-up work:**
+**2026-09-05 — Claude; verified by Dominic (`./scripts/test.sh`, `./scripts/build.sh`).**
 
-> After finishing: update `status:` in this file's front-matter, update
-> `docs/tasks/PROGRESS.md`, and log any new decision in `docs/DECISIONS.md`
-> or new blocker in `docs/BLOCKERS.md`.
+- **Files changed:** `Packages/ScreenTimeNextCore/Sources/ScreenTimeNextCore/Mocks/` (5 mocks:
+  authorization, selection, monitoring, shield, in-memory storage — each with scriptable failure
+  modes); `Services/ServiceContainer.swift`; app target `ScreenTimeNextApp/ServiceContainer+Environment.swift`
+  (SwiftUI environment key + `.services(_:)` modifier), `ScreenTimeNextApp.swift` (installs
+  `.mocks()` once at the root), `RootView.swift` (resolves services from the environment only);
+  `Tests/ScreenTimeNextCoreTests/MockServicesTests.swift`; `scripts/check-imports.sh` (run by
+  `test.sh` first).
+- **Build result:** `./scripts/build.sh` — BUILD OK (iOS Simulator).
+- **Tests run:** `./scripts/test.sh` — **26 tests, 0 failures** (16 existing + 10 new).
+- **Verdict:** **PASS**
+- **Platform limitations or manual steps:** none. The five protocols already existed (Task 001
+  starter); no signature changed. `NSLock.withLock` needed a macOS 14 minimum on the package for
+  host-side tests.
+- **Follow-up work:** the real adapters (Tasks 004/005/010/011) must satisfy the same protocols
+  unchanged. Mock shield *counts* repeated applies; the real adapter must make the second a no-op
+  (Rule 6, tested in Task 011).
+
+### DoD status
+- [x] All five protocols exist and compile with no Screen Time framework imports.
+- [x] Mock implementations exist for all five, including failure modes.
+- [x] No file under the package or `ScreenTimeNext/Features/` imports FamilyControls, DeviceActivity, or ManagedSettings.
+- [x] A script enforces the previous line automatically (`scripts/check-imports.sh`, run by `test.sh`).
+- [x] Dependency injection point exists and is used by at least one view (`RootView`).
