@@ -10,8 +10,8 @@ in the same commit as the work. If this file and a task's front-matter disagree,
 
 | # | Task | Status | Depends on | QA owned | Verdict | Notes |
 |---|---|---|---|---|---|---|
-| 001 | [Project Foundation](001-project-foundation.md) | in_progress | — | — | BLOCKED (by gate, partial) | project + package done; extension target & capabilities wait for the Phase 1 gate; build confirmation pending |
-| 002 | [App Architecture](002-app-architecture.md) | not_started | 001 | — | — | |
+| 001 | [Project Foundation](001-project-foundation.md) | done | — | — | PASS (ext. target + capabilities blocked by gate) | build OK, 16/16 tests; `./scripts/test.sh` |
+| 002 | [App Architecture](002-app-architecture.md) | in_progress | 001 | — | — | |
 | 003 | [Parent Onboarding](003-parent-onboarding.md) | not_started | 002 | QA-01 | — | |
 | 004 | [Family Controls Authorization](004-family-controls-authorization.md) | not_started | 002, 003 | QA-02 | — | entitlement risk |
 | 005 | [Family Activity Picker](005-family-activity-picker.md) | not_started | 004 | QA-03, QA-04 | — | |

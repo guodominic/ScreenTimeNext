@@ -1,7 +1,7 @@
 ---
 task: "001"
 title: Project Foundation
-status: in_progress        # not_started | in_progress | blocked | done  — awaiting first build confirmation
+status: done               # not_started | in_progress | blocked | done  (extension target + capabilities deferred to the Phase 1 gate)
 depends_on: []
 qa_criteria: []
 prd_refs: ["§8", "§9", "Appendix A"]
@@ -59,10 +59,9 @@ The repository already contains this directory skeleton with `.gitkeep` files �
   `ScreenTimeNext/ScreenTimeNextApp/{ScreenTimeNextApp,RootView}.swift`; `ScreenTimeNext/Resources/`;
   `Packages/ScreenTimeNextCore/` (Package.swift + moved Core/Shared sources + tests);
   `DeviceActivityMonitorExtension/` (empty); docs updated (D-008, source-layout.md).
-- **Build result:** not yet run after restructuring — Dominic to open the project, select the
-  Personal Team, ⌘B, and report.
-- **Tests run:** none yet — `cd Packages/ScreenTimeNextCore && swift test` once the build is green.
-- **Verdict:** **BLOCKED (by gate, partial)** — see below.
+- **Build result:** ⌘B on iPhone 17 Pro simulator — **Build Succeeded** (Xcode 26.3 / 27 beta, Personal Team UL96K6Z74J).
+- **Tests run:** `./scripts/test.sh` — **16 tests, 0 failures** (WarningStateEngineTests 12, SessionWindowTests 4).
+- **Verdict:** **PASS** for everything a free account can do; extension target and App Groups / Family Controls capabilities are **BLOCKED (by gate)** per D-007, not failed.
 - **Platform limitations or manual steps:**
   - Extension target **not created** on purpose: the template adds a Family Controls entitlement
     that a free Personal Team cannot sign, which would stop the whole app from installing on a
@@ -70,11 +69,15 @@ The repository already contains this directory skeleton with `.gitkeep` files �
   - App Groups and Family Controls capabilities **not added** — unavailable on a free account.
   - Team must be selected by hand in Signing & Capabilities (free Personal Team).
   - Xcode generated a multiplatform, iOS-27-only, test-less project; corrected per D-008.
+  - Xcode 27 beta cannot see the package's test targets from any scheme (Product › Test greyed
+    out); tests run through `scripts/test.sh` (SwiftPM + Xcode toolchain, scratch dir in
+    `~/Library/Caches` because files under `~/Desktop` / the Claude mount keep re-acquiring
+    Finder xattrs that `codesign` rejects). Xcode lives at `~/Downloads/Xcode-beta.app`.
 - **Follow-up work:** Task 002 (mocks + DI + import-boundary check), Task 006 needs a local-container
   storage implementation first (D-007). Extension target + capabilities at the gate.
 
 ### DoD status
-- [x] Project builds — *pending confirmation*
+- [x] Project builds (simulator; device run pending Dominic's next session)
 - [ ] Extension target exists — **blocked by gate (D-007)**
 - [x] On-disk layout matches the layout of record (`docs/source-layout.md`, D-008 — Appendix A superseded)
 - [x] App Group identifier in exactly one place (`AppGroup.swift`), referenced by both targets — *extension side pending Phase 1*
