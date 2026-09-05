@@ -25,9 +25,10 @@ public struct SessionWindow: Codable, Equatable, Sendable {
         self.chosenActivity = chosenActivity
     }
 
-    public init(startedAt: Date, budgetSeconds: Int) {
+    public init(startedAt: Date, budgetSeconds: Int, chosenActivity: TransitionActivity? = nil) {
         self.startedAt = startedAt
         self.endsAt = startedAt.addingTimeInterval(TimeInterval(budgetSeconds))
+        self.chosenActivity = chosenActivity
     }
 
     /// Total length of the window in seconds.
