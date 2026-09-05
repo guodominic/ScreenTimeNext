@@ -127,7 +127,7 @@ struct SettingsView: View {
         let profile = ChildProfile(id: existingProfileID ?? UUID(), name: name)
         let config = ScreenTimeConfiguration(
             dailyBudgetSeconds: budgetMinutes * 60,
-            warningOffsetsSeconds: warningMinutes.map { $0 * 60 },
+            warningOffsetsSeconds: warningMinutes.map { min($0 * 60, ScreenTimeConfiguration.maxWarningOffset(forBudgetSeconds: budgetMinutes * 60)) },
             selectedActivities: TransitionActivity.allCases.filter { activities.contains($0) }
         )
         do {

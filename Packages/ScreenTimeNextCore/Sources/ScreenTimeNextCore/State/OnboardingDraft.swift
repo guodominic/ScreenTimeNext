@@ -45,9 +45,12 @@ public struct OnboardingDraft: Equatable, Sendable {
 
     /// Activities are stored in the canonical `TransitionActivity.allCases` order, not set order.
     public var configuration: ScreenTimeConfiguration {
-        ScreenTimeConfiguration(
+        // A reminder can never be as long as the budget (D-013): clamp, so going back to lower
+        // the budget after setting reminders cannot leave an impossible combination behind.
+        let cap = ScreenTimeConfiguration.maxWarningOffset(forBudgetSeconds: dailyBudgetSeconds)
+        return ScreenTimeConfiguration(
             dailyBudgetSeconds: dailyBudgetSeconds,
-            warningOffsetsSeconds: warningMinutes.map { $0 * 60 },
+            warningOffsetsSeconds: warningMinutes.map { min($0 * 60, cap) },
             selectedActivities: TransitionActivity.allCases.filter { selectedActivities.contains($0) }
         )
     }

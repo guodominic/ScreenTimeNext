@@ -28,6 +28,14 @@ final class OnboardingDraftTests: XCTestCase {
         XCTAssertEqual(draft.childProfile.name, "Ivy")
     }
 
+    /// Budget lowered after reminders were set: reminders are clamped to budget − 1 minute.
+    func testRemindersAreClampedToTheBudget() {
+        var draft = OnboardingDraft()
+        draft.warningMinutes = [10, 5, 1]
+        draft.dailyBudgetSeconds = 8 * 60
+        XCTAssertEqual(draft.configuration.warningOffsetsSeconds, [420, 300, 60], "10 → 7")
+    }
+
     func testActivitiesAreStoredInCanonicalOrder() {
         var draft = OnboardingDraft()
         draft.selectedActivities = [.familyTime, .lego, .reading]
