@@ -9,9 +9,9 @@ import ScreenTimeNextCore
 @main
 struct ScreenTimeNextApp: App {
 
-    /// Phase 0 (D-007): the whole app runs on mocks — no entitlement, no device required.
-    /// Phase 1 swaps real adapters in here, and nowhere else.
-    private let container: ServiceContainer = .mocks()
+    /// Phase 0 (D-007): Screen Time services mocked, persistence real (app container).
+    /// Phase 1 swaps real adapters and the App Group container in here, and nowhere else.
+    private let container: ServiceContainer = .phase0()
 
     var body: some Scene {
         WindowGroup {

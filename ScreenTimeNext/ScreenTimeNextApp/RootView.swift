@@ -31,9 +31,10 @@ struct RootView: View {
         (try? services.storage.loadChildProfile()) != nil
     }
 
-    /// Preview-build convenience: forget the profile so onboarding runs again.
-    /// Phase 0 storage is in-memory, so relaunching the app does the same thing.
+    /// Parent-initiated "start over": erase ScreenTimeNext's own records, then onboard again.
     private func reset() {
+        try? services.storage.eraseAll()
+        try? services.selection.clearSelection()
         route = .onboarding
     }
 }

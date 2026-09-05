@@ -36,7 +36,9 @@ struct HomePlaceholderView: View {
                 Section {
                     Button("Reset setup", role: .destructive, action: onReset)
                 } footer: {
-                    Text("Preview build. The parent dashboard and child timer are coming next.")
+                    Text(services.storageIsVolatile
+                         ? "Storage unavailable — settings will not survive a relaunch."
+                         : "Settings are saved on this device. The parent dashboard and child timer are coming next.")
                 }
             }
             .navigationTitle("ScreenTimeNext")

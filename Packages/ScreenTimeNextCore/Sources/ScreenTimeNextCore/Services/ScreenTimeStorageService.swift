@@ -37,4 +37,8 @@ public protocol ScreenTimeStorageService: Sendable {
     /// Re-read on every app foreground — the extension may have changed it. PRD §14.
     func loadProtectionState() throws -> ProtectionState
     func save(_ state: ProtectionState) throws
+
+    /// Forget everything ScreenTimeNext stored. Parent-initiated "start over" (and Task 017).
+    /// Never touches anything outside ScreenTimeNext's own records.
+    func eraseAll() throws
 }

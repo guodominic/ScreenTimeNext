@@ -39,4 +39,30 @@ public struct ServiceContainer: Sendable {
         ServiceContainer(authorization: authorization, selection: selection,
                          monitoring: monitoring, shield: shield, storage: storage)
     }
+
+    // MARK: Phase 0 (D-007)
+
+    /// What the app actually runs on before the paid membership exists: the four Screen Time
+    /// services mocked, persistence real (app container). Falls back to in-memory storage only if
+    /// the container cannot be opened — and reports that through `storageIsVolatile`.
+    public static func phase0() -> ServiceContainer {
+        let storage: any ScreenTimeStorageService
+        if let file = try? FileStorageService.appContainer() {
+            storage = file
+        } else {
+            storage = InMemoryScreenTimeStorageService()
+        }
+        return ServiceContainer(
+            authorization: MockScreenTimeAuthorizationService(),
+            selection: MockScreenTimeSelectionService(),
+            monitoring: MockScreenTimeMonitoringService(),
+            shield: MockScreenTimeShieldService(),
+            storage: storage
+        )
+    }
+
+    /// True when the container had to fall back to memory (nothing survives a relaunch).
+    public var storageIsVolatile: Bool {
+        storage is InMemoryScreenTimeStorageService
+    }
 }

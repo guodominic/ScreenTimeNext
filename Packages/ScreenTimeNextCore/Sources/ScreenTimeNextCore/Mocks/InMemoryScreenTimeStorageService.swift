@@ -63,6 +63,13 @@ public final class InMemoryScreenTimeStorageService: ScreenTimeStorageService, @
         try lock.withLock { try check(); protection = state }
     }
 
+    public func eraseAll() throws {
+        try lock.withLock {
+            try check()
+            profile = nil; configuration = nil; usageByDay = [:]; window = nil; protection = .unshielded
+        }
+    }
+
     // MARK: Test controls
 
     /// Simulate the shared container being unreachable (docs/BLOCKERS.md B-002).
