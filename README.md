@@ -49,7 +49,26 @@ Packages/ScreenTimeNextCore/  framework-free core package + its tests
 DeviceActivityMonitorExtension/  extension target (Phase 1)
 ```
 
-## Getting started
+## Run it on your own iPhone or iPad (preview build)
+
+There is no App Store or TestFlight build yet (see `docs/BLOCKERS.md`). To run the preview you need
+a Mac with Xcode 26 or newer and a free Apple ID:
+
+1. Clone this repository and open `ScreenTimeNext.xcodeproj`.
+2. Xcode › Settings › Accounts › add your Apple ID (free "Personal Team" is enough).
+3. Select the `ScreenTimeNext` target › Signing & Capabilities › choose your Personal Team.
+   Do the same for the `ScreenTimeNextWidgetsExtension` target.
+4. Plug in your iPhone/iPad, unlock it, trust the computer, and turn on
+   Settings › Privacy & Security › Developer Mode (the device restarts).
+5. Pick your device at the top of Xcode and press ⌘R. On the device, trust the developer
+   certificate under Settings › General › VPN & Device Management the first time.
+
+Free-account limits: the app expires after 7 days (re-run from Xcode), and one Apple ID can install
+on at most 3 devices. The preview has no Screen Time enforcement — it is the transition experience
+only (timer, reminders, "what's next", Live Activity). Enforcement arrives with the Family Controls
+entitlement.
+
+## Getting started (contributors)
 1. Read `CLAUDE.md`.
 2. Read `docs/tasks/PROGRESS.md` to see where the project stands.
 3. Check `docs/BLOCKERS.md` before starting anything entitlement-dependent.
