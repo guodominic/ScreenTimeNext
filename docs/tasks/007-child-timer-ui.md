@@ -1,7 +1,7 @@
 ---
 task: "007"
 title: Child Timer UI
-status: not_started        # not_started | in_progress | blocked | done
+status: done               # not_started | in_progress | blocked | done  (device check pending)
 depends_on: ["006"]
 qa_criteria: ["QA-06", "QA-07"]
 prd_refs: ["§6.10", "§7", "§10"]
@@ -48,15 +48,33 @@ Implement the child timer screen with a timestamp-derived countdown and state-dr
 - [ ] The screen exposes no technical or authorization detail to the child.
 
 ## Completion report
-Append the result here when the task finishes. Do not edit earlier tasks' reports.
 
-- **Files changed:**
-- **Build result:**
-- **Tests run:**
-- **Verdict:** PASS / FAIL / BLOCKED / NEEDS MANUAL DEVICE TEST
-- **Platform limitations or manual steps:**
-- **Follow-up work:**
+**2026-09-05 — Claude; verified by Dominic (`./scripts/test.sh`, `./scripts/build.sh`).**
 
-> After finishing: update `status:` in this file's front-matter, update
-> `docs/tasks/PROGRESS.md`, and log any new decision in `docs/DECISIONS.md`
-> or new blocker in `docs/BLOCKERS.md`.
+- **Files changed:** package `State/SessionController.swift` (+ `ChildSessionSnapshot`), `SessionWindow`
+  gained `totalSeconds` and an upper clamp on remaining time; app `Features/ChildTimer/{ChildTimerViewModel,ChildTimerView}.swift`;
+  home placeholder links to the timer and offers a parent-side "End session now".
+  Tests: `SessionControllerTests` (11).
+- **Build result:** `./scripts/build.sh` — BUILD OK.
+- **Tests run:** `./scripts/test.sh` — **51 tests, 0 failures**.
+- **Verdict:** **PASS** (automated) · **NEEDS MANUAL DEVICE TEST** for QA-06 (background 1–2 min and
+  return; expect the correct remaining time immediately) and the visual state changes.
+- **Platform limitations or manual steps:** none for Phase 0.
+- **Design notes:**
+  - D-006 session-window model. The persisted `SessionWindow` is the in-flight usage record; it is
+    folded into `DailyUsage` only when finalized (new Start, parent end-early, or day rollover), so
+    expiry while the app is killed is accounted for identically (tested).
+  - `SessionWindow.remainingSeconds(at:)` is clamped to the window's total length — a backward clock
+    change cannot manufacture time beyond the session (PRD §17; Task 017 tests the rest).
+  - State is monotonic within a session (`WarningStateEngine.next`), so jitter never steps back.
+  - A disabled warning is entered but rendered as `active` (D-004).
+  - The 1-second loop only redraws; `scenePhase == .active` forces a recompute.
+- **Follow-up work:** Task 009 fills `WhatsNextSlot`; Task 015 expands the finished state; Task 016
+  schedules local notifications from the same window timestamps.
+
+### DoD status
+- [ ] **QA-06** — countdown survives background/foreground — *automated (relaunch after 700 s); device check pending*
+- [x] **QA-07** (rendering half) — 10/5/1 warning states render distinctly (copy per §6.11–§6.13).
+- [x] Killing and relaunching shows the correct remaining time (`restore()` test).
+- [x] No `Timer` value is persisted or authoritative.
+- [x] The screen exposes no technical or authorization detail; only control is Start (idle) — §7.5/§7.6.
