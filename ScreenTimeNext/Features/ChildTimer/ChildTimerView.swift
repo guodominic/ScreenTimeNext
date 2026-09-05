@@ -12,6 +12,7 @@ struct ChildTimerView: View {
     @Environment(\.services) private var services
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var viewModel: ChildTimerViewModel
 
     init(services: ServiceContainer) {
@@ -36,8 +37,7 @@ struct ChildTimerView: View {
                     }
                 }
                 .padding(28)
-                .frame(maxWidth: 560)
-                .frame(maxWidth: .infinity)
+                .readableWidth(620)
                 .multilineTextAlignment(.center)
             }
         }
@@ -128,9 +128,9 @@ struct ChildTimerView: View {
     private func ring(big: Bool) -> some View {
         let total = max(1, snapshot.window?.totalSeconds ?? 1)
         let fraction = Double(snapshot.remainingSeconds) / Double(total)
-        let size: CGFloat = big ? 340 : 260
+        let size: CGFloat = (big ? 340 : 260) * sizeClass.controlScale
         let digits = Self.clock(snapshot.remainingSeconds)
-        let fontSize: CGFloat = (big ? 96 : 68) * (digits.count > 5 ? 0.78 : 1)   // h:mm:ss fits
+        let fontSize: CGFloat = (big ? 96 : 68) * sizeClass.controlScale * (digits.count > 5 ? 0.78 : 1)   // h:mm:ss fits
         return ZStack {
             Circle().fill(color.opacity(0.10))
             ProgressRing(fraction: fraction, lineWidth: big ? 24 : 16, color: color)

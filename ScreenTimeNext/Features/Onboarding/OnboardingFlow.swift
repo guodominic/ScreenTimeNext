@@ -76,6 +76,7 @@ struct OnboardingStepScaffold<Content: View>: View {
                         .bounceIn(delay: 0.16)
                 }
                 .padding(24)
+                .readableWidth()
             }
             .safeAreaInset(edge: .bottom) {
                 Button(action: action) { Text(buttonTitle) }
@@ -84,6 +85,7 @@ struct OnboardingStepScaffold<Content: View>: View {
                     .opacity(buttonEnabled ? 1 : 0.5)
                     .padding(.horizontal, 24)
                     .padding(.bottom, 12)
+                    .readableWidth()
             }
         }
         .navigationBarTitleDisplayMode(.inline)

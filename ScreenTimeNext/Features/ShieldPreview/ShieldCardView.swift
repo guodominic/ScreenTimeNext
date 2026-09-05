@@ -55,7 +55,7 @@ struct ShieldCardView: View {
             .bounceIn(delay: 0.2)
         }
         .padding(28)
-        .frame(maxWidth: 380)
+        .readableWidth(420)
         .background(
             RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .fill(.regularMaterial)

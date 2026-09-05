@@ -114,6 +114,7 @@ struct ParentDashboardView: View {
             .padding(20)
             .background(RoundedRectangle(cornerRadius: 24, style: .continuous).fill(Theme.heroGradient))
             .bounceIn()
+            .readableWidth(720)
             .listRowInsets(EdgeInsets())
             .listRowBackground(Color.clear)
         }
@@ -247,6 +248,7 @@ struct ExtendTimeSheet: View {
                 Button { onExtend(minutes); dismiss() } label: { Text("Add \(minutes) minutes") }
                     .buttonStyle(PillButtonStyle(color: Theme.lavender))
                     .padding(.horizontal, 24)
+                    .readableWidth(460)
             }
             .padding(.top, 20)
             .navigationBarTitleDisplayMode(.inline)

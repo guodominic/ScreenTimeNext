@@ -52,6 +52,34 @@ enum Theme {
     static let heroGradient = LinearGradient(colors: [sky.opacity(0.9), lavender.opacity(0.9)], startPoint: .topLeading, endPoint: .bottomTrailing)
 }
 
+// MARK: - Adaptive layout (iPad)
+
+/// iPad is this product's main device — a child's screen time mostly happens there — so nothing
+/// may simply stretch to the full width of a 13" display. Text gets a readable measure; controls
+/// that are dragged with a finger get bigger, not just wider.
+struct ReadableWidth: ViewModifier {
+    var max: CGFloat = 640
+    func body(content: Content) -> some View {
+        content
+            .frame(maxWidth: max)
+            .frame(maxWidth: .infinity)      // centre within the available space
+    }
+}
+
+extension View {
+    func readableWidth(_ max: CGFloat = 640) -> some View { modifier(ReadableWidth(max: max)) }
+}
+
+extension UserInterfaceSizeClass? {
+    /// 1.0 on iPhone, 1.35 on iPad — for hit targets and dials, not for text.
+    /// Read `@Environment(\.horizontalSizeClass)` in the view and call this, rather than deriving
+    /// it from a computed EnvironmentValues property (SwiftUI's dependency tracking is only
+    /// reliable for real environment keys).
+    var controlScale: CGFloat {
+        self == .regular ? 1.35 : 1.0
+    }
+}
+
 // MARK: - Reusable pieces
 
 struct CardStyle: ViewModifier {

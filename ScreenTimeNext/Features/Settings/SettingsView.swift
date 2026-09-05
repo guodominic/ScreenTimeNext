@@ -29,12 +29,9 @@ struct SettingsView: View {
             }
 
             Section {
-                HStack {
-                    Spacer()
-                    MinuteDial(minutes: $budgetMinutes, range: 2...120, step: 2, color: Theme.mint, size: 200)
-                    Spacer()
-                }
-                .listRowBackground(Color.clear)
+                MinuteDial(minutes: $budgetMinutes, range: 2...120, step: 2, color: Theme.mint, baseSize: 200)
+                    .frame(maxWidth: .infinity)
+                    .listRowBackground(Color.clear)
             } header: {
                 Text("Daily budget")
             } footer: {

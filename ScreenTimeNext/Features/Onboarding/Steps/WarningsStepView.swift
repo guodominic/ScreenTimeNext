@@ -44,7 +44,7 @@ struct WarningDials: View {
                            step: 1,
                            title: "Reminder \(i + 1)",
                            color: colors[i],
-                           size: 104,
+                           baseSize: 104,
                            zeroMeansOff: true)
             }
         }

@@ -13,8 +13,12 @@ struct MinuteDial: View {
     let step: Int
     var title: String? = nil
     var color: Color = Theme.sky
-    var size: CGFloat = 230
+    /// Base size; on iPad every dial is scaled up (see `size`), because the whole control is dragged.
+    var baseSize: CGFloat = 230
     var zeroMeansOff = false
+
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    private var size: CGFloat { baseSize * sizeClass.controlScale }
 
     private var span: Int { range.upperBound - range.lowerBound }
     private var fraction: Double { span == 0 ? 0 : Double(minutes - range.lowerBound) / Double(span) }
@@ -128,7 +132,7 @@ struct MinuteDial: View {
 #Preview("Reminder") {
     struct Host: View {
         @State var m = 5
-        var body: some View { MinuteDial(minutes: $m, range: 0...15, step: 1, title: "Reminder", color: Theme.sun, size: 150, zeroMeansOff: true) }
+        var body: some View { MinuteDial(minutes: $m, range: 0...15, step: 1, title: "Reminder", color: Theme.sun, baseSize: 150, zeroMeansOff: true) }
     }
     return Host()
 }
