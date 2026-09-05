@@ -1,14 +1,18 @@
 //  RootView.swift
 //  ScreenTimeNext
 //
-//  Task 001 placeholder. Its only job is to prove the app target links ScreenTimeNextCore.
-//  Task 002 replaces this with real root navigation behind injected services.
+//  Task 002 placeholder: proves views reach services only through the environment.
+//  Task 003 replaces this with real onboarding + root navigation.
 
 import SwiftUI
 import ScreenTimeNextCore
 
 struct RootView: View {
-    private let configuration = ScreenTimeConfiguration.default
+    @Environment(\.services) private var services
+
+    @State private var authorization: ScreenTimeAuthorizationStatus = .notDetermined
+    @State private var configuration: ScreenTimeConfiguration = .default
+    @State private var errorText: String?
 
     var body: some View {
         VStack(spacing: 12) {
@@ -17,12 +21,25 @@ struct RootView: View {
             Text("Make screen time end peacefully.")
                 .foregroundStyle(.secondary)
             Divider().padding(.vertical)
-            Text("Default budget: \(configuration.dailyBudgetSeconds / 60) minutes")
-            Text("Warnings: \(warningSummary)")
-            Text("Stage at 5:00 left: \(WarningStateEngine.stage(remainingSeconds: 300).rawValue)")
+
+            LabeledContent("Authorization", value: authorization.rawValue)
+            LabeledContent("Daily budget", value: "\(configuration.dailyBudgetSeconds / 60) min")
+            LabeledContent("Warnings", value: warningSummary)
+            LabeledContent("Stage at 5:00 left", value: WarningStateEngine.stage(remainingSeconds: 300).rawValue)
+
+            if let errorText {
+                Text(errorText).foregroundStyle(.red).font(.footnote)
+            }
+
+            Button("Request authorization (mock)") {
+                Task { await requestAuthorization() }
+            }
+            .buttonStyle(.borderedProminent)
+            .padding(.top)
         }
         .font(.callout)
         .padding()
+        .task { await load() }
     }
 
     private var warningSummary: String {
@@ -32,8 +49,27 @@ struct RootView: View {
             .compactMap { $0 }
             .joined(separator: " / ") + " min"
     }
+
+    private func load() async {
+        authorization = await services.authorization.status
+        configuration = (try? services.storage.loadConfiguration()) ?? .default
+    }
+
+    private func requestAuthorization() async {
+        do {
+            authorization = try await services.authorization.requestAuthorization()
+            errorText = nil
+        } catch {
+            errorText = "Authorization failed: \(error)"
+            authorization = await services.authorization.status
+        }
+    }
 }
 
-#Preview {
-    RootView()
+#Preview("Approved") {
+    RootView().services(.mocks())
+}
+
+#Preview("Denied") {
+    RootView().services(.mocks(authorization: MockScreenTimeAuthorizationService(script: .deny)))
 }

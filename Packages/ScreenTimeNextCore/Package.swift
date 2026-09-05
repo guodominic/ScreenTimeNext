@@ -15,6 +15,7 @@ let package = Package(
     name: "ScreenTimeNextCore",
     platforms: [
         .iOS("18.0"),
+        .macOS("14.0"),   // host platform for `swift test`; NSLock.withLock needs 13+
     ],
     products: [
         .library(name: "ScreenTimeNextCore", targets: ["ScreenTimeNextCore"]),

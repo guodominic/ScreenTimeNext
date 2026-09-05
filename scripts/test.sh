@@ -8,6 +8,7 @@
 # Usage:  ./scripts/test.sh            (from the repo root)
 
 set -euo pipefail
+"$(dirname "$0")/check-imports.sh"
 cd "$(dirname "$0")/../Packages/ScreenTimeNextCore"
 
 # Locate Xcode: known location first, Spotlight as fallback.
