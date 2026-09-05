@@ -1,8 +1,9 @@
 //  RootView.swift
 //  ScreenTimeNext
 //
-//  Task 003. Routes between onboarding and the (placeholder) home based on whether a child
-//  profile exists. Reads services from the environment only.
+//  Routes between first-run setup, the parent dashboard, and the child timer. D-016: after setup
+//  the parent is handed a RUNNING timer, and any launch during a session shows the timer.
+//  Reads services from the environment only.
 
 import SwiftUI
 import Combine
@@ -22,7 +23,10 @@ struct RootView: View {
             case .loading:
                 ProgressView()
             case .onboarding:
-                OnboardingFlow(services: services) { route = .home }
+                OnboardingFlow(services: services) {
+                    route = .home
+                    showChildTimer = true      // D-016: hand over a running timer, not a summary
+                }
             case .home:
                 ParentDashboardView(services: services,
                                     onOpenTimer: { showChildTimer = true },
@@ -30,7 +34,7 @@ struct RootView: View {
             }
         }
         .task {
-            route = hasProfile ? .home : .onboarding
+            route = isSetUp ? .home : .onboarding
             presentTimerIfSessionExists()
         }
         // During a session the device is the child's: however the app is opened, the timer is
@@ -55,8 +59,10 @@ struct RootView: View {
         }
     }
 
-    private var hasProfile: Bool {
-        (try? services.storage.loadChildProfile()) != nil
+    /// D-016 — setup is "has a configuration been written", not "is there a profile": the name is
+    /// optional now, so a saved budget is what marks the app as set up.
+    private var isSetUp: Bool {
+        (try? services.storage.hasStoredConfiguration()) ?? false
     }
 
     /// Parent-initiated "start over": erase ScreenTimeNext's own records, then onboard again.

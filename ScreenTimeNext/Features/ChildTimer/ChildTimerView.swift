@@ -21,6 +21,9 @@ struct ChildTimerView: View {
 
     private var snapshot: ChildSessionSnapshot { viewModel.snapshot }
     private var name: String { viewModel.childName }
+    /// D-016 — the name is optional, so every greeting has a name-less form.
+    private var greeting: String { name.isEmpty ? "Hi!" : "Hi \(name)!" }
+    private var addressed: String { name.isEmpty ? "" : ", \(name)" }
     private var color: Color { Theme.color(for: snapshot.state) }
 
     var body: some View {
@@ -65,7 +68,7 @@ struct ChildTimerView: View {
             Mascot(mood: .happy, size: 150 * sizeClass.controlScale, tint: Theme.sky)
             SpeechBubble(color: Theme.sky) {
                 VStack(spacing: 6) {
-                    Text("Hi \(name)!").font(.system(.title, design: .rounded).bold())
+                    Text(greeting).font(.system(.title, design: .rounded).bold())
                     Text("You have \(minutesText(snapshot.remainingSeconds)) of screen time today.")
                         .font(.title3).foregroundStyle(.secondary)
                 }
@@ -77,34 +80,46 @@ struct ChildTimerView: View {
 
         case .active:
             ring(big: true)
-            mascotRow(.playing, "Enjoy your screen time, \(name).")
+            mascotRow(.playing, name.isEmpty ? "Enjoy your screen time." : "Enjoy your screen time, \(name).")
 
         case .extended:
             ring(big: true)
-            mascotRow(.playing, "You've got some extra time, \(name)!")
+            mascotRow(.playing, name.isEmpty ? "You've got some extra time!" : "You've got some extra time\(addressed)!")
 
-        case .firstWarning:
-            Mascot(mood: .thinking, size: 108 * sizeClass.controlScale, tint: color)
-            headline("\(remainingMinutesText) left 👋")
-            subline("You're almost done. What do you want to do next?")
-            WhatsNextChooser(
-                activities: viewModel.availableActivities,
-                chosen: snapshot.chosenActivity,
-                onChoose: { viewModel.choose($0) }
-            )
-            ring(big: false)
-
-        case .secondWarning:
-            Mascot(mood: .playing, size: 100 * sizeClass.controlScale, tint: color)
-            headline("\(remainingMinutesText) left")
-            subline("Time to finish up what you're doing.")
-            if let activity = snapshot.chosenActivity { ChosenActivityBadge(activity: activity) }
-            ring(big: false)
+        case .firstWarning, .secondWarning:
+            if snapshot.isChoosingMoment {
+                // D-016 — this is where the child decides, at the second-to-last reminder.
+                Mascot(mood: .thinking, size: 108 * sizeClass.controlScale, tint: color)
+                headline("\(remainingMinutesText) left 👋")
+                subline("What do you want to do next?")
+                WhatsNextChooser(
+                    activities: viewModel.availableActivities,
+                    chosen: snapshot.chosenActivity,
+                    onChoose: { viewModel.choose($0) }
+                )
+                ring(big: false)
+            } else {
+                Mascot(mood: .playing, size: 100 * sizeClass.controlScale, tint: color)
+                headline("\(remainingMinutesText) left")
+                subline(snapshot.chosenActivity == nil
+                        ? "You're almost done."
+                        : "Time to finish up what you're doing.")
+                if let activity = snapshot.chosenActivity { ChosenActivityBadge(activity: activity) }
+                ring(big: false)
+            }
 
         case .finalWarning:
             headline(snapshot.remainingSeconds <= 60 ? "One more minute!" : "\(remainingMinutesText) left!")
             subline("Finish your game.")
-            if let activity = snapshot.chosenActivity { ChosenActivityBadge(activity: activity) }
+            if let activity = snapshot.chosenActivity {
+                ChosenActivityBadge(activity: activity)
+            } else if snapshot.isChoosingMoment {
+                WhatsNextChooser(
+                    activities: viewModel.availableActivities,
+                    chosen: nil,
+                    onChoose: { viewModel.choose($0) }
+                )
+            }
             ring(big: true).pulsing()
             Mascot(mood: .hurrying, size: 92 * sizeClass.controlScale, tint: color)
 

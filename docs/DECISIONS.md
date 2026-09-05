@@ -412,6 +412,42 @@ picker in Phase 1). Task 011 shields exactly what the selection names, still nev
 Honesty constraint (§17) unchanged: even category coverage is not airtight, and no copy may claim
 it is.
 
+---
+
+## D-016 — Setup collapses to two screens; the child picks the activity, not the parent
+**Date:** 2026-09-05 · **Status:** accepted (Dominic) · supersedes parts of PRD §6.1–§6.8
+
+**Context.** The eight-step onboarding was built straight from the PRD, and it is wrong for the
+scene the product actually lives in: a child wants the iPad *now*, a parent says "fifteen minutes"
+and picks the device up. Anything that is not that decision is friction at exactly the wrong moment.
+Dominic's rule: **the app should reach its purpose with as few taps as possible.**
+
+**Decision.**
+- **Two screens.** Welcome (Pip, one line, one button — a greeting, not a manual) → Quick Setup
+  (a minutes dial and "what counts") → **a running timer**. The parent hands over a live session;
+  there is no summary step to acknowledge.
+- **The child's name is optional**, moved to Settings. Every greeting has a name-less form
+  ("Hi!", "Nice job!"). "Is the app set up" is now `hasStoredConfiguration()`, not "is there a
+  profile" — the old proxy stopped being true the moment the name became optional.
+- **Reminders move to Settings**, with defaults derived from the budget (D-013 already does this).
+- **The child chooses what's next, not the parent** — at the **second-to-last** reminder
+  (`WarningStateEngine.chooserIndex`: with 10/5/1 that is the 5-minute one; with one reminder, that
+  one). Early enough to prepare, late enough to feel real. If they ignore it, the chooser stays
+  available through the final reminder. The parent's activity pre-approval screen is gone; D-009's
+  "empty set means offer all eight" is now the normal case, not the fallback.
+- **The dashboard's idle state is an instant-start surface**: minutes ± and "Start now", seeded
+  from the saved budget, so a repeat "fifteen minutes" is two taps from launch.
+
+**Tension acknowledged.** §7.4 asks for minimal interaction in the final five minutes, and with the
+default reminders the chooser now lands exactly at five. Judged worth it: at ten minutes the choice
+is abstract and forgotten by the time it matters. Watch this in validation — if children ignore the
+chooser at five, move it back one slot.
+
+**Consequences.** `OnboardingDraft.childProfile` is optional and `commit` no longer throws on a
+missing name; `ChildSessionSnapshot.isChoosingMoment` drives the chooser; the Warnings, What's Next,
+Child Profile and Ready steps are deleted. PRD §6.2/§6.6/§6.7/§6.8 are superseded — the *content*
+of those screens survives in Settings and in the child flow, the *sequence* does not.
+
 <!-- Template for new entries:
 
 ## D-NNN — <short imperative title>

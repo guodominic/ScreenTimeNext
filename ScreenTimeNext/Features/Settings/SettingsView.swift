@@ -22,10 +22,14 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
-            Section("Child") {
-                TextField("First name", text: $childName)
+            Section {
+                TextField("First name (optional)", text: $childName)
                     .textContentType(.givenName)
                     .autocorrectionDisabled()
+            } header: {
+                Text("Child")
+            } footer: {
+                Text("Only used to greet your child by name. It stays on this device, and the app works fine without it.")
             }
 
             Section {
@@ -45,7 +49,7 @@ struct SettingsView: View {
             } header: {
                 Text("Reminders (minutes before the end)")
             } footer: {
-                Text("Up to three, each shorter than the budget (up to \(ScreenTimeConfiguration.maxWarningOffset(forBudgetSeconds: budgetMinutes * 60) / 60) min). Off skips that reminder. A finish notification is always sent.")
+                Text("Your child is asked what to do next at the second-to-last reminder. Up to three, each shorter than the budget (up to \(ScreenTimeConfiguration.maxWarningOffset(forBudgetSeconds: budgetMinutes * 60) / 60) min). Off skips that reminder. A finish notification is always sent.")
             }
 
             Section {
@@ -92,7 +96,6 @@ struct SettingsView: View {
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
                 Button("Save") { save() }
-                    .disabled(childName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
         }
         .onAppear(perform: load)
@@ -121,7 +124,7 @@ struct SettingsView: View {
 
     private func save() {
         let name = childName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let profile = ChildProfile(id: existingProfileID ?? UUID(), name: name)
+        let profile = ChildProfile(id: existingProfileID ?? UUID(), name: name)   // empty name is fine (D-016)
         let config = ScreenTimeConfiguration(
             dailyBudgetSeconds: budgetMinutes * 60,
             warningOffsetsSeconds: warningMinutes.map { min($0 * 60, ScreenTimeConfiguration.maxWarningOffset(forBudgetSeconds: budgetMinutes * 60)) },
@@ -142,6 +145,47 @@ struct SettingsView: View {
         } catch {
             errorText = "Couldn't save. Please try again."
         }
+    }
+}
+
+/// Three small dials: reminders, in minutes before the end. 0 = off. Bounded by the budget —
+/// a reminder must be strictly shorter than the window it runs in (D-013).
+struct WarningDials: View {
+    @Binding var minutes: [Int]
+    let budgetMinutes: Int
+
+    private let colors = [Theme.sun, Theme.peach, Theme.coral]
+
+    private var upperBound: Int {
+        ScreenTimeConfiguration.maxWarningOffset(forBudgetSeconds: budgetMinutes * 60) / 60
+    }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            ForEach(0..<ScreenTimeConfiguration.maxWarnings, id: \.self) { i in
+                MinuteDial(minutes: slot(i),
+                           range: 0...upperBound,
+                           step: 1,
+                           title: "Reminder \(i + 1)",
+                           color: colors[i],
+                           baseSize: 104,
+                           zeroMeansOff: true)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .card()
+    }
+
+    private func slot(_ i: Int) -> Binding<Int> {
+        Binding(
+            get: { i < minutes.count ? minutes[i] : 0 },
+            set: { newValue in
+                var m = minutes
+                while m.count < ScreenTimeConfiguration.maxWarnings { m.append(0) }
+                m[i] = newValue
+                minutes = m
+            }
+        )
     }
 }
 

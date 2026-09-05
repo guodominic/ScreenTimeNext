@@ -39,6 +39,10 @@ public final class InMemoryScreenTimeStorageService: ScreenTimeStorageService, @
         try lock.withLock { try check(); self.configuration = configuration }
     }
 
+    public func hasStoredConfiguration() throws -> Bool {
+        try lock.withLock { try check(); return configuration != nil }
+    }
+
     public func loadDailyUsage(for date: Date) throws -> DailyUsage? {
         try lock.withLock { try check(); return usageByDay[Self.dayKey(date)] }
     }

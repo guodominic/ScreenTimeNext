@@ -20,12 +20,16 @@ public struct ChildSessionSnapshot: Equatable, Sendable {
     public let remainingSeconds: Int
     /// Seconds-before-end of the warning currently in force (for "5 minutes left" copy).
     public let activeWarningSeconds: Int?
+    /// D-016 — true while the child should be asked what to do next (second-to-last reminder).
+    public let isChoosingMoment: Bool
     public let window: SessionWindow?
 
-    public init(state: ScreenTimeState, remainingSeconds: Int, activeWarningSeconds: Int? = nil, window: SessionWindow?) {
+    public init(state: ScreenTimeState, remainingSeconds: Int, activeWarningSeconds: Int? = nil,
+                isChoosingMoment: Bool = false, window: SessionWindow?) {
         self.state = state
         self.remainingSeconds = remainingSeconds
         self.activeWarningSeconds = activeWarningSeconds
+        self.isChoosingMoment = isChoosingMoment
         self.window = window
     }
 
@@ -249,12 +253,19 @@ public final class SessionController: @unchecked Sendable {
         } else {
             lastState = WarningStateEngine.next(current: lastState, remainingSeconds: remaining, warningOffsets: offsets)
         }
+        let reached = WarningStateEngine.reachedWarningIndex(remainingSeconds: remaining, warningOffsets: offsets)
         return ChildSessionSnapshot(
             state: lastState,
             remainingSeconds: remaining,
             activeWarningSeconds: lastState.isWarning
                 ? WarningStateEngine.activeWarningOffset(remainingSeconds: remaining, warningOffsets: offsets)
                 : nil,
+            // The chooser appears at the second-to-last reminder and stays available from there on,
+            // so a child who ignored it still has a way to pick.
+            isChoosingMoment: {
+                guard let reached, let chooser = WarningStateEngine.chooserIndex(warningCount: offsets.count) else { return false }
+                return reached >= chooser && window.chosenActivity == nil
+            }(),
             window: window
         )
     }

@@ -24,6 +24,19 @@ public enum WarningStateEngine {
         return .secondWarning
     }
 
+    /// D-016 — where the child is asked to choose what's next: the **second-to-last** reminder.
+    /// Close enough to the end to feel real, far enough that they aren't choosing under pressure
+    /// in the final minute. With a single reminder there is no second-to-last, so it is that one.
+    public static func chooserIndex(warningCount count: Int) -> Int? {
+        guard count > 0 else { return nil }
+        return count == 1 ? 0 : count - 2
+    }
+
+    /// True when the warning at `index` is the one that carries the activity chooser.
+    public static func isChooser(warningAt index: Int, count: Int) -> Bool {
+        chooserIndex(warningCount: count) == index
+    }
+
     /// The stage implied by remaining time alone.
     public static func stage(remainingSeconds: Int, warningOffsets: [Int]) -> ScreenTimeState {
         if remainingSeconds <= 0 { return .finished }

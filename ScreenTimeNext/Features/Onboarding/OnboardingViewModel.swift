@@ -1,21 +1,15 @@
 //  OnboardingViewModel.swift
 //  ScreenTimeNext
 //
-//  Task 003. Owns the draft and the navigation path for the 8-step parent onboarding.
-//  Talks to services through protocols only (Rules 1, 2). Nothing is persisted until `finish()`.
+//  D-016 — holds the two decisions made in the moment (how long, what counts) and starts the
+//  session. Nothing is persisted until `startNow()`.
 
 import SwiftUI
 import Observation
 import ScreenTimeNextCore
 
 enum OnboardingStep: Hashable {
-    case childProfile
-    case permission
-    case appSelection
-    case budget
-    case warnings
-    case whatsNext
-    case ready
+    case quickSetup
 }
 
 @Observable
@@ -27,7 +21,6 @@ final class OnboardingViewModel {
     var authorization: ScreenTimeAuthorizationStatus = .notDetermined
     var authorizationMessage: String?
     var isRequestingAuthorization = false
-
     var commitError: String?
 
     private let services: ServiceContainer
@@ -36,17 +29,15 @@ final class OnboardingViewModel {
         self.services = services
     }
 
-    // MARK: Navigation
+    func advance(to step: OnboardingStep) { path.append(step) }
 
-    func advance(to step: OnboardingStep) {
-        path.append(step)
-    }
-
-    // MARK: §6.3 Permission
+    // MARK: Screen Time access — requested when the parent reaches for the picker, not before
 
     func loadAuthorizationStatus() async {
         authorization = await services.authorization.status
     }
+
+    var needsAuthorization: Bool { authorization != .approved }
 
     func requestAuthorization() async {
         isRequestingAuthorization = true
@@ -56,38 +47,30 @@ final class OnboardingViewModel {
             authorizationMessage = nil
         } catch ScreenTimeAuthorizationError.denied {
             authorization = .denied
-            authorizationMessage = "Screen Time access was declined. You can allow it in Settings › Screen Time, then try again."
+            authorizationMessage = "Screen Time access was declined. You can allow it in Settings › Screen Time."
         } catch ScreenTimeAuthorizationError.entitlementUnavailable {
             authorization = await services.authorization.status
             authorizationMessage = "Screen Time access isn't available in this build yet."
         } catch {
             authorization = await services.authorization.status
-            authorizationMessage = "Something went wrong requesting access. Please try again."
+            authorizationMessage = "Something went wrong. Please try again."
         }
     }
 
-    var canContinuePastPermission: Bool { authorization == .approved }
+    func applySelection(_ snapshot: SelectionSnapshot) { draft.selection = snapshot }
+    func clearSelection() { draft.selection = nil }
 
-    // MARK: §6.4 Selection (Phase 0: mocked — Task 005 replaces the presenter, not this model)
+    // MARK: Start
 
-    func applySelection(_ snapshot: SelectionSnapshot) {
-        draft.selection = snapshot
-    }
-
-    func clearSelection() {
-        draft.selection = nil
-    }
-
-    // MARK: §6.8 Finish
-
-    /// Returns true when everything was persisted.
-    func finish() -> Bool {
+    /// Saves the setup and opens the session in one step — the parent hands over a running timer.
+    func startNow() -> Bool {
         do {
             try draft.commit(using: services)
+            _ = try services.makeSessionController().start()
             commitError = nil
             return true
         } catch {
-            commitError = "Couldn't save the setup. Please try again."
+            commitError = "Couldn't start. Please try again."
             return false
         }
     }

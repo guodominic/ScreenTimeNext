@@ -18,6 +18,9 @@ final class ParentDashboardViewModel {
     private(set) var session: ChildSessionSnapshot = .idle
     private(set) var remainingTodaySeconds: Int = 0
     private(set) var notificationsDenied = false
+    /// D-016 — the minutes shown on the idle hero; seeded from the saved budget so a repeat
+    /// "fifteen minutes" is two taps from launch.
+    var quickMinutes: Int = ScreenTimeConfiguration.defaultBudgetSeconds / 60
     private(set) var authorization: ScreenTimeAuthorizationStatus = .notDetermined
 
     private let services: ServiceContainer
@@ -54,6 +57,9 @@ final class ParentDashboardViewModel {
         let storage = services.storage
         profile = try? storage.loadChildProfile()
         configuration = (try? storage.loadConfiguration()) ?? .default
+        if session.window == nil {
+            quickMinutes = configuration.dailyBudgetSeconds / 60
+        }
         selectionSummary = (try? services.selection.loadSelection())?.summary ?? .empty
         protectionState = (try? storage.loadProtectionState()) ?? .unshielded
         refreshSession()
@@ -65,6 +71,23 @@ final class ParentDashboardViewModel {
     }
 
     // MARK: Parent actions
+
+    /// Nudge the idle dial, clamped to the same range as every other budget control.
+    func adjustQuickMinutes(_ delta: Int) {
+        let range = ScreenTimeConfiguration.budgetRangeSeconds
+        quickMinutes = min(max(quickMinutes + delta, range.lowerBound / 60), range.upperBound / 60)
+    }
+
+    /// D-016 — set today's budget from the hero and open a session in one action.
+    func startSession() {
+        var config = configuration
+        config = ScreenTimeConfiguration(dailyBudgetSeconds: quickMinutes * 60,
+                                         warningOffsetsSeconds: config.warningOffsetsSeconds,
+                                         selectedActivities: config.selectedActivities)
+        try? services.storage.save(config)
+        _ = try? controller.start()
+        reload()
+    }
 
     func endSession() {
         _ = try? controller.endEarly()

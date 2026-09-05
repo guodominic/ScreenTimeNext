@@ -156,6 +156,10 @@ public final class FileStorageService: ScreenTimeStorageService, @unchecked Send
         try lock.withLock { try write(configuration, to: .configuration) }
     }
 
+    public func hasStoredConfiguration() throws -> Bool {
+        lock.withLock { read(ScreenTimeConfiguration.self, from: .configuration) != nil }
+    }
+
     public func loadDailyUsage(for date: Date) throws -> DailyUsage? {
         lock.withLock {
             let table = read([String: DailyUsage].self, from: .dailyUsage) ?? [:]

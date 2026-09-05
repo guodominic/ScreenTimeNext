@@ -1,4 +1,8 @@
-//  WelcomeStepView.swift — PRD §6.1
+//  WelcomeStepView.swift — PRD §6.1, D-016
+//
+//  A greeting, not a manual. One promise, one button. Everything else the parent needs to know,
+//  they will learn by using it thirty seconds from now.
+
 import SwiftUI
 import ScreenTimeNextCore
 
@@ -6,32 +10,37 @@ struct WelcomeStepView: View {
     @Bindable var viewModel: OnboardingViewModel
 
     var body: some View {
-        OnboardingStepScaffold(
-            title: "Make screen time end peacefully.",
-            symbol: "sun.max.fill",
-            color: Theme.sky,
-            mascot: .happy,
-            buttonTitle: "Get Started",
-            action: { viewModel.advance(to: .childProfile) }
-        ) {
-            VStack(alignment: .leading, spacing: 14) {
-                Text("ScreenTimeNext helps your child move from screen time to what's next — with gentle warnings before time ends, and a next activity they get to choose.")
-                    .foregroundStyle(.secondary)
-                HStack(spacing: 12) {
-                    feature("bell.badge.fill", "Gentle warnings", Theme.sun)
-                    feature("hand.thumbsup.fill", "They choose next", Theme.mint)
-                    feature("heart.fill", "Calm endings", Theme.coral)
-                }
-            }
-        }
-    }
+        ZStack {
+            LinearGradient(colors: [Theme.sky.opacity(0.38), Color(.systemGroupedBackground)],
+                           startPoint: .top, endPoint: .center)
+                .ignoresSafeArea()
+            PlayfulBackground(tint: Theme.sky, intensity: 1.0)
 
-    private func feature(_ symbol: String, _ text: String, _ color: Color) -> some View {
-        VStack(spacing: 8) {
-            Image(systemName: symbol).font(.title2).foregroundStyle(color)
-            Text(text).font(.caption.weight(.semibold)).multilineTextAlignment(.center)
+            VStack(spacing: 22) {
+                Spacer()
+                Mascot(mood: .happy, size: 230, tint: Theme.sky)
+                    .bounceIn()
+                Text("Hi, I'm Pip!")
+                    .font(.system(size: 44, weight: .heavy, design: .rounded))
+                    .bounceIn(delay: 0.1)
+                Text("Let's make screen time end peacefully.")
+                    .font(.title3)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .bounceIn(delay: 0.16)
+                Spacer()
+                Button { viewModel.advance(to: .quickSetup) } label: { Text("Let's go") }
+                    .buttonStyle(PillButtonStyle(color: Theme.mint))
+                    .bounceIn(delay: 0.24)
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 16)
+            }
+            .readableWidth(520)
         }
-        .frame(maxWidth: .infinity)
-        .card(tint: color)
+        .navigationBarTitleDisplayMode(.inline)
     }
+}
+
+#Preview {
+    NavigationStack { WelcomeStepView(viewModel: OnboardingViewModel(services: .mocks())) }
 }

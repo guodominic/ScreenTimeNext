@@ -15,17 +15,18 @@ final class OnboardingDraftTests: XCTestCase {
         XCTAssertEqual(draft.warningMinutes, [10, 5, 1])
         XCTAssertTrue(draft.selectedActivities.isEmpty)
         XCTAssertNil(draft.selection)
-        XCTAssertFalse(draft.isChildNameValid)
+        XCTAssertFalse(draft.hasChildName)
         XCTAssertFalse(draft.hasSelection)
     }
 
-    func testChildNameIsTrimmedAndValidated() {
+    func testChildNameIsTrimmedAndOptional() {
         var draft = OnboardingDraft()
         draft.childName = "   "
-        XCTAssertFalse(draft.isChildNameValid)
+        XCTAssertFalse(draft.hasChildName)
+        XCTAssertNil(draft.childProfile, "D-016: no name means no profile, not an error")
         draft.childName = "  Ivy \n"
-        XCTAssertTrue(draft.isChildNameValid)
-        XCTAssertEqual(draft.childProfile.name, "Ivy")
+        XCTAssertTrue(draft.hasChildName)
+        XCTAssertEqual(draft.childProfile?.name, "Ivy")
     }
 
     /// Defaults follow the budget until the parent touches the dials.
@@ -84,14 +85,16 @@ final class OnboardingDraftTests: XCTestCase {
         XCTAssertEqual(try selection.loadSelection(), draft.selection)
     }
 
-    func testCommitWithoutNameThrowsAndWritesNothing() {
+    /// D-016 — setup with no name at all still produces a usable configuration.
+    func testCommitWithoutNameSavesConfigurationAndNoProfile() throws {
         let storage = InMemoryScreenTimeStorageService()
         let services = ServiceContainer.mocks(storage: storage)
-        let draft = OnboardingDraft()
-        XCTAssertThrowsError(try draft.commit(using: services)) { error in
-            XCTAssertEqual(error as? OnboardingError, .missingChildName)
-        }
-        XCTAssertNil(try? storage.loadChildProfile())
+        var draft = OnboardingDraft()
+        draft.dailyBudgetSeconds = 15 * 60
+        try draft.commit(using: services)
+        XCTAssertNil(try storage.loadChildProfile())
+        XCTAssertEqual(try storage.loadConfiguration().dailyBudgetSeconds, 900)
+        XCTAssertTrue(try storage.hasStoredConfiguration(), "the app now counts as set up")
     }
 
     func testCommitWithoutSelectionSkipsSelectionSave() throws {

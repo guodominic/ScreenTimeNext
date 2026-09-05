@@ -7,6 +7,7 @@
 import Foundation
 
 public enum OnboardingError: Error, Equatable, Sendable {
+    /// Kept for source compatibility; setup no longer requires a name (D-016).
     case missingChildName
 }
 
@@ -54,13 +55,17 @@ public struct OnboardingDraft: Equatable, Sendable {
         childName.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    public var isChildNameValid: Bool { !trimmedChildName.isEmpty }
+    /// D-016 — the name is optional. The app is used in the moment ("you get 15 minutes"), not
+    /// configured as a profile; copy degrades to a warm, name-less form when it is empty.
+    public var hasChildName: Bool { !trimmedChildName.isEmpty }
 
     public var hasSelection: Bool { !(selection?.summary.isEmpty ?? true) }
 
     // MARK: Derived records
 
-    public var childProfile: ChildProfile { ChildProfile(name: trimmedChildName) }
+    public var childProfile: ChildProfile? {
+        hasChildName ? ChildProfile(name: trimmedChildName) : nil
+    }
 
     /// Activities are stored in the canonical `TransitionActivity.allCases` order, not set order.
     public var configuration: ScreenTimeConfiguration {
@@ -78,8 +83,9 @@ public struct OnboardingDraft: Equatable, Sendable {
 
     /// Persist the draft through the service protocols. Nothing is written before this call.
     public func commit(using services: ServiceContainer) throws {
-        guard isChildNameValid else { throw OnboardingError.missingChildName }
-        try services.storage.save(childProfile)
+        if let childProfile {
+            try services.storage.save(childProfile)
+        }
         try services.storage.save(configuration)
         if let selection {
             try services.selection.save(selection)

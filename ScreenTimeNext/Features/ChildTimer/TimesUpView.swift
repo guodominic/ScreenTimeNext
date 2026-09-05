@@ -10,6 +10,8 @@ import ScreenTimeNextCore
 
 struct TimesUpView: View {
     let childName: String
+
+    private var addressed: String { childName.isEmpty ? "" : ", \(childName)" }
     let chosenActivity: TransitionActivity?
     /// True when today's budget is already spent and there is no session to show (§6.10 idle-with-no-budget).
     let budgetSpentEarlier: Bool
@@ -36,7 +38,7 @@ struct TimesUpView: View {
                     .bounceIn(delay: 0.15)
                 }
                 .frame(height: 200)
-                Text("You chose \(activity.displayName).")
+                Text("You chose \(activity.displayName)\(addressed).")
                     .font(.title2)
                     .bounceIn(delay: 0.3)
                 Text(activity.invitation)
@@ -54,7 +56,7 @@ struct TimesUpView: View {
                     .font(.title3)
                     .foregroundStyle(.secondary)
                     .bounceIn(delay: 0.2)
-                Text("See you tomorrow, \(childName)!")
+                Text(childName.isEmpty ? "See you tomorrow!" : "See you tomorrow, \(childName)!")
                     .font(.system(.title, design: .rounded).bold())
                     .bounceIn(delay: 0.3)
             } else {
@@ -64,7 +66,7 @@ struct TimesUpView: View {
                         .bounceIn(delay: 0.15)
                 }
                 .frame(height: 200)
-                Text("Nice job, \(childName).")
+                Text(childName.isEmpty ? "Nice job!" : "Nice job, \(childName).")
                     .font(.title3)
                     .foregroundStyle(.secondary)
                     .bounceIn(delay: 0.3)

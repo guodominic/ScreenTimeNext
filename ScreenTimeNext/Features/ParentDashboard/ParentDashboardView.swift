@@ -74,39 +74,95 @@ struct ParentDashboardView: View {
 
     private var heroSection: some View {
         Section {
-            HStack(spacing: 16) {
-                ZStack(alignment: .bottomLeading) {
-                    ProgressRing(fraction: viewModel.remainingFraction, lineWidth: 12, color: .white.opacity(0.95))
-                    VStack(spacing: 0) {
-                        Text(ChildTimerView.clock(viewModel.session.window != nil ? viewModel.session.remainingSeconds : viewModel.remainingTodaySeconds))
-                            .font(.system(size: 26, weight: .bold, design: .rounded))
-                            .monospacedDigit()
-                            .contentTransition(.numericText())
-                        Text(viewModel.session.window != nil ? "in session" : "left today")
-                            .font(.caption2.weight(.semibold))
-                            .opacity(0.85)
+            VStack(spacing: 16) {
+                HStack(alignment: .top, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(name)
+                            .font(.system(.title2, design: .rounded).bold())
+                        statChip(sessionSymbol, viewModel.sessionStatusText)
+                        statChip("shield.lefthalf.filled", viewModel.protectionText)
                     }
-                    Mascot(mood: heroMood, size: 52, tint: .white, animated: false)
-                        .offset(x: -10, y: 8)
+                    Spacer(minLength: 0)
+                    // Pip stands BESIDE the ring — never over the number (Dominic, 2026-09-05).
+                    Mascot(mood: heroMood, size: 76, tint: .white, animated: false)
                 }
-                .frame(width: 120, height: 120)
 
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(name)
-                        .font(.system(.title2, design: .rounded).bold())
-                    statChip("clock.fill", "\(viewModel.configuration.dailyBudgetSeconds / 60) min a day")
-                    statChip(sessionSymbol, viewModel.sessionStatusText)
-                    statChip("shield.lefthalf.filled", viewModel.protectionText)
+                if viewModel.sessionIsRunning || viewModel.session.state == .finished {
+                    runningRing
+                } else {
+                    quickStart
                 }
-                Spacer(minLength: 0)
             }
             .foregroundStyle(.white)
             .padding(20)
-            .background(RoundedRectangle(cornerRadius: 24, style: .continuous).fill(Theme.heroGradient))
+            .background(RoundedRectangle(cornerRadius: 28, style: .continuous).fill(Theme.heroGradient))
             .bounceIn()
             .readableWidth(720)
             .listRowInsets(EdgeInsets())
             .listRowBackground(Color.clear)
+        }
+    }
+
+    /// Mid-session: the ring, with the number unobstructed in the middle.
+    private var runningRing: some View {
+        ZStack {
+            ProgressRing(fraction: viewModel.remainingFraction, lineWidth: 12, color: .white.opacity(0.95))
+            VStack(spacing: 0) {
+                Text(ChildTimerView.clock(viewModel.session.window != nil ? viewModel.session.remainingSeconds : viewModel.remainingTodaySeconds))
+                    .font(.system(size: 34, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .contentTransition(.numericText())
+                Text(viewModel.session.window != nil ? "in session" : "left today")
+                    .font(.caption2.weight(.semibold))
+                    .opacity(0.85)
+            }
+        }
+        .frame(width: 132, height: 132)
+        .padding(.bottom, 4)
+    }
+
+    /// Idle: the whole point of the app in two taps — set the minutes, hand it over.
+    private var quickStart: some View {
+        VStack(spacing: 12) {
+            HStack(spacing: 14) {
+                Button { viewModel.adjustQuickMinutes(-ScreenTimeConfiguration.budgetStepSeconds / 60) } label: {
+                    Image(systemName: "minus.circle.fill").font(.title)
+                }
+                VStack(spacing: -2) {
+                    Text("\(viewModel.quickMinutes)")
+                        .font(.system(size: 52, weight: .heavy, design: .rounded))
+                        .monospacedDigit()
+                        .contentTransition(.numericText())
+                    Text("minutes").font(.caption.weight(.semibold)).opacity(0.85)
+                }
+                .frame(minWidth: 110)
+                Button { viewModel.adjustQuickMinutes(ScreenTimeConfiguration.budgetStepSeconds / 60) } label: {
+                    Image(systemName: "plus.circle.fill").font(.title)
+                }
+            }
+            .foregroundStyle(.white)
+            .sensoryFeedback(.selection, trigger: viewModel.quickMinutes)
+
+            Button {
+                viewModel.startSession()
+                onOpenTimer()
+            } label: {
+                Label("Start now", systemImage: "play.fill")
+                    .font(.system(.headline, design: .rounded).bold())
+                    .foregroundStyle(Theme.sky)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 13)
+                    .background(Capsule().fill(.white))
+            }
+            .buttonStyle(.plain)
+            .disabled(viewModel.remainingTodaySeconds == 0)
+            .opacity(viewModel.remainingTodaySeconds == 0 ? 0.5 : 1)
+
+            Text(viewModel.remainingTodaySeconds == 0
+                 ? "Today's time is used up."
+                 : "Sets today's budget and hands over a running timer.")
+                .font(.caption)
+                .opacity(0.85)
         }
     }
 

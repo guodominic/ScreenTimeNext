@@ -27,6 +27,10 @@ public protocol ScreenTimeStorageService: Sendable {
     func loadConfiguration() throws -> ScreenTimeConfiguration
     func save(_ configuration: ScreenTimeConfiguration) throws
 
+    /// True once a configuration has actually been written. D-016: the child's name is optional,
+    /// so "has a profile" no longer answers "has this been set up".
+    func hasStoredConfiguration() throws -> Bool
+
     func loadDailyUsage(for date: Date) throws -> DailyUsage?
     func save(_ usage: DailyUsage) throws
 

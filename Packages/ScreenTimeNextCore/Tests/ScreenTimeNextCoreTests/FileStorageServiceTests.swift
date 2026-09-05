@@ -106,6 +106,16 @@ final class FileStorageServiceTests: XCTestCase {
         XCTAssertEqual(store.schemaVersion, AppGroup.currentSchemaVersion, "erase keeps the manifest")
     }
 
+    /// D-016 — "is the app set up" is a stored configuration, not a stored profile.
+    func testHasStoredConfiguration() throws {
+        let store = try open()
+        XCTAssertFalse(try store.hasStoredConfiguration())
+        try store.save(ScreenTimeConfiguration.default)
+        XCTAssertTrue(try store.hasStoredConfiguration())
+        try store.eraseAll()
+        XCTAssertFalse(try store.hasStoredConfiguration())
+    }
+
     func testDayKeyIsLexicallyChronological() {
         let a = FileStorageService.dayKey(Date(timeIntervalSince1970: 1_700_000_000))
         let b = FileStorageService.dayKey(Date(timeIntervalSince1970: 1_700_000_000 + 40 * 86_400))
