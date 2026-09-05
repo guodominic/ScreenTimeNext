@@ -42,10 +42,19 @@ final class ChildTimerViewModel {
         run { try controller.tick() }
     }
 
-    // MARK: Child actions (the only one there is)
+    // MARK: Child actions
 
     func start() {
         run { try controller.start() }
+    }
+
+    /// PRD §6.11 — pick what to do next. Task 009.
+    func choose(_ activity: TransitionActivity) {
+        run { try controller.choose(activity) }
+    }
+
+    var availableActivities: [TransitionActivity] {
+        (try? controller.availableActivities()) ?? TransitionActivity.allCases
     }
 
     // MARK: Internals

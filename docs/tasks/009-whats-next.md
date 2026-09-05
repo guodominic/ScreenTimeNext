@@ -1,7 +1,7 @@
 ---
 task: "009"
 title: What's Next (Transition Activities)
-status: not_started        # not_started | in_progress | blocked | done
+status: done               # not_started | in_progress | blocked | done
 depends_on: ["003", "006"]
 qa_criteria: ["QA-08"]
 prd_refs: ["§6.7", "§6.11", "§6.12", "§6.14"]
@@ -48,15 +48,21 @@ mechanism that is supposed to reduce conflict, and §21 lists it as an explicit 
 - [ ] The empty-approved-set case has defined, tested behavior.
 
 ## Completion report
-Append the result here when the task finishes. Do not edit earlier tasks' reports.
 
-- **Files changed:**
-- **Build result:**
-- **Tests run:**
-- **Verdict:** PASS / FAIL / BLOCKED / NEEDS MANUAL DEVICE TEST
-- **Platform limitations or manual steps:**
-- **Follow-up work:**
+**2026-09-05 — Claude. Verified in the batched run with 008/014/015 (see PROGRESS).**
 
-> After finishing: update `status:` in this file's front-matter, update
-> `docs/tasks/PROGRESS.md`, and log any new decision in `docs/DECISIONS.md`
-> or new blocker in `docs/BLOCKERS.md`.
+- **Files changed:** package `TransitionActivity` (+`invitation`, `symbolName`), `SessionWindow.chosenActivity`,
+  `SessionController.choose(_:)` / `availableActivities()`, `ChildSessionSnapshot.chosenActivity`;
+  app `ChildTimerView` — `WhatsNextChooser` in `warning10`, `ChosenActivityBadge` in `warning5`;
+  `ChildTimerViewModel.choose`. Tests: `WhatsNextTests` (8). Decision D-009.
+- **Verdict:** **PASS** (automated; device check with the rest of the batch).
+- **Design notes:** the choice is a field on the session window — persists through
+  background/relaunch, reaches Time's Up, clears on the next Start. Empty parent set → all eight
+  offered (D-009). Chooser only in `warning10` (§7.4). Parent onboarding was already gating the set.
+- **Follow-up work:** Task 015 renders `invitation` on Time's Up (done in the same batch).
+
+### DoD status
+- [x] **QA-08** — the child can select a next activity (automated; device check pending in batch).
+- [x] The parent-approved set gates the child's options (or all eight when none approved — D-009).
+- [x] The choice persists to the five-minute warning and the Time's Up screen.
+- [x] The empty-approved-set case has defined, tested behavior.

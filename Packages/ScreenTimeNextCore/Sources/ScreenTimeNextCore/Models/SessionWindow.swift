@@ -15,10 +15,14 @@ public struct SessionWindow: Codable, Equatable, Sendable {
     public let startedAt: Date
     /// Moves forward when a parent grants an extension (PRD §15).
     public var endsAt: Date
+    /// What the child chose to do next (PRD §6.11). Lives and dies with the session, so it
+    /// carries through to Time's Up and is gone by the next Start. Optional for decode-compat.
+    public var chosenActivity: TransitionActivity?
 
-    public init(startedAt: Date, endsAt: Date) {
+    public init(startedAt: Date, endsAt: Date, chosenActivity: TransitionActivity? = nil) {
         self.startedAt = startedAt
         self.endsAt = endsAt
+        self.chosenActivity = chosenActivity
     }
 
     public init(startedAt: Date, budgetSeconds: Int) {
@@ -45,6 +49,6 @@ public struct SessionWindow: Codable, Equatable, Sendable {
 
     /// Grant a parent extension (PRD §6.16, §15). Returns a new window; does not mutate in place.
     public func extended(bySeconds seconds: Int) -> SessionWindow {
-        SessionWindow(startedAt: startedAt, endsAt: endsAt.addingTimeInterval(TimeInterval(seconds)))
+        SessionWindow(startedAt: startedAt, endsAt: endsAt.addingTimeInterval(TimeInterval(seconds)), chosenActivity: chosenActivity)
     }
 }

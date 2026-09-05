@@ -187,6 +187,29 @@ impossible without per-file exceptions.
 original suggestion. Task file paths updated. `@testable import ScreenTimeNextCore` in tests.
 The package must stay Foundation-only; the import-boundary check (Task 002) covers it.
 
+---
+
+## D-009 — What's Next: choice lives on the session; an empty parent set means "all"
+**Date:** 2026-09-05 · **Status:** accepted (Task 009)
+
+**Context.** PRD §6.11 has the child choose a next activity at the 10-minute warning, §6.12 shows it
+at five minutes, §6.14 names it at Time's Up. Two things the PRD leaves open: where the choice is
+stored, and what the child sees if the parent approved no activities in §6.7.
+
+**Decision.**
+- The choice is a field on `SessionWindow`. It therefore persists across background/relaunch
+  (QA-08 groundwork), survives to Time's Up, and is cleared automatically when the window is
+  finalized — no separate lifecycle to manage.
+- An empty parent selection is treated as "no preference": the child is offered the whole fixed
+  set of eight. Onboarding hints but does not force a pick. Showing an empty chooser at the moment
+  the product is supposed to help would be the worst outcome.
+- The chooser is shown only in `warning10` (PRD §7.4 — minimal interaction in the last five minutes);
+  later states display the choice, they do not offer to change it.
+
+**Consequences.** `SessionController.choose(_:)` and `availableActivities()`. Task 015 renders
+`activity.invitation`. If a future version wants the child to pick earlier (during `active`), that
+is a UI change only.
+
 <!-- Template for new entries:
 
 ## D-NNN — <short imperative title>

@@ -33,4 +33,32 @@ public enum TransitionActivity: String, Codable, CaseIterable, Identifiable, Sen
         case .familyTime: return "Family Time"
         }
     }
+
+    /// Time's Up copy (PRD §6.14): "You chose LEGO. Let's go build!" — the second sentence.
+    public var invitation: String {
+        switch self {
+        case .lego:       return "Let's go build!"
+        case .drawing:    return "Let's go draw!"
+        case .reading:    return "Grab a book!"
+        case .outside:    return "Let's head outside!"
+        case .snack:      return "Snack time!"
+        case .bath:       return "Bath time!"
+        case .homework:   return "Let's get it done!"
+        case .familyTime: return "Let's find the family!"
+        }
+    }
+
+    /// SF Symbol for the chooser tiles.
+    public var symbolName: String {
+        switch self {
+        case .lego:       return "square.stack.3d.up.fill"
+        case .drawing:    return "paintpalette.fill"
+        case .reading:    return "book.fill"
+        case .outside:    return "sun.max.fill"
+        case .snack:      return "carrot.fill"
+        case .bath:       return "drop.fill"
+        case .homework:   return "pencil.and.list.clipboard"
+        case .familyTime: return "figure.2.and.child.holdinghands"
+        }
+    }
 }

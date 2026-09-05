@@ -69,12 +69,19 @@ struct ChildTimerView: View {
         case .warning10:
             headline("10 minutes left 👋")
             subline("You're almost done. What do you want to do next?")
-            WhatsNextSlot()
+            WhatsNextChooser(
+                activities: viewModel.availableActivities,
+                chosen: snapshot.chosenActivity,
+                onChoose: { viewModel.choose($0) }
+            )
             smallTime(snapshot.remainingSeconds)
 
         case .warning5:
             headline("5 minutes left")
             subline("Time to finish up what you're doing.")
+            if let activity = snapshot.chosenActivity {
+                ChosenActivityBadge(activity: activity)
+            }
             smallTime(snapshot.remainingSeconds)
 
         case .warning1:
@@ -137,11 +144,50 @@ struct ChildTimerView: View {
     }
 }
 
-/// Task 009 replaces this with the child's activity chooser. Kept as a named slot so the timer's
-/// layout does not change when it arrives.
-struct WhatsNextSlot: View {
+/// PRD §6.11 — one tap to choose. Big tiles, no text entry, no scrolling for eight items.
+struct WhatsNextChooser: View {
+    let activities: [TransitionActivity]
+    let chosen: TransitionActivity?
+    let onChoose: (TransitionActivity) -> Void
+
+    private let columns = [GridItem(.flexible()), GridItem(.flexible())]
+
     var body: some View {
-        Text("Pick something fun for after")
+        LazyVGrid(columns: columns, spacing: 10) {
+            ForEach(activities) { activity in
+                let isChosen = chosen == activity
+                Button {
+                    onChoose(activity)
+                } label: {
+                    VStack(spacing: 6) {
+                        Image(systemName: activity.symbolName)
+                            .font(.title2)
+                        Text(activity.displayName)
+                            .font(.headline)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                }
+                .buttonStyle(.bordered)
+                .tint(isChosen ? Color.accentColor : Color.secondary)
+                .overlay(alignment: .topTrailing) {
+                    if isChosen {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(Color.accentColor)
+                            .padding(6)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// PRD §6.12 — remind the child what they picked, warmly, without offering to change it (§7.4).
+struct ChosenActivityBadge: View {
+    let activity: TransitionActivity
+
+    var body: some View {
+        Label("Next: \(activity.displayName)", systemImage: activity.symbolName)
             .font(.headline)
             .padding(.horizontal, 20).padding(.vertical, 12)
             .background(Capsule().fill(Color.accentColor.opacity(0.15)))

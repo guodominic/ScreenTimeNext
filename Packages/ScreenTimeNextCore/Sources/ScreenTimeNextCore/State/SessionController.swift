@@ -35,6 +35,9 @@ public struct ChildSessionSnapshot: Equatable, Sendable {
     public var displayState: ScreenTimeState {
         state.isWarning && !presentsWarning ? .active : state
     }
+
+    /// PRD §6.11–§6.14: the child's pick, if any, for this session.
+    public var chosenActivity: TransitionActivity? { window?.chosenActivity }
 }
 
 public final class SessionController: @unchecked Sendable {
@@ -106,6 +109,27 @@ public final class SessionController: @unchecked Sendable {
             guard let window = try currentWindowLocked() else {
                 return try idleSnapshotLocked()
             }
+            return try snapshotLocked(for: window, at: now())
+        }
+    }
+
+    /// PRD §6.7 / D-009: the activities offered to the child — the parent's picks, or the whole
+    /// fixed set when the parent picked none ("no preference" rather than "nothing").
+    public func availableActivities() throws -> [TransitionActivity] {
+        let chosen = try storage.loadConfiguration().selectedActivities
+        return chosen.isEmpty ? TransitionActivity.allCases : chosen
+    }
+
+    /// The child picks what to do next (PRD §6.11). Persists on the current window.
+    /// No window → nothing to attach the choice to; returns the idle snapshot unchanged.
+    @discardableResult
+    public func choose(_ activity: TransitionActivity) throws -> ChildSessionSnapshot {
+        try lock.withLock {
+            guard var window = try currentWindowLocked() else {
+                return try idleSnapshotLocked()
+            }
+            window.chosenActivity = activity
+            try storage.save(window)
             return try snapshotLocked(for: window, at: now())
         }
     }
