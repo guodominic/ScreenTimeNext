@@ -1,7 +1,7 @@
 ---
 task: "006"
 title: Screen Time Configuration
-status: not_started        # not_started | in_progress | blocked | done
+status: done               # not_started | in_progress | blocked | done  (App Group impl at Phase 1 gate)
 depends_on: ["002"]
 qa_criteria: ["QA-05"]
 prd_refs: ["§12", "§13", "§6.5", "§6.6"]
@@ -51,15 +51,30 @@ Note the deliberate split — `ScreenTimeState` tracks the *session*, `Protectio
 - [ ] Unit tests cover round-trip, defaults, and corrupt-store recovery.
 
 ## Completion report
-Append the result here when the task finishes. Do not edit earlier tasks' reports.
 
-- **Files changed:**
-- **Build result:**
-- **Tests run:**
-- **Verdict:** PASS / FAIL / BLOCKED / NEEDS MANUAL DEVICE TEST
-- **Platform limitations or manual steps:**
-- **Follow-up work:**
+**2026-09-05 — Claude; verified by Dominic (`./scripts/test.sh`, `./scripts/build.sh`).**
 
-> After finishing: update `status:` in this file's front-matter, update
-> `docs/tasks/PROGRESS.md`, and log any new decision in `docs/DECISIONS.md`
-> or new blocker in `docs/BLOCKERS.md`.
+- **Files changed:** package `Storage/FileStorageService.swift` (one JSON file per record, atomic
+  writes, schema manifest + migration hook, corrupt file → defaults/nil, usage bucketed by local
+  day and pruned to 14 days, `appContainer()` / `appGroup(identifier:)` factories);
+  `ScreenTimeStorageService` protocol gained `eraseAll()`; in-memory mock updated;
+  `ServiceContainer.phase0()` (mocks + real file storage, `storageIsVolatile` fallback flag);
+  app `ScreenTimeNextApp` now runs on `.phase0()`; `RootView.reset()` erases; home footer reports
+  storage state. Tests: `FileStorageServiceTests` (8).
+- **Build result:** `./scripts/build.sh` — BUILD OK.
+- **Tests run:** `./scripts/test.sh` — **40 tests, 0 failures**.
+- **Verdict:** **PASS** (Phase 0 scope). App Group container: **BLOCKED (by gate)** — same class,
+  different directory, switched in `ServiceContainer.phase0()`'s successor at Phase 1.
+- **Platform limitations or manual steps:** models from §12 already existed (Task 001). Budget is
+  stored in seconds; presentation converts. D-006 (session window) decided — `SessionWindow` is
+  persisted as its own record.
+- **Follow-up work:** Phase 1 — `FileStorageService.appGroup()` becomes the container once the
+  capability exists (B-002); extension reads the same files. QA-05 manual check: onboard, kill
+  the app, relaunch → lands on home.
+
+### DoD status
+- [x] **QA-05** — daily budget survives a relaunch (automated: second instance on the same directory; manual relaunch pending with QA-01)
+- [x] All six model types from §12 exist with the specified fields.
+- [ ] Storage is in the App Group container and readable from the extension target — **blocked by gate (D-007 / B-002)**; app-container directory in Phase 0.
+- [x] A corrupt or missing store yields documented defaults instead of a crash.
+- [x] Unit tests cover round-trip, defaults, and corrupt-store recovery.

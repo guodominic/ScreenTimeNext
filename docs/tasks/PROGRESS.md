@@ -15,7 +15,7 @@ in the same commit as the work. If this file and a task's front-matter disagree,
 | 003 | [Parent Onboarding](003-parent-onboarding.md) | done | 002 | QA-01 | PASS / NEEDS MANUAL DEVICE TEST | 32/32; QA-01 click-through pending |
 | 004 | [Family Controls Authorization](004-family-controls-authorization.md) | not_started | 002, 003 | QA-02 | — | entitlement risk |
 | 005 | [Family Activity Picker](005-family-activity-picker.md) | not_started | 004 | QA-03, QA-04 | — | |
-| 006 | [Screen Time Configuration](006-screen-time-configuration.md) | not_started | 002 | QA-05 | — | |
+| 006 | [Screen Time Configuration](006-screen-time-configuration.md) | done | 002 | QA-05 | PASS (App Group at gate) | 40/40; FileStorageService |
 | 007 | [Child Timer UI](007-child-timer-ui.md) | not_started | 006 | QA-06, QA-07 | — | |
 | 008 | [Warning State Engine](008-warning-state-engine.md) | not_started | 006 | QA-07 | — | pure logic, no device needed |
 | 009 | [What's Next](009-whats-next.md) | not_started | 003, 006 | QA-08 | — | |
@@ -75,7 +75,7 @@ but remember §22: that half alone is a prototype, not V1.
 
 | Half | State |
 |---|---|
-| Coherent transition experience | in progress — 001–003 done; 006 next |
+| Coherent transition experience | in progress — 001–003, 006 done; 007 next |
 | Real Screen Time enforcement | not started |
 
 Both must be complete. Neither alone is V1.
