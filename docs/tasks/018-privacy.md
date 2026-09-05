@@ -1,7 +1,7 @@
 ---
 task: "018"
 title: Privacy Audit
-status: not_started        # not_started | in_progress | blocked | done
+status: done               # not_started | in_progress | blocked | done  (re-audit at Phase 1)
 depends_on: ["017"]
 qa_criteria: ["QA-15"]
 prd_refs: ["§16"]
@@ -47,15 +47,25 @@ Audit all logging and data collection, then produce `PRIVACY.md` at the reposito
 - [ ] App Store privacy questionnaire answers are drafted and ready for Task 019.
 
 ## Completion report
-Append the result here when the task finishes. Do not edit earlier tasks' reports.
 
-- **Files changed:**
-- **Build result:**
-- **Tests run:**
-- **Verdict:** PASS / FAIL / BLOCKED / NEEDS MANUAL DEVICE TEST
-- **Platform limitations or manual steps:**
-- **Follow-up work:**
+**2026-09-05 — Claude. Verified in the batched run with 017.**
 
-> After finishing: update `status:` in this file's front-matter, update
-> `docs/tasks/PROGRESS.md`, and log any new decision in `docs/DECISIONS.md`
-> or new blocker in `docs/BLOCKERS.md`.
+- **Audit method:** `scripts/privacy-audit.sh`, run by `test.sh` on every verification. Greps all
+  Swift sources (app, package, extension folder) and the project file for: networking APIs, URL
+  literals, logging calls in production code, remote package dependencies, analytics/ads/crash SDK
+  names, and any read of `SelectionSnapshot.payload` outside the selection adapter.
+- **Findings (2026-09-05):** none. No networking, no logging, no third-party code, no backend.
+  Notification content contains the child's first name and the chosen activity only — never app
+  names or selection detail. The only child data stored is a first name, in the app container.
+- **Files changed:** `scripts/privacy-audit.sh`; `PRIVACY.md` status → audited for Phase 0;
+  `scripts/test.sh` runs the audit.
+- **Verdict:** **PASS** (Phase 0). Re-run at Phase 1 when the Screen Time adapters exist.
+- **App Store privacy questionnaire (draft answers):** Data collected — none. Data linked to user —
+  none. Tracking — none. (The child's first name never leaves the device.)
+
+### DoD status
+- [x] **QA-15** — no child usage data is unintentionally sent to a backend (audited, and enforced on every test run).
+- [x] A documented sweep of all logging and networking call sites exists (the script is the sweep; it covers the extension folder).
+- [x] No FamilyActivity token or selection content appears in any log (no logging exists; payload access is fenced).
+- [x] `PRIVACY.md` exists at the repository root and covers App Group and all three Screen Time frameworks.
+- [x] App Store privacy questionnaire answers are drafted (above).

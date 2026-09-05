@@ -1,7 +1,7 @@
 ---
 task: "017"
 title: Edge Cases
-status: not_started        # not_started | in_progress | blocked | done
+status: in_progress        # not_started | in_progress | blocked | done  (Phase 0 scope done; shield/bypass scenarios at Phase 1 gate)
 depends_on: ["012", "013", "016"]
 qa_criteria: ["QA-12", "QA-13", "QA-14"]
 prd_refs: ["§17"]
@@ -53,15 +53,30 @@ configuration changes, date/time changes, and the child attempting to reopen pro
 - [ ] Bypass limitations discovered are recorded in `docs/BLOCKERS.md` and flagged as copy constraints.
 
 ## Completion report
-Append the result here when the task finishes. Do not edit earlier tasks' reports.
 
-- **Files changed:**
-- **Build result:**
-- **Tests run:**
-- **Verdict:** PASS / FAIL / BLOCKED / NEEDS MANUAL DEVICE TEST
-- **Platform limitations or manual steps:**
-- **Follow-up work:**
+**2026-09-05 — Claude, Phase 0 scope. Verified in the batched run with 018.**
 
-> After finishing: update `status:` in this file's front-matter, update
-> `docs/tasks/PROGRESS.md`, and log any new decision in `docs/DECISIONS.md`
-> or new blocker in `docs/BLOCKERS.md`.
+- **Files changed:** `SessionController.currentWindowLocked` — a window is current while it started
+  today OR is still running (a 23:50 session is not cut at midnight; a timezone change cannot end a
+  running session; only an ended window from another day is finalized, onto the day it started).
+  Dashboard shows "Screen Time access" status (revocation surfaces to the parent, never the child).
+  Tests: `EdgeCaseTests` (10) on REAL file storage: restart mid-session and in every stage,
+  midnight span, yesterday's finished window, timezone flip, forward/backward clock jumps,
+  budget/activity changes mid-session, revocation.
+- **Verdict:** **PASS** (Phase 0) · **BLOCKED (by gate)**: restart with an active shield, child
+  reopening protected content, revocation's effect on enforcement.
+- **Decisions:** budget changes apply to the next session; a running window is never discarded by
+  a clock or calendar change; backward clock is clamped to the window length (residual limit: a
+  child who sets the clock back *before* Start gets a normal session — acceptable, documented).
+- **Honesty constraint (§17):** nothing in copy claims bypass-proof enforcement; `docs/BLOCKERS.md`
+  B-003 carries the device-test list.
+- **Follow-up work:** Phase 1 — shield persistence across restart, reopen-after-expiry, notification
+  delivery latency measured on device (Task 016 note).
+
+### DoD status
+- [x] **QA-12** — restart does not silently destroy configuration (file storage, every stage).
+- [x] **QA-13** — midnight / day rollover handled (span + finalize-on-its-day).
+- [x] **QA-14** — authorization revocation handled (timer continues; parent sees it; child does not) — enforcement half at gate.
+- [x] Backward clock change cannot manufacture screen time; residual limit documented.
+- [x] Every §17 scenario reproducible without a device has an automated test; device-only ones listed in B-003.
+- [x] Bypass limitations recorded as copy constraints (B-003, PRIVACY.md "What we cannot promise").

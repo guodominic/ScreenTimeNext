@@ -26,8 +26,8 @@ in the same commit as the work. If this file and a task's front-matter disagree,
 | 014 | [Parent Dashboard](014-parent-dashboard.md) | done | 006, 011 | — | PASS | + SettingsView; Extend row disabled until 013; batched run |
 | 015 | [Time's Up Experience](015-times-up-experience.md) | done | 009 | — | PASS | TimesUpView; batched run |
 | 016 | [Notifications & Background](016-notifications-background.md) | done | 008, 012 | — | PASS / device check pending | local notifications — needed in Phase 0 |
-| 017 | [Edge Cases](017-edge-cases.md) | not_started | 012, 013, 016 | QA-12, QA-13, QA-14 | — | |
-| 018 | [Privacy Audit](018-privacy.md) | not_started | 017 | QA-15 | — | produces `PRIVACY.md` |
+| 017 | [Edge Cases](017-edge-cases.md) | in_progress | 012, 013, 016 | QA-12, QA-13, QA-14 | PASS (Phase 0) / BLOCKED by gate (shield scenarios) | midnight-span rule; EdgeCaseTests on file storage |
+| 018 | [Privacy Audit](018-privacy.md) | done | 017 | QA-15 | PASS (re-audit at Phase 1) | scripts/privacy-audit.sh on every test run |
 | 019 | [App Store Readiness](019-app-store-readiness.md) | not_started | 018 | — | — | entitlement gate |
 | 020 | [Final QA](020-final-qa.md) | not_started | 019 | QA-01…QA-15 | — | |
 
@@ -40,16 +40,16 @@ in the same commit as the work. If this file and a task's front-matter disagree,
 | QA-03 | Parent can select protected content | 005 | — |
 | QA-04 | Selection survives relaunch | 005 | — |
 | QA-05 | Daily budget survives relaunch | 006 | PASS (automated); device relaunch check pending |
-| QA-06 | Countdown survives background/foreground | 007 | — |
-| QA-07 | 10/5/1 warning states render correctly | 008 / 007 | — |
-| QA-08 | Child can select a next activity | 009 | — |
+| QA-06 | Countdown survives background/foreground | 007 | PASS (automated); device check pending |
+| QA-07 | 10/5/1 warning states render correctly | 008 / 007 | PASS (automated); device look pending |
+| QA-08 | Child can select a next activity | 009 | PASS (automated); device check pending |
 | QA-09 | Time expiration triggers enforcement path | 012 | — |
 | QA-10 | Content shielded without clearing unrelated settings | 011 | — |
-| QA-11 | Parent extension works after expiration | 013 | — |
-| QA-12 | Device restart does not destroy configuration | 017 | — |
-| QA-13 | Midnight / day rollover handled | 017 | — |
-| QA-14 | Authorization revocation handled | 017 | — |
-| QA-15 | No child usage data sent to a backend | 018 | — |
+| QA-11 | Parent extension works after expiration | 013 | PASS session half; shield half at gate |
+| QA-12 | Device restart does not destroy configuration | 017 | PASS (automated, file storage) |
+| QA-13 | Midnight / day rollover handled | 017 | PASS (automated) |
+| QA-14 | Authorization revocation handled | 017 | PASS Phase 0 scope; enforcement half at gate |
+| QA-15 | No child usage data sent to a backend | 018 | PASS (audited + enforced) |
 
 ## Phases (D-007)
 
@@ -80,7 +80,7 @@ but remember §22: that half alone is a prototype, not V1.
 
 | Half | State |
 |---|---|
-| Coherent transition experience | Phase 0 feature-complete pending device check: 001–003, 006–009, 013 (session half), 014–016 done |
+| Coherent transition experience | **Phase 0 complete** (pending on-device checks): 001–003, 006–009, 013 (session half), 014–018 |
 | Real Screen Time enforcement | not started |
 
 Both must be complete. Neither alone is V1.

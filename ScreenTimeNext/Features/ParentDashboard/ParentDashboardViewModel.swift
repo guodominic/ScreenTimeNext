@@ -18,6 +18,7 @@ final class ParentDashboardViewModel {
     private(set) var session: ChildSessionSnapshot = .idle
     private(set) var remainingTodaySeconds: Int = 0
     private(set) var notificationsDenied = false
+    private(set) var authorization: ScreenTimeAuthorizationStatus = .notDetermined
 
     private let services: ServiceContainer
     private let controller: SessionController
@@ -46,7 +47,10 @@ final class ParentDashboardViewModel {
 
     /// Full re-read: appear, foreground, after Settings.
     func reload() {
-        Task { notificationsDenied = await services.notifications.isPermissionDenied }
+        Task {
+            notificationsDenied = await services.notifications.isPermissionDenied
+            authorization = await services.authorization.status
+        }
         let storage = services.storage
         profile = try? storage.loadChildProfile()
         configuration = (try? storage.loadConfiguration()) ?? .default
@@ -92,6 +96,15 @@ final class ParentDashboardViewModel {
     }
 
     var sessionIsRunning: Bool { session.window != nil && session.state != .finished }
+
+    var authorizationText: String {
+        switch authorization {
+        case .notDetermined: return "Not requested"
+        case .approved:      return "Allowed"
+        case .denied:        return "Declined"
+        case .revoked:       return "Turned off in Settings"
+        }
+    }
 
     var protectionText: String {
         switch protectionState {

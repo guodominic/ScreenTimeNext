@@ -180,10 +180,14 @@ public final class SessionController: @unchecked Sendable {
 
     // MARK: Internals (lock held)
 
-    /// Today's window, or nil. A window from another day is finalized and cleared here.
+    /// The live window, or nil. Task 017 rule: a window is current while it started today OR is
+    /// still running — so a session that starts at 23:50 is not cut off at midnight, and a
+    /// timezone change cannot end a running session. Only a window that has ended AND belongs to
+    /// another day is finalized (its usage lands on the day it started) and cleared.
     private func currentWindowLocked() throws -> SessionWindow? {
         guard let window = try storage.loadSessionWindow() else { return nil }
-        if calendar.isDate(window.startedAt, inSameDayAs: now()) {
+        let current = now()
+        if calendar.isDate(window.startedAt, inSameDayAs: current) || window.remainingSeconds(at: current) > 0 {
             return window
         }
         try finalizeLocked(window)

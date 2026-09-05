@@ -9,6 +9,7 @@
 
 set -euo pipefail
 "$(dirname "$0")/check-imports.sh"
+"$(dirname "$0")/privacy-audit.sh"
 cd "$(dirname "$0")/../Packages/ScreenTimeNextCore"
 
 # Locate Xcode: known location first, Spotlight as fallback.

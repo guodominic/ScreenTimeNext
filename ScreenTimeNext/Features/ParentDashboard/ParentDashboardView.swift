@@ -62,6 +62,7 @@ struct ParentDashboardView: View {
             LabeledContent("Remaining today", value: ChildTimerView.clock(viewModel.remainingTodaySeconds))
             LabeledContent("Session", value: viewModel.sessionStatusText)
             LabeledContent("Protection", value: viewModel.protectionText)
+            LabeledContent("Screen Time access", value: viewModel.authorizationText)
         }
     }
 

@@ -1,9 +1,10 @@
 # Privacy Policy — ScreenTimeNext
 
-**Status: DRAFT.** Written before the first build so that App Store Connect and the Family
-Controls entitlement request have a policy URL to point at. Task 018 audits the shipped code
-against this document and finalizes it; until then, treat every statement below as a commitment
-the code must be checked against, not a description of code that exists.
+**Status: audited for Phase 0 (2026-09-05); re-audit at Phase 1.** `scripts/privacy-audit.sh`
+runs on every test run and fails the build if networking, logging, third-party SDKs or raw
+selection access ever appear. The statements about Family Controls, Device Activity and Managed
+Settings below describe adapters that do not exist yet (Phase 1) — they are commitments the
+Phase 1 code will be audited against.
 
 _Last updated: 2026-09-04_
 
