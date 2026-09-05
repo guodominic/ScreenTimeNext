@@ -60,14 +60,9 @@ struct ShieldCardView: View {
             .padding(.top, 4)
             .bounceIn(delay: 0.2)
         }
-        .padding(28)
-        .readableWidth(420)
-        .background(
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .fill(.regularMaterial)
-        )
-        .shadow(color: .black.opacity(0.18), radius: 24, y: 8)
-        .padding(24)
+        .padding(.horizontal, 32)
+        .frame(maxWidth: 460)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 

@@ -9,7 +9,8 @@ import Observation
 import ScreenTimeNextCore
 
 enum OnboardingStep: Hashable {
-    case quickSetup
+    case time          // how long, and when to remind
+    case whatCounts    // which apps and categories the budget applies to
 }
 
 @Observable

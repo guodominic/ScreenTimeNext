@@ -16,6 +16,8 @@ struct RootView: View {
     private enum Route { case loading, onboarding, home }
     @State private var route: Route = .loading
     @State private var showChildTimer = false
+    /// A notification tapped before the app finished routing — honoured once `route` settles.
+    @State private var pendingTimerRequest = false
 
     var body: some View {
         Group {
@@ -35,6 +37,10 @@ struct RootView: View {
         }
         .task {
             route = isSetUp ? .home : .onboarding
+            if pendingTimerRequest && route == .home {
+                pendingTimerRequest = false
+                showChildTimer = true
+            }
             presentTimerIfSessionExists()
         }
         // During a session the device is the child's: however the app is opened, the timer is
@@ -42,8 +48,10 @@ struct RootView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { presentTimerIfSessionExists() }
         }
+        // A warning was tapped. If routing hasn't finished yet (cold launch straight from the
+        // notification), remember it and honour it as soon as it has.
         .onReceive(NotificationCenter.default.publisher(for: .openChildTimer)) { _ in
-            if route == .home { showChildTimer = true }
+            if route == .home { showChildTimer = true } else { pendingTimerRequest = true }
         }
         .fullScreenCover(isPresented: $showChildTimer) {
             NavigationStack {

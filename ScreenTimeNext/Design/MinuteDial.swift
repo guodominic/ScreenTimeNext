@@ -10,7 +10,11 @@ import SwiftUI
 struct MinuteDial: View {
     @Binding var minutes: Int
     let range: ClosedRange<Int>
+    /// Constant step, or — when `fineBelow` is set — 1 minute under that threshold.
     let step: Int
+    /// Below this many minutes the dial moves one minute at a time (D-017): short budgets are the
+    /// common case and two-minute jumps are too coarse to say "seven more minutes".
+    var fineBelow: Int? = nil
     var title: String? = nil
     var color: Color = Theme.sky
     /// Base size; on iPad every dial is scaled up (see `size`), because the whole control is dragged.
@@ -73,16 +77,16 @@ struct MinuteDial: View {
             .accessibilityValue(zeroMeansOff && minutes == 0 ? "Off" : "\(minutes) minutes")
             .accessibilityAdjustableAction { direction in
                 switch direction {
-                case .increment: nudge(step)
-                case .decrement: nudge(-step)
+                case .increment: nudge(1)
+                case .decrement: nudge(-1)
                 @unknown default: break
                 }
             }
 
             HStack(spacing: 28) {
-                Button { nudge(-step) } label: { Image(systemName: "minus.circle.fill").font(.title) }
+                Button { nudge(-1) } label: { Image(systemName: "minus.circle.fill").font(.title) }
                     .disabled(minutes <= range.lowerBound)
-                Button { nudge(step) } label: { Image(systemName: "plus.circle.fill").font(.title) }
+                Button { nudge(1) } label: { Image(systemName: "plus.circle.fill").font(.title) }
                     .disabled(minutes >= range.upperBound)
             }
             .tint(color)
@@ -111,13 +115,23 @@ struct MinuteDial: View {
             .rotationEffect(.degrees(fraction * 360))
     }
 
+    /// The step in force around a given value.
+    private func step(near value: Int) -> Int {
+        if let fineBelow, value < fineBelow { return 1 }
+        return step
+    }
+
     private func set(_ raw: Double) {
-        let stepped = (raw / Double(step)).rounded() * Double(step)
+        let st = step(near: Int(raw))
+        let stepped = (raw / Double(st)).rounded() * Double(st)
         minutes = min(max(Int(stepped), range.lowerBound), range.upperBound)
     }
 
-    private func nudge(_ delta: Int) {
-        minutes = min(max(minutes + delta, range.lowerBound), range.upperBound)
+    private func nudge(_ direction: Int) {
+        // Stepping DOWN across the threshold should use the finer step, so 16 → 14 → 13 … reads
+        // naturally rather than jumping.
+        let st = step(near: direction < 0 ? minutes - 1 : minutes)
+        minutes = min(max(minutes + direction * st, range.lowerBound), range.upperBound)
     }
 }
 

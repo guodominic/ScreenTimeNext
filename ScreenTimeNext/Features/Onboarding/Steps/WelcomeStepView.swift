@@ -29,7 +29,7 @@ struct WelcomeStepView: View {
                     .multilineTextAlignment(.center)
                     .bounceIn(delay: 0.16)
                 Spacer()
-                Button { viewModel.advance(to: .quickSetup) } label: { Text("Let's go") }
+                Button { viewModel.advance(to: .time) } label: { Text("Let's go") }
                     .buttonStyle(PillButtonStyle(color: Theme.mint))
                     .bounceIn(delay: 0.24)
                     .padding(.horizontal, 24)

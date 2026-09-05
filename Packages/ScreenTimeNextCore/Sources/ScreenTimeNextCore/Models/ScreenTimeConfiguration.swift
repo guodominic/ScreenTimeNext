@@ -33,10 +33,18 @@ public struct ScreenTimeConfiguration: Codable, Equatable, Sendable {
 
     // MARK: Ranges (D-013)
 
-    /// 2–120 minutes in 2-minute steps.
-    public static let budgetRangeSeconds = 120...7200
+    /// 1–120 minutes. Short budgets are the common case ("you get seven more minutes"), so below
+    /// `fineStepThresholdSeconds` the dial moves a minute at a time; above it, two.
+    public static let budgetRangeSeconds = 60...7200
     public static let budgetStepSeconds = 120
+    public static let fineBudgetStepSeconds = 60
+    public static let fineStepThresholdSeconds = 900        // 15 minutes
     public static let defaultBudgetSeconds = 3600
+
+    /// The step to use around a given budget.
+    public static func budgetStep(near seconds: Int) -> Int {
+        seconds < fineStepThresholdSeconds ? fineBudgetStepSeconds : budgetStepSeconds
+    }
 
     /// Each warning: 1–15 minutes before the end (0 in the UI means "off").
     public static let warningOffsetRange = 60...900

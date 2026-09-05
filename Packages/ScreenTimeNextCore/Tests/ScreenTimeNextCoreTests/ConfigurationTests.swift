@@ -67,7 +67,7 @@ final class ConfigurationTests: XCTestCase {
         c.dailyBudgetSeconds = 99_999
         XCTAssertEqual(c.dailyBudgetSeconds, 7200)
         c.dailyBudgetSeconds = 1
-        XCTAssertEqual(c.dailyBudgetSeconds, 120)
+        XCTAssertEqual(c.dailyBudgetSeconds, 60)
     }
 
     func testDefaultOffsetsForBudget() {
@@ -84,8 +84,16 @@ final class ConfigurationTests: XCTestCase {
     }
 
     func testDialRangesAreConsistent() {
-        XCTAssertEqual(ScreenTimeConfiguration.budgetRangeSeconds.lowerBound % ScreenTimeConfiguration.budgetStepSeconds, 0)
+        XCTAssertEqual(ScreenTimeConfiguration.budgetRangeSeconds.lowerBound, 60)
         XCTAssertEqual(ScreenTimeConfiguration.budgetRangeSeconds.upperBound, 120 * 60)
         XCTAssertEqual(ScreenTimeConfiguration.warningOffsetRange.upperBound, 15 * 60)
+    }
+
+    /// Short budgets are the common case, so the dial gets finer under 15 minutes.
+    func testBudgetStepIsFinerBelowFifteenMinutes() {
+        XCTAssertEqual(ScreenTimeConfiguration.budgetStep(near: 60), 60)
+        XCTAssertEqual(ScreenTimeConfiguration.budgetStep(near: 14 * 60), 60)
+        XCTAssertEqual(ScreenTimeConfiguration.budgetStep(near: 15 * 60), 120)
+        XCTAssertEqual(ScreenTimeConfiguration.budgetStep(near: 60 * 60), 120)
     }
 }

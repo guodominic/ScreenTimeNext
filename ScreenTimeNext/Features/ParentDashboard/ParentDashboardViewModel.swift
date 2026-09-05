@@ -72,10 +72,12 @@ final class ParentDashboardViewModel {
 
     // MARK: Parent actions
 
-    /// Nudge the idle dial, clamped to the same range as every other budget control.
-    func adjustQuickMinutes(_ delta: Int) {
+    /// Nudge the idle dial by one step — a minute under 15, two above (D-017).
+    func adjustQuickMinutes(_ direction: Int) {
         let range = ScreenTimeConfiguration.budgetRangeSeconds
-        quickMinutes = min(max(quickMinutes + delta, range.lowerBound / 60), range.upperBound / 60)
+        let probe = direction < 0 ? (quickMinutes - 1) * 60 : quickMinutes * 60
+        let step = ScreenTimeConfiguration.budgetStep(near: probe) / 60
+        quickMinutes = min(max(quickMinutes + direction * step, range.lowerBound / 60), range.upperBound / 60)
     }
 
     /// D-016 — set today's budget from the hero and open a session in one action.

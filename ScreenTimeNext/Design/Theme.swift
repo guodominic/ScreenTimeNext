@@ -19,17 +19,30 @@ nonisolated enum Theme {
     static let peach    = Color(red: 1.00, green: 0.67, blue: 0.45)
     static let ink      = Color.primary
 
-    /// Session-state color for timers, rings and backgrounds.
+    static let grass = Color(red: 0.29, green: 0.76, blue: 0.44)
+    static let amber = Color(red: 1.00, green: 0.72, blue: 0.20)
+    static let tangerine = Color(red: 1.00, green: 0.55, blue: 0.24)
+    static let ruby = Color(red: 0.96, green: 0.36, blue: 0.36)
+
+    /// D-017 — urgency lives in COLOUR, not in Pip's face: green while there's plenty, then amber,
+    /// orange and red as the end approaches, and a celebration at the finish.
     static func color(for state: ScreenTimeState) -> Color {
         switch state {
         case .idle:          return sky
-        case .active:        return mint
-        case .extended:      return lavender
-        case .firstWarning:  return sun
-        case .secondWarning: return peach
-        case .finalWarning:  return coral
-        case .finished:      return lavender
+        case .active:        return grass
+        case .extended:      return grass
+        case .firstWarning:  return amber
+        case .secondWarning: return tangerine
+        case .finalWarning:  return ruby
+        case .finished:      return lavender     // a stand-in; the finish draws `celebration`
         }
+    }
+
+    static var celebrationColors: [Color] { [coral, sun, mint, sky, lavender] }
+
+    /// The finish is the happy moment — a full rainbow rather than one hue.
+    static var celebration: AngularGradient {
+        AngularGradient(colors: celebrationColors + [coral], center: .center)
     }
 
     static func gradient(for state: ScreenTimeState) -> LinearGradient {
@@ -167,6 +180,16 @@ struct PillButtonStyle: ButtonStyle {
 }
 
 /// A circular progress ring — remaining vs. total.
+/// A ring drawn with the celebration rainbow, for the finish.
+struct CelebrationRing: View {
+    var lineWidth: CGFloat = 18
+
+    var body: some View {
+        Circle()
+            .stroke(Theme.celebration, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+    }
+}
+
 struct ProgressRing: View {
     let fraction: Double          // 0…1 remaining
     var lineWidth: CGFloat = 14

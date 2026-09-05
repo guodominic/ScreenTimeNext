@@ -16,13 +16,16 @@
 
 import SwiftUI
 
+/// Every mood is positive. Pip is never anxious and never scolds — urgency is carried entirely by
+/// colour (D-017). A worried face at the one-minute mark would teach a child that the ending is
+/// something to dread, which is the opposite of what this product is for (§7).
 enum MascotMood: Hashable {
     case happy       // idle, greeting — waves
     case playing     // session running — arms swing
-    case thinking    // reminder — head tilt, eyes up, one hand at the chin
-    case hurrying    // final minute — wide eyes, open mouth, quick bounce
+    case thinking    // reminder — head tilt, eyes up, curious
+    case excited     // final stretch — big grin, bouncy, looking forward to what's next
     case cheering    // finished — both arms up, jumping
-    case sleepy      // nothing left today — eyes closed, gentle sway
+    case sleepy      // nothing left today — eyes closed, peaceful
 }
 
 struct Mascot: View {
@@ -46,11 +49,11 @@ struct Mascot: View {
 
     private var bobbing: Bool { motionOK && phase }
 
-    /// Vertical travel of the idle loop; `.cheering` and `.hurrying` are springier.
+    /// Vertical travel of the idle loop; `.cheering` and `.excited` are springier.
     private var lift: CGFloat {
         switch mood {
         case .cheering: return size * 0.075
-        case .hurrying: return size * 0.05
+        case .excited: return size * 0.06
         case .sleepy:   return size * 0.012
         default:        return size * 0.028
         }
@@ -58,7 +61,7 @@ struct Mascot: View {
 
     private var loopDuration: Double {
         switch mood {
-        case .hurrying: return 0.42
+        case .excited: return 0.50
         case .cheering: return 0.55
         case .sleepy:   return 2.6
         default:        return 1.5
@@ -248,17 +251,18 @@ struct Mascot: View {
         .frame(height: head * 0.05)
     }
 
+    /// Brows always read as friendly: raised and open, never drawn together (which reads as worry).
     private var browAngle: Double {
         switch mood {
-        case .thinking: return -16
-        case .hurrying: return -22
-        case .cheering: return 12
-        default:        return -6
+        case .thinking: return -14
+        case .excited: return 14
+        case .cheering: return 16
+        default:        return 8
         }
     }
 
     private var eyeW: CGFloat { head * 0.24 }
-    private var pupilW: CGFloat { eyeW * (mood == .hurrying ? 0.62 : 0.52) }
+    private var pupilW: CGFloat { eyeW * (mood == .excited ? 0.60 : 0.52) }
     private var eyesClosed: Bool { mood == .sleepy || blink }
 
     private var openEye: some View {
@@ -294,7 +298,7 @@ struct Mascot: View {
     private var pupilOffset: (x: CGFloat, y: CGFloat) {
         switch mood {
         case .thinking: return (0.14, -0.16)
-        case .hurrying: return (0, 0.04)
+        case .excited: return (0, -0.06)
         case .cheering: return (0, -0.04)
         default:        return (glance ? 0.10 : -0.06, 0.06)
         }
@@ -330,7 +334,7 @@ struct Mascot: View {
     @ViewBuilder
     private var mouth: some View {
         switch mood {
-        case .cheering, .hurrying:
+        case .cheering, .excited:
             openMouth
         case .thinking:
             Capsule()
@@ -380,8 +384,9 @@ struct Mascot: View {
             return side > 0 ? (bobbing ? 145 : 115) : 12
         case .playing:
             return outward * (bobbing ? 28 : 12)
-        case .hurrying:
-            return outward * (bobbing ? 55 : 30)
+        case .excited:
+            // Arms swinging up — eagerness, not panic.
+            return outward * (bobbing ? 95 : 60)
         case .thinking:
             return side > 0 ? 128 : 10          // hand up near the chin
         case .sleepy:
@@ -432,7 +437,7 @@ private struct Smile: Shape {
 #Preview("Moods") {
     ScrollView {
         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 28) {
-            ForEach([MascotMood.happy, .playing, .thinking, .hurrying, .cheering, .sleepy], id: \.self) { mood in
+            ForEach([MascotMood.happy, .playing, .thinking, .excited, .cheering, .sleepy], id: \.self) { mood in
                 VStack(spacing: 8) {
                     Mascot(mood: mood, size: 140, tint: Theme.sky)
                     Text(String(describing: mood)).font(.caption.weight(.semibold))

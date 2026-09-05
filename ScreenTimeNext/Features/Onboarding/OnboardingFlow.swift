@@ -25,7 +25,8 @@ struct OnboardingFlow: View {
             WelcomeStepView(viewModel: viewModel)
                 .navigationDestination(for: OnboardingStep.self) { step in
                     switch step {
-                    case .quickSetup: QuickSetupView(viewModel: viewModel, onStart: onStart)
+                    case .time:       TimeStepView(viewModel: viewModel)
+                    case .whatCounts: WhatCountsStepView(viewModel: viewModel, onStart: onStart)
                     }
                 }
         }

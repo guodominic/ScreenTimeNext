@@ -63,13 +63,9 @@ struct ShieldPreviewView: View {
         ZStack {
             PretendAppBackdrop()
             ShieldCardView(presentation: presentation)
-                .scaleEffect(0.86)
                 .id(presentation)          // re-run the entrance animation on every change
         }
-        .frame(maxHeight: 460)
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .padding(.horizontal, 12)
-        .padding(.top, 8)
+        .frame(maxHeight: 420)
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: presentation)
     }
 

@@ -33,7 +33,6 @@ struct ParentDashboardView: View {
         NavigationStack {
             List {
                 heroSection
-                childSection
                 contentSection
                 whatsNextSection
                 parentSection
@@ -72,62 +71,103 @@ struct ParentDashboardView: View {
 
     // MARK: Sections
 
+    /// D-017 — the ring IS the session: it shows the state and it is the way into the child timer.
+    /// There is no separate "Session" list section any more.
     private var heroSection: some View {
         Section {
-            VStack(spacing: 16) {
-                HStack(alignment: .top, spacing: 16) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(name)
-                            .font(.system(.title2, design: .rounded).bold())
-                        statChip(sessionSymbol, viewModel.sessionStatusText)
-                        statChip("shield.lefthalf.filled", viewModel.protectionText)
+            Button(action: onOpenTimer) {
+                VStack(spacing: 16) {
+                    HStack(alignment: .top, spacing: 16) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(name)
+                                .font(.system(.title2, design: .rounded).bold())
+                            statChip(sessionSymbol, viewModel.sessionStatusText)
+                            statChip("shield.lefthalf.filled", viewModel.protectionText)
+                        }
+                        Spacer(minLength: 0)
+                        Mascot(mood: heroMood, size: 76, tint: .white, animated: false)
                     }
-                    Spacer(minLength: 0)
-                    // Pip stands BESIDE the ring — never over the number (Dominic, 2026-09-05).
-                    Mascot(mood: heroMood, size: 76, tint: .white, animated: false)
-                }
 
-                if viewModel.sessionIsRunning || viewModel.session.state == .finished {
-                    runningRing
-                } else {
-                    quickStart
+                    if viewModel.sessionIsRunning || viewModel.session.state == .finished {
+                        runningRing
+                    } else {
+                        quickStart
+                    }
                 }
+                .foregroundStyle(.white)
+                .padding(20)
+                .background(RoundedRectangle(cornerRadius: 28, style: .continuous).fill(Theme.heroGradient))
             }
-            .foregroundStyle(.white)
-            .padding(20)
-            .background(RoundedRectangle(cornerRadius: 28, style: .continuous).fill(Theme.heroGradient))
+            .buttonStyle(.plain)
             .bounceIn()
             .readableWidth(720)
             .listRowInsets(EdgeInsets())
             .listRowBackground(Color.clear)
+        } footer: {
+            Text(viewModel.sessionIsRunning
+                 ? "Tap to open \(name)'s timer. Press and hold “Parents” there to come back."
+                 : "Tap to open the timer.")
         }
     }
 
-    /// Mid-session: the ring, with the number unobstructed in the middle.
+    /// Mid-session: the ring, number unobstructed, with "open" made explicit.
     private var runningRing: some View {
-        ZStack {
-            ProgressRing(fraction: viewModel.remainingFraction, lineWidth: 12, color: .white.opacity(0.95))
-            VStack(spacing: 0) {
-                Text(ChildTimerView.clock(viewModel.session.window != nil ? viewModel.session.remainingSeconds : viewModel.remainingTodaySeconds))
-                    .font(.system(size: 34, weight: .bold, design: .rounded))
-                    .monospacedDigit()
-                    .contentTransition(.numericText())
-                Text(viewModel.session.window != nil ? "in session" : "left today")
-                    .font(.caption2.weight(.semibold))
-                    .opacity(0.85)
+        VStack(spacing: 10) {
+            ZStack {
+                ProgressRing(fraction: viewModel.remainingFraction, lineWidth: 12, color: .white.opacity(0.95))
+                VStack(spacing: 0) {
+                    Text(ChildTimerView.clock(viewModel.session.window != nil ? viewModel.session.remainingSeconds : viewModel.remainingTodaySeconds))
+                        .font(.system(size: 34, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                        .contentTransition(.numericText())
+                    Text(viewModel.session.window != nil ? "in session" : "left today")
+                        .font(.caption2.weight(.semibold))
+                        .opacity(0.85)
+                }
+            }
+            .frame(width: 132, height: 132)
+
+            HStack(spacing: 12) {
+                Label("Open timer", systemImage: "hourglass")
+                    .font(.system(.subheadline, design: .rounded).bold())
+                if viewModel.sessionIsRunning {
+                    Button(role: .destructive) { confirmEndSession = true } label: {
+                        Label("End", systemImage: "stop.fill")
+                            .font(.system(.subheadline, design: .rounded).bold())
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 12).padding(.vertical, 6)
+                            .background(Capsule().fill(.white.opacity(0.22)))
+                    }
+                    .buttonStyle(.plain)
+                    .confirmationDialog("End today's session now?", isPresented: $confirmEndSession, titleVisibility: .visible) {
+                        Button("End session", role: .destructive) { viewModel.endSession() }
+                        Button("Keep going", role: .cancel) {}
+                    } message: {
+                        Text("The time used so far counts toward today's budget.")
+                    }
+                }
+                if viewModel.canExtend {
+                    Button { showExtend = true } label: {
+                        Label("Extend", systemImage: "plus")
+                            .font(.system(.subheadline, design: .rounded).bold())
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 12).padding(.vertical, 6)
+                            .background(Capsule().fill(.white.opacity(0.22)))
+                    }
+                    .buttonStyle(.plain)
+                }
             }
         }
-        .frame(width: 132, height: 132)
-        .padding(.bottom, 4)
     }
 
     /// Idle: the whole point of the app in two taps — set the minutes, hand it over.
     private var quickStart: some View {
         VStack(spacing: 12) {
             HStack(spacing: 14) {
-                Button { viewModel.adjustQuickMinutes(-ScreenTimeConfiguration.budgetStepSeconds / 60) } label: {
+                Button { viewModel.adjustQuickMinutes(-1) } label: {
                     Image(systemName: "minus.circle.fill").font(.title)
                 }
+                .buttonStyle(.plain)
                 VStack(spacing: -2) {
                     Text("\(viewModel.quickMinutes)")
                         .font(.system(size: 52, weight: .heavy, design: .rounded))
@@ -136,9 +176,10 @@ struct ParentDashboardView: View {
                     Text("minutes").font(.caption.weight(.semibold)).opacity(0.85)
                 }
                 .frame(minWidth: 110)
-                Button { viewModel.adjustQuickMinutes(ScreenTimeConfiguration.budgetStepSeconds / 60) } label: {
+                Button { viewModel.adjustQuickMinutes(1) } label: {
                     Image(systemName: "plus.circle.fill").font(.title)
                 }
+                .buttonStyle(.plain)
             }
             .foregroundStyle(.white)
             .sensoryFeedback(.selection, trigger: viewModel.quickMinutes)
@@ -157,12 +198,6 @@ struct ParentDashboardView: View {
             .buttonStyle(.plain)
             .disabled(viewModel.remainingTodaySeconds == 0)
             .opacity(viewModel.remainingTodaySeconds == 0 ? 0.5 : 1)
-
-            Text(viewModel.remainingTodaySeconds == 0
-                 ? "Today's time is used up."
-                 : "Sets today's budget and hands over a running timer.")
-                .font(.caption)
-                .opacity(0.85)
         }
     }
 
@@ -171,7 +206,7 @@ struct ParentDashboardView: View {
         case .idle: return .happy
         case .finished: return .sleepy
         case .firstWarning, .secondWarning: return .thinking
-        case .finalWarning: return .hurrying
+        case .finalWarning: return .excited
         default: return .playing
         }
     }
@@ -190,44 +225,6 @@ struct ParentDashboardView: View {
             .font(.subheadline.weight(.semibold))
             .padding(.horizontal, 10).padding(.vertical, 5)
             .background(Capsule().fill(.white.opacity(0.18)))
-    }
-
-    private var childSection: some View {
-        Section {
-            Button(action: onOpenTimer) {
-                HStack(spacing: 12) {
-                    IconChip(symbol: "hourglass", color: Theme.mint)
-                    Text("Open child timer").fontWeight(.semibold).foregroundStyle(Theme.mint)
-                }
-            }
-            if viewModel.canExtend {
-                Button { showExtend = true } label: {
-                    HStack(spacing: 12) {
-                        IconChip(symbol: "plus", color: Theme.lavender)
-                        Text("Extend time").fontWeight(.semibold).foregroundStyle(Theme.lavender)
-                    }
-                }
-            }
-            if viewModel.sessionIsRunning {
-                Button(role: .destructive) { confirmEndSession = true } label: {
-                    HStack(spacing: 12) {
-                        IconChip(symbol: "stop.fill", color: .red)
-                        Text("End session now").fontWeight(.semibold).foregroundStyle(.red)
-                    }
-                }
-                // Anchored to the button so the iPad popover points at it (Dominic, 2026-09-05).
-                .confirmationDialog("End today's session now?", isPresented: $confirmEndSession, titleVisibility: .visible) {
-                    Button("End session", role: .destructive) { viewModel.endSession() }
-                    Button("Keep going", role: .cancel) {}
-                } message: {
-                    Text("The time used so far counts toward today's budget.")
-                }
-            }
-        } header: {
-            Text("Session")
-        } footer: {
-            Text("Hand the device to \(name) on the timer screen. While a session runs, opening the app shows the timer; press and hold \u{201C}Parents\u{201D} to come back here.")
-        }
     }
 
     private var contentSection: some View {

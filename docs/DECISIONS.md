@@ -448,6 +448,37 @@ missing name; `ChildSessionSnapshot.isChoosingMoment` drives the chooser; the Wa
 Child Profile and Ready steps are deleted. PRD §6.2/§6.6/§6.7/§6.8 are superseded — the *content*
 of those screens survives in Settings and in the child flow, the *sequence* does not.
 
+---
+
+## D-017 — Urgency is carried by colour, never by Pip's face
+**Date:** 2026-09-05 · **Status:** accepted (Dominic)
+
+**Context.** Pip had an anxious mood (`.hurrying`: knitted brows, wide eyes) for the final minute.
+Dominic: every expression should be positive; convey urgency with colour instead.
+
+**Why he's right.** A worried face at the one-minute mark teaches the child that the ending is
+something to dread — precisely the association this product exists to break (§7: transition, not
+punishment). Colour carries the same information without any emotional charge: it is a signal, not
+a judgement.
+
+**Decision.**
+- `.hurrying` becomes **`.excited`** — big grin, raised brows, arms swinging up. Every mood is now
+  positive: happy, playing, thinking (curious), excited, cheering, sleepy (peaceful).
+- The state ramp is **green → amber → orange → red**, and the finish is a **rainbow**
+  (`Theme.celebration`, `CelebrationBackdrop`, `CelebrationRing`) rather than one more hue —
+  the ending should look like the best moment on the screen, not the most alarming.
+
+**Also in this pass (Dominic's list).**
+- The dashboard hero **is** the session: it shows state and is the tap target for the child timer;
+  the separate "Session" list section is gone, with End/Extend as chips on the hero.
+- The transition interstitial is **full-bleed** — no card inside a box. That is also how the real
+  ManagedSettings shield looks, so the preview got more faithful, not just cleaner.
+- Tapping a warning notification opens the timer even on a cold launch (a pending request is
+  honoured once routing settles).
+- Setup splits: **time + reminders** on one screen (no headline — the dial says what it is), then
+  **what counts** on its own, skippable. The budget dial steps by **one minute under fifteen**,
+  two above, and the range now starts at one minute — "seven more minutes" is a real answer.
+
 <!-- Template for new entries:
 
 ## D-NNN — <short imperative title>

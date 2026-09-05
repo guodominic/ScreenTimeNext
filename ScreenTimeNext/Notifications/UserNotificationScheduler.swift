@@ -65,6 +65,10 @@ nonisolated final class UserNotificationScheduler: NSObject, NotificationSchedul
     /// The child tapped a warning: land on the timer, never on the parent dashboard.
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
                                             didReceive response: UNNotificationResponse) async {
+        // Every ScreenTimeNext notification is about the session, so any tap goes to the timer —
+        // never to the parent dashboard.
+        let isOurs = NotificationIdentifier.all.contains(response.notification.request.identifier)
+        guard isOurs else { return }
         await MainActor.run {
             NotificationCenter.default.post(name: .openChildTimer, object: nil)
         }

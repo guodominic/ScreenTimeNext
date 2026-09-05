@@ -87,3 +87,15 @@ struct ChildBackdrop: View {
         Mascot(mood: .playing, size: 140, tint: Theme.mint)
     }
 }
+
+/// The finish deserves more than one hue (D-017): a soft rainbow wash plus drifting shapes.
+struct CelebrationBackdrop: View {
+    var body: some View {
+        ZStack {
+            LinearGradient(colors: Theme.celebrationColors.map { $0.opacity(0.30) } + [Color(.systemBackground)],
+                           startPoint: .topLeading, endPoint: .bottomTrailing)
+            PlayfulBackground(tint: Theme.lavender, intensity: 1.2)
+        }
+        .ignoresSafeArea()
+    }
+}

@@ -28,7 +28,11 @@ struct ChildTimerView: View {
 
     var body: some View {
         ZStack {
-            ChildBackdrop(color: color)
+            if snapshot.state == .finished {
+                CelebrationBackdrop()
+            } else {
+                ChildBackdrop(color: color)
+            }
             ScrollView {
                 VStack(spacing: 24) {
                     content
@@ -121,7 +125,7 @@ struct ChildTimerView: View {
                 )
             }
             ring(big: true).pulsing()
-            Mascot(mood: .hurrying, size: 92 * sizeClass.controlScale, tint: color)
+            Mascot(mood: .excited, size: 92 * sizeClass.controlScale, tint: color)
 
         case .finished:
             TimesUpView(childName: name,
