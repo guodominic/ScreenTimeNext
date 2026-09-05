@@ -17,14 +17,14 @@ in the same commit as the work. If this file and a task's front-matter disagree,
 | 005 | [Family Activity Picker](005-family-activity-picker.md) | not_started | 004 | QA-03, QA-04 | — | |
 | 006 | [Screen Time Configuration](006-screen-time-configuration.md) | done | 002 | QA-05 | PASS (App Group at gate) | 40/40; FileStorageService |
 | 007 | [Child Timer UI](007-child-timer-ui.md) | done | 006 | QA-06, QA-07 | PASS / device check pending | 51/51; SessionController |
-| 008 | [Warning State Engine](008-warning-state-engine.md) | not_started | 006 | QA-07 | — | pure logic, no device needed |
-| 009 | [What's Next](009-whats-next.md) | not_started | 003, 006 | QA-08 | — | |
+| 008 | [Warning State Engine](008-warning-state-engine.md) | done | 006 | QA-07 | PASS | transition-table tests; batched run |
+| 009 | [What's Next](009-whats-next.md) | done | 003, 006 | QA-08 | PASS | choice on SessionWindow; D-009; batched run |
 | 010 | [Device Activity Monitor](010-device-activity-monitor.md) | not_started | 005, 006 | — | — | likely device-test only |
 | 011 | [Managed Settings Shield](011-managed-settings-shield.md) | not_started | 005 | QA-10 | — | |
 | 012 | [Enforcement Integration](012-enforcement-integration.md) | not_started | 010, 011 | QA-09 | — | **the V1 make-or-break task** |
 | 013 | [Parent Extension](013-parent-extension.md) | not_started | 012 | QA-11 | — | |
-| 014 | [Parent Dashboard](014-parent-dashboard.md) | not_started | 006, 011 | — | — | |
-| 015 | [Time's Up Experience](015-times-up-experience.md) | not_started | 009 | — | — | |
+| 014 | [Parent Dashboard](014-parent-dashboard.md) | done | 006, 011 | — | PASS | + SettingsView; Extend row disabled until 013; batched run |
+| 015 | [Time's Up Experience](015-times-up-experience.md) | done | 009 | — | PASS | TimesUpView; batched run |
 | 016 | [Notifications & Background](016-notifications-background.md) | not_started | 008, 012 | — | — | |
 | 017 | [Edge Cases](017-edge-cases.md) | not_started | 012, 013, 016 | QA-12, QA-13, QA-14 | — | |
 | 018 | [Privacy Audit](018-privacy.md) | not_started | 017 | QA-15 | — | produces `PRIVACY.md` |
@@ -59,6 +59,11 @@ in the same commit as the work. If this file and a task's front-matter disagree,
 | **Gate** | — | pay $99, submit entitlement request ×2 | Only if Phase 0 says yes |
 | **1 — enforcement half** | paid | 004, 005, 010, 011, 012, 013, 016, 017, 018, 019, 020 | §22 Definition of Done |
 
+## Batched verification note
+Tasks 008, 009, 014, 015 were written and committed separately but verified in ONE
+`test.sh` + `build.sh` run on 2026-09-05 (Dominic's call, low-risk Phase 0 work). Rule 9/10 stays the
+default; batching is acceptable for mock-backed experience tasks when errors are file-attributable.
+
 ## Critical path
 
 ```text
@@ -75,7 +80,7 @@ but remember §22: that half alone is a prototype, not V1.
 
 | Half | State |
 |---|---|
-| Coherent transition experience | in progress — 001–003, 006, 007 done; 008 next |
+| Coherent transition experience | Phase 0 feature-complete pending device check: 001–003, 006–009, 014, 015 done |
 | Real Screen Time enforcement | not started |
 
 Both must be complete. Neither alone is V1.

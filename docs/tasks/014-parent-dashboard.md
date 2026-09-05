@@ -1,7 +1,7 @@
 ---
 task: "014"
 title: Parent Dashboard
-status: not_started        # not_started | in_progress | blocked | done
+status: done               # not_started | in_progress | blocked | done
 depends_on: ["006", "011"]
 qa_criteria: []
 prd_refs: ["§6.9"]
@@ -46,15 +46,23 @@ Implement the parent dashboard showing budget, remaining time, protection status
 - [ ] Remaining-time logic is shared with the child timer, not duplicated.
 
 ## Completion report
-Append the result here when the task finishes. Do not edit earlier tasks' reports.
 
-- **Files changed:**
-- **Build result:**
-- **Tests run:**
-- **Verdict:** PASS / FAIL / BLOCKED / NEEDS MANUAL DEVICE TEST
-- **Platform limitations or manual steps:**
-- **Follow-up work:**
+**2026-09-05 — Claude. Verified in the batched run with 008/009/015 (see PROGRESS).**
 
-> After finishing: update `status:` in this file's front-matter, update
-> `docs/tasks/PROGRESS.md`, and log any new decision in `docs/DECISIONS.md`
-> or new blocker in `docs/BLOCKERS.md`.
+- **Files changed:** app `Features/ParentDashboard/{ParentDashboardViewModel,ParentDashboardView}.swift`
+  (replaces the Task 003 placeholder), `Features/Settings/SettingsView.swift`; `RootView` routes to
+  the dashboard. Dashboard shows §6.9's five items plus session status; "End session now" is behind
+  a confirmation; "Extend time" is a visible, disabled row until Task 013. Settings edits name,
+  budget presets, warnings, activities, protected content (mock picker), and "Start over".
+- **Verdict:** **PASS** (automated build; device look with the batch).
+- **Design notes:** protection state is re-read from storage on appear and on foreground (§14);
+  remaining time comes from `SessionController` (shared with the child timer — one implementation).
+  Settings note: budget changes apply from the next session (Task 017 owns mid-session config
+  changes).
+- **Follow-up work:** Task 005 replaces the mock picker in Settings too; Task 013 enables Extend.
+
+### DoD status
+- [x] All five §6.9 elements render (budget, remaining, protection, selected content, activities).
+- [x] Protection status is re-read from shared storage on appearance and is never stale.
+- [x] Selected content is summarized with no token leakage in UI or logs (counts only).
+- [x] Remaining-time logic is shared with the child timer, not duplicated.

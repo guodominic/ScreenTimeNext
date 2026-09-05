@@ -21,7 +21,7 @@ struct RootView: View {
             case .onboarding:
                 OnboardingFlow(services: services) { route = .home }
             case .home:
-                HomePlaceholderView { reset() }
+                ParentDashboardView(services: services) { reset() }
             }
         }
         .task { route = hasProfile ? .home : .onboarding }
