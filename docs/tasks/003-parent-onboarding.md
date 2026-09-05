@@ -1,7 +1,7 @@
 ---
 task: "003"
 title: Parent Onboarding
-status: done               # not_started | in_progress | blocked | done  (QA-01 manual walkthrough pending)
+status: done               # not_started | in_progress | blocked | done
 depends_on: ["002"]
 qa_criteria: ["QA-01"]
 prd_refs: ["§6.1–§6.8", "§5", "§7"]
@@ -72,8 +72,8 @@ Show the child's name and the configured daily budget. Explain that the app will
   (placeholder until Task 014); `ScreenTimeNextApp/RootView.swift` (routes onboarding vs home).
 - **Build result:** `./scripts/build.sh` — BUILD OK.
 - **Tests run:** `./scripts/test.sh` — **32 tests, 0 failures**.
-- **Verdict:** **PASS** (automated) · **NEEDS MANUAL DEVICE TEST** for the QA-01 end-to-end walkthrough
-  (⌘R, Welcome → Finish, including going back to change the name and confirming it is kept).
+- **Verdict:** **PASS** — automated 32/32, and QA-01 walked through on Dominic's iPhone on 2026-09-05
+  (Welcome → Finish → home → Reset setup → back to Get Started).
 - **Platform limitations or manual steps:** Phase 0 storage is in-memory, so relaunching the app
   restarts onboarding — by design until Task 006 adds local persistence. The picker step is a
   sample-selection button; Task 005 replaces `SelectionPickerButton` with the FamilyActivityPicker
@@ -82,7 +82,7 @@ Show the child's name and the configured daily budget. Explain that the app will
   meaningful); Task 009 defines the empty-activities fallback (onboarding only hints, does not block).
 
 ### DoD status
-- [ ] **QA-01** — a parent can complete onboarding end to end — *manual walkthrough pending*
+- [x] **QA-01** — a parent can complete onboarding end to end (on device, 2026-09-05)
 - [x] All eight screens match §6.1–§6.8 defaults and copy.
 - [x] Back navigation preserves entered data (single draft held by the view model behind a NavigationStack).
 - [x] Flow works with mock services only — no entitlement required to run it.

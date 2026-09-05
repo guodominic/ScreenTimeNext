@@ -12,7 +12,7 @@ in the same commit as the work. If this file and a task's front-matter disagree,
 |---|---|---|---|---|---|---|
 | 001 | [Project Foundation](001-project-foundation.md) | done | — | — | PASS (ext. target + capabilities blocked by gate) | build OK, 16/16 tests; `./scripts/test.sh` |
 | 002 | [App Architecture](002-app-architecture.md) | done | 001 | — | PASS | 26/26 tests; import check automated |
-| 003 | [Parent Onboarding](003-parent-onboarding.md) | done | 002 | QA-01 | PASS / NEEDS MANUAL DEVICE TEST | 32/32; QA-01 click-through pending |
+| 003 | [Parent Onboarding](003-parent-onboarding.md) | done | 002 | QA-01 | PASS | 32/32; QA-01 verified on device |
 | 004 | [Family Controls Authorization](004-family-controls-authorization.md) | not_started | 002, 003 | QA-02 | — | entitlement risk |
 | 005 | [Family Activity Picker](005-family-activity-picker.md) | not_started | 004 | QA-03, QA-04 | — | |
 | 006 | [Screen Time Configuration](006-screen-time-configuration.md) | done | 002 | QA-05 | PASS (App Group at gate) | 40/40; FileStorageService |
@@ -35,11 +35,11 @@ in the same commit as the work. If this file and a task's front-matter disagree,
 
 | # | Criterion | Owning task | Result |
 |---|---|---|---|
-| QA-01 | Parent can complete onboarding | 003 | — |
+| QA-01 | Parent can complete onboarding | 003 | PASS (device, 2026-09-05) |
 | QA-02 | Authorization failure handled gracefully | 004 | — |
 | QA-03 | Parent can select protected content | 005 | — |
 | QA-04 | Selection survives relaunch | 005 | — |
-| QA-05 | Daily budget survives relaunch | 006 | — |
+| QA-05 | Daily budget survives relaunch | 006 | PASS (automated); device relaunch check pending |
 | QA-06 | Countdown survives background/foreground | 007 | — |
 | QA-07 | 10/5/1 warning states render correctly | 008 / 007 | — |
 | QA-08 | Child can select a next activity | 009 | — |
