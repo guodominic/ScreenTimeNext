@@ -297,6 +297,12 @@ Scope it to the parent-selected content, not `.all()`: during screen time the ch
 inside selected content, so shielding that is both sufficient and proportionate (shielding
 everything would interrupt a phone call or a homework app for no reason).
 
+**Built in Phase 0 (2026-09-05):** the interstitial's copy and design, as
+`ShieldPresentation.make(for:childName:)` in the package plus an in-app preview a parent can show
+to a real child. Verified: a free Personal Team cannot even see the Family Controls capability in
+Xcode (Apple DTS), and adding the entitlement would break installation — so the preview is the only
+way to work on this before the gate, and it is the half that most needs iterating with children.
+
 **Consequences.** `NotificationKind` gains no new cases now. Task 010/011/012 scope grows: a
 `ShieldConfigurationExtension` and a `ShieldActionExtension` target — **two more bundle IDs in the
 entitlement request** (`docs/entitlement-request.md` lists them). Copy for the shield goes through

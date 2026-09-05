@@ -58,6 +58,28 @@ Implement scoped, idempotent shielding and unshielding of the selected content t
 - [ ] `ProtectionState` is written to shared storage after every change.
 
 ## Completion report
+
+**2026-09-05 — Claude, PREVIEW HALF ONLY (Phase 0). The shield itself is blocked by the gate.**
+
+- **Why a preview:** Family Controls does not appear in Xcode's capability list on a free Personal
+  Team (Apple DTS, verified), and adding the entitlement would stop the app installing at all. So
+  the *design* of the interstitial — the part that decides whether this product works — was built
+  where it can be seen and tested today.
+- **Files changed:** package `State/ShieldPresentation.swift` — `ShieldMoment` (reminder / finished /
+  spentForToday) and the single copy factory `ShieldPresentation.make(for:childName:)`, framework-free;
+  `ShieldPresentationTests` (7) including a mechanical §7 copy checklist over every activity.
+  App `Features/ShieldPreview/{ShieldCardView,ShieldPreviewView}.swift` — a faithful mock of the
+  system's shield layout over a blurred pretend app, with a full-screen mode for handing the device
+  to a child; entry point on the dashboard.
+- **Verdict:** **PASS** for the preview · **BLOCKED (by gate, D-007/B-001)** for real shielding.
+- **The handoff that makes this worth doing now:** Phase 1's `ShieldConfigurationExtension` builds
+  `ShieldConfiguration` directly from these values —
+  `icon: UIImage(systemName: p.symbolName)`, `title`/`subtitle` as `ShieldConfiguration.Label`,
+  `primaryButtonLabel`, tinted by the chosen activity's color. `ShieldActionExtension` reads
+  `p.primaryButtonContinues`: true → lift ScreenTimeNext's own shield and continue; false → close
+  the app (never a bypass, §17). No copy is rewritten at that point.
+
+
 Append the result here when the task finishes. Do not edit earlier tasks' reports.
 
 - **Files changed:**

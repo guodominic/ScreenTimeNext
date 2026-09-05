@@ -17,6 +17,7 @@ struct ParentDashboardView: View {
     @State private var confirmEndSession = false
     @State private var confirmReset = false
     @State private var showExtend = false
+    @State private var showShieldPreview = false
     let onOpenTimer: () -> Void
     let onReset: () -> Void
 
@@ -65,6 +66,12 @@ struct ParentDashboardView: View {
                 Button("Cancel", role: .cancel) {}
             } message: {
                 Text("Erases \(name)'s profile and all settings on this device. This cannot be undone.")
+            }
+            .sheet(isPresented: $showShieldPreview) {
+                ShieldPreviewView(childName: viewModel.profile?.name ?? "your child",
+                                  activities: viewModel.configuration.selectedActivities.isEmpty
+                                      ? TransitionActivity.allCases
+                                      : viewModel.configuration.selectedActivities)
             }
             .sheet(isPresented: $showExtend) {
                 ExtendTimeSheet(childName: name) { minutes in
@@ -163,10 +170,15 @@ struct ParentDashboardView: View {
                     .listRowInsets(EdgeInsets())
                     .listRowBackground(Color.clear)
             }
+            Button { showShieldPreview = true } label: {
+                Label("Preview the transition screen", systemImage: "rectangle.inset.filled.and.person.filled")
+                    .foregroundStyle(Theme.coral)
+                    .fontWeight(.semibold)
+            }
         } header: {
             Text("Protected content")
         } footer: {
-            Text("Enforcement arrives with Screen Time access. In this preview build the budget is a timer only.")
+            Text("With Screen Time access, a full-screen message appears inside the app your child is using — at each reminder, and when time is up. Preview it above; enforcement itself arrives with that access.")
         }
     }
 
