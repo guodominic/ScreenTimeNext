@@ -9,9 +9,11 @@ import ScreenTimeNextCore
 
 struct RootView: View {
     @Environment(\.services) private var services
+    @Environment(\.scenePhase) private var scenePhase
 
     private enum Route { case loading, onboarding, home }
     @State private var route: Route = .loading
+    @State private var showChildTimer = false
 
     var body: some View {
         Group {
@@ -21,10 +23,35 @@ struct RootView: View {
             case .onboarding:
                 OnboardingFlow(services: services) { route = .home }
             case .home:
-                ParentDashboardView(services: services) { reset() }
+                ParentDashboardView(services: services,
+                                    onOpenTimer: { showChildTimer = true },
+                                    onReset: { reset() })
             }
         }
-        .task { route = hasProfile ? .home : .onboarding }
+        .task {
+            route = hasProfile ? .home : .onboarding
+            presentTimerIfSessionExists()
+        }
+        // During a session the device is the child's: however the app is opened, the timer is
+        // what they see. The Parents control (D-011) is the way to the dashboard.
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { presentTimerIfSessionExists() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .openChildTimer)) { _ in
+            if route == .home { showChildTimer = true }
+        }
+        .fullScreenCover(isPresented: $showChildTimer) {
+            NavigationStack {
+                ChildTimerView(services: services)
+            }
+        }
+    }
+
+    private func presentTimerIfSessionExists() {
+        guard route == .home else { return }
+        if (try? services.makeSessionController().tick())?.window != nil {
+            showChildTimer = true
+        }
     }
 
     private var hasProfile: Bool {

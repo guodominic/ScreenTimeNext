@@ -74,6 +74,17 @@ the setup so results are reproducible.
 
 ---
 
+## B-004 — Time Sensitive Notifications capability
+**Status:** open — behind the D-007 gate · **Owner:** Dominic · **Raised:** 2026-09-05 · **Blocks:** notification prominence (D-012)
+
+Warnings are marked `.timeSensitive` in code. iOS honors that only when the target carries the
+Time Sensitive Notifications capability, which a free Personal Team cannot add.
+
+**Required manual step.** After the paid membership exists: Signing & Capabilities → + Capability
+→ Time Sensitive Notifications on the app target.
+
+---
+
 <!-- Template for new entries:
 
 ## B-NNN — <short title>

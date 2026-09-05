@@ -38,6 +38,10 @@ nonisolated final class UserNotificationScheduler: NSObject, NotificationSchedul
             content.title = item.title
             content.body = item.body
             content.sound = .default
+            // Breaks through Focus and the scheduled summary once the Time Sensitive Notifications
+            // capability is on the target (Phase 1). Without it iOS quietly treats this as `.active`.
+            content.interruptionLevel = .timeSensitive
+            content.userInfo = ["route": "childTimer"]
             let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute, .second], from: item.fireDate)
             let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
             center.add(UNNotificationRequest(identifier: item.identifier, content: content, trigger: trigger))
@@ -57,4 +61,17 @@ nonisolated final class UserNotificationScheduler: NSObject, NotificationSchedul
                                             willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
         [.banner, .sound]
     }
+
+    /// The child tapped a warning: land on the timer, never on the parent dashboard.
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                            didReceive response: UNNotificationResponse) async {
+        await MainActor.run {
+            NotificationCenter.default.post(name: .openChildTimer, object: nil)
+        }
+    }
+}
+
+extension Notification.Name {
+    /// Posted when the app should present the child timer (notification tap, session running).
+    static let openChildTimer = Notification.Name("screentimenext.openChildTimer")
 }

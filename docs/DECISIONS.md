@@ -252,6 +252,36 @@ the dashboard that matters (End session, Extend) is additionally behind a confir
 **Consequences.** Enough friction for a young child, no friction for a parent. Not a security
 boundary — the real boundary is the shield (Phase 1); this is UX only.
 
+---
+
+## D-012 — Making warnings unmissable: what iOS allows, and the Phase 1 shield interstitial
+**Date:** 2026-09-05 · **Status:** accepted for Phase 0 items; **proposed** for the Phase 1 design
+
+**Context.** A banner is easy to miss. Dominic asked whether the device can switch to the timer
+screen at the 5-minute mark. It cannot: iOS has no API for an app to foreground itself, for anyone.
+
+**Phase 0 (done).** Tapping a warning lands on the child timer, not the dashboard. While a session
+exists, opening the app by any route shows the timer full-screen (Parents control to leave).
+Notifications carry `.timeSensitive`, which becomes effective once the Time Sensitive Notifications
+capability is on the target (ordinary capability; needs the paid membership — B-004).
+
+**Optional (Phase 0-compatible).** A Live Activity via a Widget extension: a ticking countdown in
+the Dynamic Island / status area on iPhone and on the Lock Screen on iPad. No entitlement. Worth it
+if the validation devices are iPhones; low value on an iPad that is unlocked and in use.
+
+**Phase 1 design direction — the real answer.** Use the ManagedSettings shield *as the warning*:
+at the 5-minute mark apply the shield to the selected content with a custom `ShieldConfiguration`
+("5 minutes left, {name}. Time to finish up." + a primary button), and have the ShieldAction
+extension lift it on the button so the final minutes proceed. The shield is system-level, full
+screen, and appears inside the app the child is using — the one surface iOS lets a third party
+take over. Repeat at 1 minute; at 0 the shield stays. This is the mechanism that makes a
+"transition assistant" different from a timer. Timing depends on DeviceActivity events at the
+warning marks, whose reliability Phase 1 must measure on device (D-006's known limitation).
+
+**Consequences.** `NotificationKind` gains no new cases now. Task 010/011/012 scope grows: shield
+configuration + ShieldAction extension targets (two more bundle IDs in the entitlement request —
+`docs/entitlement-request.md` must list them). Copy for the shield goes through the §7 checklist.
+
 <!-- Template for new entries:
 
 ## D-NNN — <short imperative title>

@@ -16,10 +16,12 @@ struct ParentDashboardView: View {
     @State private var viewModel: ParentDashboardViewModel
     @State private var confirmEndSession = false
     @State private var pendingExtension: Int?
+    let onOpenTimer: () -> Void
     let onReset: () -> Void
 
-    init(services: ServiceContainer, onReset: @escaping () -> Void) {
+    init(services: ServiceContainer, onOpenTimer: @escaping () -> Void, onReset: @escaping () -> Void) {
         _viewModel = State(initialValue: ParentDashboardViewModel(services: services))
+        self.onOpenTimer = onOpenTimer
         self.onReset = onReset
     }
 
@@ -68,9 +70,7 @@ struct ParentDashboardView: View {
 
     private var childSection: some View {
         Section {
-            NavigationLink {
-                ChildTimerView(services: services)
-            } label: {
+            Button(action: onOpenTimer) {
                 Label("Open child timer", systemImage: "hourglass")
             }
             if viewModel.sessionIsRunning {
@@ -83,7 +83,7 @@ struct ParentDashboardView: View {
         } header: {
             Text("Child")
         } footer: {
-            Text("Hand the device to \(viewModel.profile?.name ?? "your child") on the timer screen. There is no way back to this screen mid-session.")
+            Text("Hand the device to \(viewModel.profile?.name ?? "your child") on the timer screen. While a session runs, opening the app shows the timer; press and hold \u{201C}Parents\u{201D} to come back here.")
         }
     }
 
@@ -156,7 +156,7 @@ struct ParentDashboardView: View {
 }
 
 #Preview {
-    ParentDashboardView(services: .mocks(storage: dashboardPreviewStorage()), onReset: {})
+    ParentDashboardView(services: .mocks(storage: dashboardPreviewStorage()), onOpenTimer: {}, onReset: {})
 }
 
 private func dashboardPreviewStorage() -> InMemoryScreenTimeStorageService {
