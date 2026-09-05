@@ -30,7 +30,13 @@ it. Full material package, paste-ready form answers and the ordered checklist ar
 10 App IDs, 7-day expiry (reinstall from Xcode weekly).
 
 **Required manual steps, in order.**
-1. Enroll in the Apple Developer Program as an individual ($99/yr, Apple Developer app, ID verification).
+1. Enroll in the Apple Developer Program as an individual ($99/yr) **via the Apple Developer app on
+   iPhone/iPad** — that route is an App Store subscription, so a refund goes through
+   reportaproblem.apple.com rather than Apple's discretionary process (there is no advertised refund
+   window). Turn auto-renew off afterwards. ID verification is usually within 48 h.
+   The **development** entitlement is available the moment the membership is active — Tasks 004,
+   005, 010, 011, 012 can all be built and device-tested without waiting for Apple's review of the
+   distribution request.
 2. Push the repository to GitHub (used as the "developer website").
 3. Register two App IDs + one App Group ID (`docs/entitlement-request.md` §三).
 4. Create the App Store Connect record; point its privacy policy URL at `PRIVACY.md`.

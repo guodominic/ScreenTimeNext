@@ -14,11 +14,26 @@
 - 审批时长:开发者报告从 4 个工作日到数周不等;extension 的申请通常比主 app 快。
 - 通过后在 Certificates, Identifiers & Profiles → Capability Requests 里看到 **Assigned** 状态即可。
 
+## 一点五、关于退款和注册方式(2026-09-05 核实)
+
+**Apple 没有公开承诺的退款窗口。** 费用页面只讲付款和税,不提退款条件;实际是个案裁量,走
+Developer Support,2–3 个工作日答复,批不批看账号年龄和理由。欧盟/英国的 14 天法定撤回权对
+纽约不适用。
+
+**因此:用 iPhone/iPad 上的 Apple Developer app 注册,不要用网页。** app 注册产生的是一笔
+**App Store 自动续订订阅**,退款走 `reportaproblem.apple.com` 的常规流程,比人工裁量宽松得多。
+注册完成后到订阅设置里**关掉自动续订**,否则一年后会再扣 $99。
+
+**真正的风险控制是顺序,不是退款。** 开发用 entitlement 在付费当天即时可用(Apple DTS 确认:
+capability 只对付费团队显示,付费后即可开发调试)。这意味着几天内就能在自己设备上回答项目最大的
+未知数 —— DeviceActivity 回调是否可靠、D-012 的过渡插页在真实 app 里是什么效果、孩子的反应如何。
+上架用的分发 entitlement 要等几周,但**不需要它就能拿到上面全部答案**。
+
 ## 二、顺序清单
 
 | # | 步骤 | 谁 | 备注 |
 |---|---|---|---|
-| 1 | 加入 Apple Developer Program(个人) | Dominic | 用 Apple Developer app(iPhone/iPad/Mac)注册;需要开启双重认证的 Apple ID、政府签发的带照片证件、$99/年。身份验证通常 48 小时内。 |
+| 1 | 加入 Apple Developer Program(个人) | Dominic | **用 iPhone/iPad 上的 Apple Developer app 注册**(退款路径更好,见上节);需要开启双重认证的 Apple ID、政府签发的带照片证件、$99/年。身份验证通常 48 小时内。完成后关掉自动续订。 |
 | 2 | 决定 GitHub 仓库地址并推送 | Dominic + Claude | 作为"开发者网站"字段。README 已经能独立说明产品。仓库可以 public,里面没有任何密钥。 |
 | 3 | 决定 Bundle ID 前缀 | Dominic | 见第三节。定下后我更新 `AppGroup.swift` 和 Task 001。 |
 | 4 | 在 Certificates, Identifiers & Profiles 注册两个 App ID | Claude 可用内置浏览器代填,Dominic 确认 | 两个 ID 都勾上 **Family Controls** 和 **App Groups** capability;同时注册 App Group ID。 |
