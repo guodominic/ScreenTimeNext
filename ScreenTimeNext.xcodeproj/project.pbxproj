@@ -6,6 +6,10 @@
 	objectVersion = 90;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		18CD1D74304BBA47006BAE45 /* ScreenTimeNextCore in Frameworks */ = {isa = PBXBuildFile; productRef = 18CD1D73304BBA47006BAE45 /* ScreenTimeNextCore */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		000000000000000000000120 /* ScreenTimeNext.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ScreenTimeNext.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -22,6 +26,7 @@
 		000000000000000130000000 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
+				18CD1D74304BBA47006BAE45 /* ScreenTimeNextCore in Frameworks */,
 			);
 		};
 /* End PBXFrameworksBuildPhase section */
@@ -60,6 +65,9 @@
 				000000000000000000000010 /* ScreenTimeNext */,
 			);
 			name = ScreenTimeNext;
+			packageProductDependencies = (
+				18CD1D73304BBA47006BAE45 /* ScreenTimeNextCore */,
+			);
 			productName = ScreenTimeNext;
 			productReference = 000000000000000000000120 /* ScreenTimeNext.app */;
 			productType = "com.apple.product-type.application";
@@ -88,6 +96,9 @@
 			);
 			mainGroup = 000000000000000000000001;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				18CD1D72304BBA47006BAE45 /* XCLocalSwiftPackageReference "Packages/ScreenTimeNextCore" */,
+			);
 			preferredProjectObjectVersion = 90;
 			productRefGroup = 000000000000000000000020 /* Products */;
 			projectDirPath = "";
@@ -339,6 +350,20 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		18CD1D72304BBA47006BAE45 /* XCLocalSwiftPackageReference "Packages/ScreenTimeNextCore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/ScreenTimeNextCore;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		18CD1D73304BBA47006BAE45 /* ScreenTimeNextCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ScreenTimeNextCore;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 000000000000000000000000 /* Project object */;
 }
