@@ -70,7 +70,7 @@ extension View {
     func readableWidth(_ max: CGFloat = 640) -> some View { modifier(ReadableWidth(max: max)) }
 }
 
-extension UserInterfaceSizeClass? {
+extension Optional where Wrapped == UserInterfaceSizeClass {
     /// 1.0 on iPhone, 1.35 on iPad — for hit targets and dials, not for text.
     /// Read `@Environment(\.horizontalSizeClass)` in the view and call this, rather than deriving
     /// it from a computed EnvironmentValues property (SwiftUI's dependency tracking is only

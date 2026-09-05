@@ -13,7 +13,7 @@
 
 import SwiftUI
 
-enum MascotMood: Equatable {
+enum MascotMood: Hashable {
     case happy       // idle, greeting
     case playing     // session running
     case thinking    // first reminder — "what shall we do next?"
