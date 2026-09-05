@@ -90,10 +90,9 @@ struct ChildTimerView: View {
             bigTime(snapshot.remainingSeconds)
 
         case .finished:
-            headline("Screen time is finished ❤️")
-            subline(snapshot.window == nil
-                    ? "You've used today's screen time. See you tomorrow, \(name)!"
-                    : "Nice job, \(name). Let's do something else now.")
+            TimesUpView(childName: name,
+                        chosenActivity: snapshot.chosenActivity,
+                        budgetSpentEarlier: snapshot.window == nil)
         }
     }
 

@@ -1,7 +1,7 @@
 ---
 task: "015"
 title: Time's Up Experience
-status: not_started        # not_started | in_progress | blocked | done
+status: done               # not_started | in_progress | blocked | done
 depends_on: ["009"]
 qa_criteria: []
 prd_refs: ["§6.14", "§6.15", "§7"]
@@ -48,15 +48,20 @@ that rule is most likely to be violated, and it is the emotional payoff of the w
 - [ ] The screen exposes no technical detail to the child.
 
 ## Completion report
-Append the result here when the task finishes. Do not edit earlier tasks' reports.
 
-- **Files changed:**
-- **Build result:**
-- **Tests run:**
-- **Verdict:** PASS / FAIL / BLOCKED / NEEDS MANUAL DEVICE TEST
-- **Platform limitations or manual steps:**
-- **Follow-up work:**
+**2026-09-05 — Claude. Verified in the batched run with 008/009/014 (see PROGRESS).**
 
-> After finishing: update `status:` in this file's front-matter, update
-> `docs/tasks/PROGRESS.md`, and log any new decision in `docs/DECISIONS.md`
-> or new blocker in `docs/BLOCKERS.md`.
+- **Files changed:** app `Features/ChildTimer/TimesUpView.swift`; `ChildTimerView` renders it for
+  `.finished`. Copy per §6.14: "Screen time is finished ❤️" / "You chose LEGO." / "Let's go build!"
+  (`TransitionActivity.invitation`, added in Task 009). Two fallbacks: no choice → "Nice job, {name}.
+  Let's do something else now."; budget already spent today → "See you tomorrow, {name}!".
+- **Verdict:** **PASS** (automated build; copy reviewed against §7; device look pending in batch).
+- **Design notes:** no dismiss control — the only ways out are the parent's (End session / next
+  day). §6.15's system shield framing is Phase 1 (Task 011); the in-app framing is this screen.
+- **Follow-up work:** none for Phase 0.
+
+### DoD status
+- [x] The screen renders the §6.14 copy and the chosen activity.
+- [x] The no-choice fallback is defined and warm.
+- [x] Nothing on the screen uses punitive framing; every string checked against §7 (no "TIME'S UP!", names what's next, no technical terms).
+- [x] The screen exposes no technical detail to the child.
