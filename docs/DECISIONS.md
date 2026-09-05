@@ -304,6 +304,13 @@ and up to three reminders each 0–15 minutes before the end (0 = off), 1-minute
   VoiceOver adjustable). Budget: 2–120 step 2 (the 1-minute floor was not adopted — say so if it
   should be). Extension: same dial, default 10. Reminders: three 0–15 dials.
 
+**Rule added 2026-09-05 (Dominic):** a reminder must be strictly shorter than the window it runs
+in. `ScreenTimeConfiguration.effectiveWarningOffsets(forWindowSeconds:)` is the single source: the
+engine, notifications and every summary use it; the dials are bounded by `maxWarningOffset` (budget
+− 1 min). A short remaining budget later in the day drops reminders that no longer fit and the
+earliest fitting one carries the chooser. Timer copy shows the actual remaining minutes (rounded
+up), not the reminder's nominal offset.
+
 **Consequences.** PRD §6.6 / §6.11–§6.13 copy is now computed from the configured minutes.
 Task 008 tests rewritten around offsets and roles. Docs that say "10/5/1" describe the defaults.
 

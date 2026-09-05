@@ -81,9 +81,8 @@ public final class SessionController: @unchecked Sendable {
             }
             let current = now()
             // Relaunch: the natural stage is the best knowledge we have.
-            let config = try storage.loadConfiguration()
             lastState = WarningStateEngine.start(remainingSeconds: window.remainingSeconds(at: current),
-                                                 warningOffsets: config.warningOffsetsSeconds)
+                                                 warningOffsets: try offsetsLocked(for: window))
             return try snapshotLocked(for: window, at: current)
         }
     }
@@ -104,8 +103,7 @@ public final class SessionController: @unchecked Sendable {
             }
             let window = SessionWindow(startedAt: current, budgetSeconds: remaining)
             try storage.save(window)
-            let config = try storage.loadConfiguration()
-            lastState = WarningStateEngine.start(remainingSeconds: remaining, warningOffsets: config.warningOffsetsSeconds)
+            lastState = WarningStateEngine.start(remainingSeconds: remaining, warningOffsets: try offsetsLocked(for: window))
             try scheduleNotificationsLocked(for: window)
             return try snapshotLocked(for: window, at: current)
         }
@@ -243,7 +241,7 @@ public final class SessionController: @unchecked Sendable {
 
     private func snapshotLocked(for window: SessionWindow, at current: Date) throws -> ChildSessionSnapshot {
         let remaining = window.remainingSeconds(at: current)
-        let offsets = try storage.loadConfiguration().warningOffsetsSeconds
+        let offsets = try offsetsLocked(for: window)
         // A controller that did not open this window (dashboard, root routing, relaunch) must adopt
         // it rather than stay idle — this was the "Session: Not started" bug.
         if lastState == .idle {
@@ -259,6 +257,11 @@ public final class SessionController: @unchecked Sendable {
                 : nil,
             window: window
         )
+    }
+
+    /// Reminders that fit this window (strictly shorter than its total length).
+    private func offsetsLocked(for window: SessionWindow) throws -> [Int] {
+        try storage.loadConfiguration().effectiveWarningOffsets(forWindowSeconds: window.totalSeconds)
     }
 
     private func recordUsageLocked(seconds: Int, on date: Date) throws {

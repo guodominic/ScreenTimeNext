@@ -156,6 +156,23 @@ final class SessionControllerTests: XCTestCase {
         XCTAssertEqual(warn.activeWarningMinutes, 5)
     }
 
+    /// Reminders longer than what is left today are ignored; the earliest fitting one carries the chooser.
+    func testRemindersThatDoNotFitTheWindowAreIgnored() throws {
+        var config = try storage.loadConfiguration()   // budget 1200
+        config.warningOffsetsSeconds = [600, 300, 60]
+        try storage.save(config)
+        try controller.start()
+        clock.advance(1000)          // 200 left, then end early → 200 used... use endEarly to make a short remaining budget
+        try controller.endEarly()    // used 1000 → 200 left today
+        let snap = try controller.start()
+        XCTAssertEqual(snap.remainingSeconds, 200)
+        XCTAssertEqual(snap.state, .active, "10- and 5-minute reminders don't fit a 200 s window")
+        clock.advance(140)           // 60 left → the only fitting reminder → firstWarning
+        let warn = try controller.tick()
+        XCTAssertEqual(warn.state, .firstWarning)
+        XCTAssertEqual(warn.activeWarningMinutes, 1)
+    }
+
     /// The "Session: Not started" bug — a fresh controller must adopt an existing window on tick.
     func testFreshControllerAdoptsRunningWindowOnTick() throws {
         try controller.start()

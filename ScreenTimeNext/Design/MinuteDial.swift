@@ -60,6 +60,9 @@ struct MinuteDial: View {
                     }
             )
             .sensoryFeedback(.selection, trigger: minutes)
+            .onChange(of: range.upperBound) { _, upper in
+                if minutes > upper { minutes = upper }      // budget lowered below this reminder
+            }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(title ?? "Minutes")
             .accessibilityValue(zeroMeansOff && minutes == 0 ? "Off" : "\(minutes) minutes")

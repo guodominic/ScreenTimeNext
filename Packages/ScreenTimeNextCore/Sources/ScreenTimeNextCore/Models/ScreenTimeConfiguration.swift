@@ -51,6 +51,19 @@ public struct ScreenTimeConfiguration: Codable, Equatable, Sendable {
         min(max(seconds, budgetRangeSeconds.lowerBound), budgetRangeSeconds.upperBound)
     }
 
+    /// The reminders that can actually fire for a window of `windowSeconds`: strictly shorter than
+    /// the window (a reminder at or beyond the window's length would fire at Start or never).
+    /// Every consumer — engine, notifications, UI summaries — must use this, never the raw list.
+    public func effectiveWarningOffsets(forWindowSeconds windowSeconds: Int) -> [Int] {
+        warningOffsetsSeconds.filter { $0 < windowSeconds }
+    }
+
+    /// Largest reminder offset that makes sense for a budget (D-013 UI bound): budget − 1 minute,
+    /// capped by the reminder range.
+    public static func maxWarningOffset(forBudgetSeconds budget: Int) -> Int {
+        min(warningOffsetRange.upperBound, max(0, budget - warningStepSeconds))
+    }
+
     /// Drops non-positive values, clamps, de-duplicates, sorts earliest-first, caps at three.
     public static func normalizedOffsets(_ offsets: [Int]) -> [Int] {
         let cleaned = offsets

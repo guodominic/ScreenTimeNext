@@ -43,11 +43,23 @@ final class NotificationPlanTests: XCTestCase {
         XCTAssertTrue(plan[3].body.contains("Let's go build!"))
     }
 
+    /// A window shorter than some reminders: only the ones that fit exist, re-indexed from 0,
+    /// and the earliest fitting one carries the first-warning copy (activity chooser).
     func testShortBudgetOnlyGetsWhatFits() {
         let window = SessionWindow(startedAt: start, budgetSeconds: 300)   // 5 minutes total
         let plan = NotificationPlan.make(for: window, configuration: .default, childName: "Ivy", now: start)
-        // 10-minute mark is before start → dropped; 5-minute mark == now → not strictly future → dropped.
-        XCTAssertEqual(plan.map(\.identifier), [NotificationIdentifier.warning(2), NotificationIdentifier.finished])
+        XCTAssertEqual(plan.map(\.identifier), [NotificationIdentifier.warning(0), NotificationIdentifier.finished])
+        XCTAssertTrue(plan[0].title.contains("1 minute left"))
+        XCTAssertTrue(plan[0].body.contains("What do you want to do next?"), "the only fitting reminder is the first warning")
+    }
+
+    /// Dominic's case: 8-minute budget, reminders 10/5/1 → 10 is dropped, 5 and 1 fire.
+    func testReminderEqualToOrLongerThanBudgetIsDropped() {
+        var config = ScreenTimeConfiguration.default
+        config.warningOffsetsSeconds = [600, 480, 300, 60]   // normalizes to [600, 480, 300]
+        let window = SessionWindow(startedAt: start, budgetSeconds: 480)
+        let plan = NotificationPlan.make(for: window, configuration: config, childName: "Ivy", now: start)
+        XCTAssertEqual(plan.map { Int($0.fireDate.timeIntervalSince(start)) }, [180, 480], "only the 5-minute reminder fits (8 − 5 = 3 min in)")
     }
 
     // MARK: Controller integration

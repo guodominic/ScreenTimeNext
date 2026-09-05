@@ -42,13 +42,13 @@ struct SettingsView: View {
             }
 
             Section {
-                WarningDials(minutes: $warningMinutes)
+                WarningDials(minutes: $warningMinutes, budgetMinutes: budgetMinutes)
                     .listRowInsets(EdgeInsets())
                     .listRowBackground(Color.clear)
             } header: {
                 Text("Reminders (minutes before the end)")
             } footer: {
-                Text("Up to three. Off skips that reminder. A finish notification is always sent.")
+                Text("Up to three, each shorter than the budget (up to \(ScreenTimeConfiguration.maxWarningOffset(forBudgetSeconds: budgetMinutes * 60) / 60) min). Off skips that reminder. A finish notification is always sent.")
             }
 
             Section {
@@ -99,6 +99,10 @@ struct SettingsView: View {
             }
         }
         .onAppear(perform: load)
+        .onChange(of: budgetMinutes) { _, newBudget in
+            let cap = ScreenTimeConfiguration.maxWarningOffset(forBudgetSeconds: newBudget * 60) / 60
+            warningMinutes = warningMinutes.map { min($0, cap) }
+        }
     }
 
     // MARK: Load / save

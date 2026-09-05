@@ -45,6 +45,20 @@ final class ConfigurationTests: XCTestCase {
         XCTAssertEqual(c.selectedActivities, [.reading])
     }
 
+    func testEffectiveOffsetsAreStrictlyShorterThanTheWindow() {
+        let c = ScreenTimeConfiguration(warningOffsetsSeconds: [600, 300, 60])
+        XCTAssertEqual(c.effectiveWarningOffsets(forWindowSeconds: 480), [300, 60])
+        XCTAssertEqual(c.effectiveWarningOffsets(forWindowSeconds: 300), [60], "equal is not shorter")
+        XCTAssertEqual(c.effectiveWarningOffsets(forWindowSeconds: 3600), [600, 300, 60])
+        XCTAssertEqual(c.effectiveWarningOffsets(forWindowSeconds: 30), [])
+    }
+
+    func testMaxWarningOffsetForBudget() {
+        XCTAssertEqual(ScreenTimeConfiguration.maxWarningOffset(forBudgetSeconds: 480), 420, "8-minute budget → reminders up to 7")
+        XCTAssertEqual(ScreenTimeConfiguration.maxWarningOffset(forBudgetSeconds: 7200), 900, "capped at 15")
+        XCTAssertEqual(ScreenTimeConfiguration.maxWarningOffset(forBudgetSeconds: 120), 60)
+    }
+
     func testDialRangesAreConsistent() {
         XCTAssertEqual(ScreenTimeConfiguration.budgetRangeSeconds.lowerBound % ScreenTimeConfiguration.budgetStepSeconds, 0)
         XCTAssertEqual(ScreenTimeConfiguration.budgetRangeSeconds.upperBound, 120 * 60)

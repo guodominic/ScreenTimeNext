@@ -75,7 +75,7 @@ struct ChildTimerView: View {
             subline("You've got some extra time, \(name)!")
 
         case .firstWarning:
-            headline("\(warningMinutes) left 👋")
+            headline("\(remainingMinutesText) left 👋")
             subline("You're almost done. What do you want to do next?")
             WhatsNextChooser(
                 activities: viewModel.availableActivities,
@@ -85,13 +85,13 @@ struct ChildTimerView: View {
             ring(big: false)
 
         case .secondWarning:
-            headline("\(warningMinutes) left")
+            headline("\(remainingMinutesText) left")
             subline("Time to finish up what you're doing.")
             if let activity = snapshot.chosenActivity { ChosenActivityBadge(activity: activity) }
             ring(big: false)
 
         case .finalWarning:
-            headline(snapshot.activeWarningMinutes == 1 ? "One more minute!" : "\(warningMinutes) left!")
+            headline(snapshot.remainingSeconds <= 60 ? "One more minute!" : "\(remainingMinutesText) left!")
             subline("Finish your game.")
             if let activity = snapshot.chosenActivity { ChosenActivityBadge(activity: activity) }
             ring(big: true)
@@ -105,7 +105,11 @@ struct ChildTimerView: View {
 
     // MARK: Pieces
 
-    private var warningMinutes: String { minutesText((snapshot.activeWarningMinutes ?? 1) * 60) }
+    /// Whole minutes remaining, rounded UP, so "5 minutes left" holds from 5:00 down to 4:01.
+    private var remainingMinutesText: String {
+        let m = max(1, Int((Double(snapshot.remainingSeconds) / 60).rounded(.up)))
+        return m == 1 ? "1 minute" : "\(m) minutes"
+    }
 
     private func headline(_ text: String) -> some View {
         Text(text).font(.system(.largeTitle, design: .rounded).bold())
@@ -115,20 +119,27 @@ struct ChildTimerView: View {
         Text(text).font(.title3).foregroundStyle(.secondary)
     }
 
-    /// Countdown inside a progress ring; the ring is remaining ÷ window total.
+    /// Countdown inside a progress ring; the ring is remaining ÷ window total. Big and bold —
+    /// this is the one thing on the screen a child should read from across the room.
     private func ring(big: Bool) -> some View {
         let total = max(1, snapshot.window?.totalSeconds ?? 1)
         let fraction = Double(snapshot.remainingSeconds) / Double(total)
-        let size: CGFloat = big ? 280 : 180
+        let size: CGFloat = big ? 340 : 260
+        let digits = Self.clock(snapshot.remainingSeconds)
+        let fontSize: CGFloat = (big ? 96 : 68) * (digits.count > 5 ? 0.78 : 1)   // h:mm:ss fits
         return ZStack {
-            ProgressRing(fraction: fraction, lineWidth: big ? 18 : 12, color: color)
-            VStack(spacing: 4) {
-                Text(Self.clock(snapshot.remainingSeconds))
-                    .font(.system(size: big ? 64 : 40, weight: .bold, design: .rounded))
+            Circle().fill(color.opacity(0.10))
+            ProgressRing(fraction: fraction, lineWidth: big ? 24 : 16, color: color)
+            VStack(spacing: 2) {
+                Text(digits)
+                    .font(.system(size: fontSize, weight: .heavy, design: .rounded))
                     .monospacedDigit()
                     .contentTransition(.numericText())
-                Text("left").font(.headline).foregroundStyle(.secondary)
+                    .minimumScaleFactor(0.6)
+                    .lineLimit(1)
+                Text("left").font(.title3.weight(.semibold)).foregroundStyle(.secondary)
             }
+            .padding(.horizontal, 28)
         }
         .frame(width: size, height: size)
         .padding(.vertical, 8)

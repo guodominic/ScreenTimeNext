@@ -40,7 +40,7 @@ public enum NotificationPlan {
                             childName: String,
                             now: Date) -> [PlannedNotification] {
         var result: [PlannedNotification] = []
-        let offsets = configuration.warningOffsetsSeconds
+        let offsets = configuration.effectiveWarningOffsets(forWindowSeconds: window.totalSeconds)
         for (index, offset) in offsets.enumerated() {
             let fireDate = window.endsAt.addingTimeInterval(-TimeInterval(offset))
             guard fireDate > now else { continue }

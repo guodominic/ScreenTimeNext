@@ -202,7 +202,8 @@ struct ParentDashboardView: View {
     }
 
     private var reminderSummary: String {
-        let mins = viewModel.configuration.warningOffsetsSeconds.map { "\($0 / 60)" }
+        let config = viewModel.configuration
+        let mins = config.effectiveWarningOffsets(forWindowSeconds: config.dailyBudgetSeconds).map { "\($0 / 60)" }
         return mins.isEmpty ? "Finish only" : mins.joined(separator: " / ") + " min"
     }
 

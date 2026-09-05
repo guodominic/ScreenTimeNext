@@ -49,7 +49,8 @@ struct ReadyStepView: View {
     }
 
     private var reminderSummary: String {
-        let mins = viewModel.draft.configuration.warningOffsetsSeconds.map { $0 / 60 }
+        let config = viewModel.draft.configuration
+        let mins = config.effectiveWarningOffsets(forWindowSeconds: config.dailyBudgetSeconds).map { $0 / 60 }
         if mins.isEmpty { return "No reminders — just a finish notification" }
         return "Reminders at " + mins.map { "\($0) min" }.joined(separator: ", ") + " before the end"
     }

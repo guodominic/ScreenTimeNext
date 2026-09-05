@@ -16,7 +16,10 @@ struct WarningsStepView: View {
             buttonTitle: "Continue",
             action: { viewModel.advance(to: .whatsNext) }
         ) {
-            WarningDials(minutes: $viewModel.draft.warningMinutes)
+            WarningDials(minutes: $viewModel.draft.warningMinutes,
+                         budgetMinutes: viewModel.draft.dailyBudgetSeconds / 60)
+            Text("Reminders must be shorter than the \(viewModel.draft.dailyBudgetSeconds / 60)-minute budget, so the dials stop at \(ScreenTimeConfiguration.maxWarningOffset(forBudgetSeconds: viewModel.draft.dailyBudgetSeconds) / 60).")
+                .font(.footnote).foregroundStyle(.secondary)
         }
     }
 }
@@ -24,14 +27,20 @@ struct WarningsStepView: View {
 /// Three small dials side by side. Shared with Settings.
 struct WarningDials: View {
     @Binding var minutes: [Int]
+    /// Daily budget in minutes: a reminder must be strictly shorter than the budget (budget 8 → up to 7).
+    let budgetMinutes: Int
 
     private let colors = [Theme.sun, Theme.peach, Theme.coral]
+
+    private var upperBound: Int {
+        ScreenTimeConfiguration.maxWarningOffset(forBudgetSeconds: budgetMinutes * 60) / 60
+    }
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
             ForEach(0..<ScreenTimeConfiguration.maxWarnings, id: \.self) { i in
                 MinuteDial(minutes: slot(i),
-                           range: 0...ScreenTimeConfiguration.warningOffsetRange.upperBound / 60,
+                           range: 0...upperBound,
                            step: 1,
                            title: "Reminder \(i + 1)",
                            color: colors[i],
