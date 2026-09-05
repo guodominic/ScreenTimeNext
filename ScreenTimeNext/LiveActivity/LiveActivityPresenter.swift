@@ -21,7 +21,8 @@ nonisolated final class LiveActivityPresenter: SessionPresenting, @unchecked Sen
             chosenActivityRaw: state.chosenActivity?.rawValue,
             stateName: state.stateName
         )
-        Task {
+        // ActivityKit asserts "Call must be made on main thread" — hop to the main actor.
+        Task { @MainActor in
             if let current = Activity<ScreenTimeActivityAttributes>.activities.first {
                 await current.update(ActivityContent(state: content, staleDate: state.endsAt))
             } else {
@@ -35,7 +36,7 @@ nonisolated final class LiveActivityPresenter: SessionPresenting, @unchecked Sen
     }
 
     func hide() {
-        Task {
+        Task { @MainActor in
             for activity in Activity<ScreenTimeActivityAttributes>.activities {
                 await activity.end(nil, dismissalPolicy: .immediate)
             }
