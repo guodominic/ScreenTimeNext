@@ -18,13 +18,21 @@ struct HomePlaceholderView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section("Child") {
+                Section("Profile") {
                     LabeledContent("Name", value: profile?.name ?? "—")
                 }
                 Section("Screen time") {
                     LabeledContent("Daily budget", value: "\(configuration.dailyBudgetSeconds / 60) min")
                     LabeledContent("Warnings", value: warningSummary)
                     LabeledContent("Protected", value: selectionSummary.isEmpty ? "Nothing yet" : "\(selectionSummary.applicationCount) apps · \(selectionSummary.categoryCount) categories")
+                }
+                Section("Child") {
+                    NavigationLink("Open child timer") {
+                        ChildTimerView(services: services)
+                    }
+                    Button("End session now", role: .destructive) {
+                        try? SessionController(storage: services.storage).endEarly()
+                    }
                 }
                 Section("What's next") {
                     if configuration.selectedActivities.isEmpty {

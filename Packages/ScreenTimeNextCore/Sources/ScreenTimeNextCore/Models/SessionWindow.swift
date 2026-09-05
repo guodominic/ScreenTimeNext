@@ -26,9 +26,17 @@ public struct SessionWindow: Codable, Equatable, Sendable {
         self.endsAt = startedAt.addingTimeInterval(TimeInterval(budgetSeconds))
     }
 
-    /// Remaining seconds at `now`, never negative.
+    /// Total length of the window in seconds.
+    public var totalSeconds: Int {
+        max(0, Int(endsAt.timeIntervalSince(startedAt).rounded(.down)))
+    }
+
+    /// Remaining seconds at `now`: never negative, and never more than the window's total length.
+    /// The upper clamp is a cheap defence against the clock being moved backward (PRD §17):
+    /// a child who sets the clock back cannot manufacture more time than the session had.
     public func remainingSeconds(at now: Date) -> Int {
-        max(0, Int(endsAt.timeIntervalSince(now).rounded(.down)))
+        let raw = Int(endsAt.timeIntervalSince(now).rounded(.down))
+        return min(max(0, raw), totalSeconds)
     }
 
     public func hasExpired(at now: Date) -> Bool {
