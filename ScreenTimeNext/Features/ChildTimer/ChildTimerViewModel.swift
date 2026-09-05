@@ -21,7 +21,7 @@ final class ChildTimerViewModel {
 
     init(services: ServiceContainer) {
         storage = services.storage
-        controller = SessionController(storage: services.storage)
+        controller = services.makeSessionController()
     }
 
     // MARK: Lifecycle

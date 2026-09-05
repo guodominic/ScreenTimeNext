@@ -1,7 +1,7 @@
 ---
 task: "016"
 title: Notifications & Background Behavior
-status: not_started        # not_started | in_progress | blocked | done
+status: done               # not_started | in_progress | blocked | done  (device check pending)
 depends_on: ["008", "012"]
 qa_criteria: []
 prd_refs: ["§14", "§7"]
@@ -44,15 +44,30 @@ Implement notification and background behavior supported by the current SDK, so 
 - [ ] Notification copy passes the §7 checklist and leaks no selection detail.
 
 ## Completion report
-Append the result here when the task finishes. Do not edit earlier tasks' reports.
 
-- **Files changed:**
-- **Build result:**
-- **Tests run:**
-- **Verdict:** PASS / FAIL / BLOCKED / NEEDS MANUAL DEVICE TEST
-- **Platform limitations or manual steps:**
-- **Follow-up work:**
+**2026-09-05 — Claude. Verified in the batched run with 013 (see PROGRESS).**
 
-> After finishing: update `status:` in this file's front-matter, update
-> `docs/tasks/PROGRESS.md`, and log any new decision in `docs/DECISIONS.md`
-> or new blocker in `docs/BLOCKERS.md`.
+- **Why now (not Phase 1):** during screen time the child is in another app, so the in-app timer
+  is never on screen at the 10/5/1 marks. Local notifications are how the warnings reach the child,
+  and they need no entitlement — they are essential to Phase 0 validation.
+- **Files changed:** package `Services/NotificationScheduling.swift` (`PlannedNotification`,
+  `NotificationKind`, pure `NotificationPlan.make(...)`, protocol, mock); `SessionController` now
+  schedules on start/choose, cancels on finalize (end-early, rollover), `rescheduleNotifications()`
+  for Settings; `ServiceContainer.notifications` + `makeSessionController()`. App
+  `Notifications/UserNotificationScheduler.swift` (UNUserNotificationCenter, calendar triggers from
+  absolute dates, stable identifiers, foreground banners); Ready step requests permission with the
+  reason on screen; dashboard shows "Notifications off" with a link to Settings when denied.
+  Tests: `NotificationPlanTests` (8).
+- **Verdict:** **PASS** (automated) · **NEEDS MANUAL DEVICE TEST**: start a 15-minute session, lock
+  the phone / switch apps, confirm the 10-minute banner arrives at 5:00 elapsed.
+- **Platform notes:** `.timeSensitive` interruption level needs an entitlement — not used. iOS may
+  coalesce or delay a calendar trigger by seconds; acceptable for Phase 0, measured in Task 017.
+- **Follow-up work:** Task 013 reschedules on extension (same batch). Task 017 measures delivery
+  latency on device and tests the denied path.
+
+### DoD status
+- [x] Warnings and expiry reach the child with the app backgrounded (local notifications; device check pending).
+- [x] Notifications are cancelled/rescheduled on budget change, extension grant, and day rollover (tested for settings change, end-early, rollover; extension in 013).
+- [x] No stale notification can fire after an extension is granted (stable identifiers; replaceAll).
+- [x] Denied permission degrades gracefully and is surfaced on the dashboard.
+- [x] Notification copy passes the §7 checklist and leaks no selection detail.

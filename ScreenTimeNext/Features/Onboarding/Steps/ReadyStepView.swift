@@ -5,6 +5,8 @@ import ScreenTimeNextCore
 struct ReadyStepView: View {
     @Bindable var viewModel: OnboardingViewModel
     let onComplete: () -> Void
+    @Environment(\.services) private var services
+    @State private var finishing = false
 
     private var name: String { viewModel.draft.trimmedChildName }
     private var minutes: Int { viewModel.draft.dailyBudgetSeconds / 60 }
@@ -12,15 +14,24 @@ struct ReadyStepView: View {
     var body: some View {
         OnboardingStepScaffold(
             title: "\(name) is all set",
-            buttonTitle: "Finish",
+            buttonTitle: finishing ? "Finishing…" : "Finish",
+            buttonEnabled: !finishing,
             action: {
-                if viewModel.finish() { onComplete() }
+                guard viewModel.finish() else { return }
+                finishing = true
+                Task {
+                    // Task 016: ask for notification permission here, in the parent flow, with the
+                    // reason on screen. Denial is not an error — warnings still show in-app.
+                    _ = await services.notifications.requestPermission()
+                    onComplete()
+                }
             }
         ) {
             VStack(alignment: .leading, spacing: 16) {
                 Label("\(minutes) minutes of screen time each day", systemImage: "clock")
                 Label("Gentle warnings before time ends", systemImage: "bell")
                 Label("\(name) picks what to do next", systemImage: "sparkles")
+                Label("Warnings arrive as notifications, so they reach \(name) in any app", systemImage: "app.badge")
                 if let activities = nonEmptyActivities {
                     Text(activities)
                         .font(.footnote)

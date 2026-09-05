@@ -17,6 +17,7 @@ final class ParentDashboardViewModel {
     private(set) var protectionState: ProtectionState = .unshielded
     private(set) var session: ChildSessionSnapshot = .idle
     private(set) var remainingTodaySeconds: Int = 0
+    private(set) var notificationsDenied = false
 
     private let services: ServiceContainer
     private let controller: SessionController
@@ -24,7 +25,7 @@ final class ParentDashboardViewModel {
 
     init(services: ServiceContainer) {
         self.services = services
-        controller = SessionController(storage: services.storage)
+        controller = services.makeSessionController()
     }
 
     func appeared() {
@@ -45,6 +46,7 @@ final class ParentDashboardViewModel {
 
     /// Full re-read: appear, foreground, after Settings.
     func reload() {
+        Task { notificationsDenied = await services.notifications.isPermissionDenied }
         let storage = services.storage
         profile = try? storage.loadChildProfile()
         configuration = (try? storage.loadConfiguration()) ?? .default

@@ -6,11 +6,13 @@
 //  tap from the child timer.
 
 import SwiftUI
+import UIKit
 import ScreenTimeNextCore
 
 struct ParentDashboardView: View {
     @Environment(\.services) private var services
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.openURL) private var openURL
     @State private var viewModel: ParentDashboardViewModel
     @State private var confirmEndSession = false
     let onReset: () -> Void
@@ -113,6 +115,15 @@ struct ParentDashboardView: View {
 
     private var parentSection: some View {
         Section {
+            if viewModel.notificationsDenied {
+                Button {
+                    if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
+                } label: {
+                    Label("Notifications are off — warnings only show in the app", systemImage: "bell.slash")
+                }
+            } else {
+                LabeledContent("Notifications", value: "On")
+            }
             LabeledContent("Extend time") {
                 Text("Coming with Screen Time access").foregroundStyle(.secondary)
             }

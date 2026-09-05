@@ -43,6 +43,7 @@ public struct ChildSessionSnapshot: Equatable, Sendable {
 public final class SessionController: @unchecked Sendable {
 
     private let storage: any ScreenTimeStorageService
+    private let notifications: (any NotificationScheduling)?
     private let now: @Sendable () -> Date
     private let calendar: Calendar
     private let lock = NSLock()
@@ -51,9 +52,11 @@ public final class SessionController: @unchecked Sendable {
     private var lastState: ScreenTimeState = .idle
 
     public init(storage: any ScreenTimeStorageService,
+                notifications: (any NotificationScheduling)? = nil,
                 calendar: Calendar = .current,
                 now: @escaping @Sendable () -> Date = { Date() }) {
         self.storage = storage
+        self.notifications = notifications
         self.calendar = calendar
         self.now = now
     }
@@ -99,6 +102,7 @@ public final class SessionController: @unchecked Sendable {
             let window = SessionWindow(startedAt: current, budgetSeconds: remaining)
             try storage.save(window)
             lastState = WarningStateEngine.start(remainingSeconds: remaining)
+            try scheduleNotificationsLocked(for: window)
             return try snapshotLocked(for: window, at: current)
         }
     }
@@ -130,7 +134,19 @@ public final class SessionController: @unchecked Sendable {
             }
             window.chosenActivity = activity
             try storage.save(window)
+            try scheduleNotificationsLocked(for: window)
             return try snapshotLocked(for: window, at: now())
+        }
+    }
+
+    /// Re-derive notifications for the current window (e.g. after Settings changed the toggles).
+    public func rescheduleNotifications() throws {
+        try lock.withLock {
+            if let window = try currentWindowLocked() {
+                try scheduleNotificationsLocked(for: window)
+            } else {
+                notifications?.cancelAll()
+            }
         }
     }
 
@@ -164,6 +180,16 @@ public final class SessionController: @unchecked Sendable {
         let elapsed = window.totalSeconds - window.remainingSeconds(at: now())
         try recordUsageLocked(seconds: elapsed, on: window.startedAt)
         try storage.clearSessionWindow()
+        notifications?.cancelAll()
+    }
+
+    /// Task 016 — (re)derive every pending notification from the window's absolute timestamps.
+    private func scheduleNotificationsLocked(for window: SessionWindow) throws {
+        guard let notifications else { return }
+        let config = try storage.loadConfiguration()
+        let name = try storage.loadChildProfile()?.name ?? ""
+        let plan = NotificationPlan.make(for: window, configuration: config, childName: name, now: now())
+        notifications.replaceAll(with: plan)
     }
 
     private func remainingBudgetSecondsLocked() throws -> Int {

@@ -145,6 +145,7 @@ struct SettingsView: View {
             } else {
                 try services.selection.clearSelection()
             }
+            try? services.makeSessionController().rescheduleNotifications()
             errorText = nil
             onSaved()
             dismiss()

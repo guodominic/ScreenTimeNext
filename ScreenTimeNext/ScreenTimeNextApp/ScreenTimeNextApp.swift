@@ -11,7 +11,7 @@ struct ScreenTimeNextApp: App {
 
     /// Phase 0 (D-007): Screen Time services mocked, persistence real (app container).
     /// Phase 1 swaps real adapters and the App Group container in here, and nowhere else.
-    private let container: ServiceContainer = .phase0()
+    private let container: ServiceContainer = .phase0(notifications: UserNotificationScheduler())
 
     var body: some Scene {
         WindowGroup {
