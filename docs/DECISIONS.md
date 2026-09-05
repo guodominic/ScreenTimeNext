@@ -269,6 +269,12 @@ capability is on the target (ordinary capability; needs the paid membership — 
 the Dynamic Island / status area on iPhone and on the Lock Screen on iPad. No entitlement. Worth it
 if the validation devices are iPhones; low value on an iPad that is unlocked and in use.
 
+**Cannot lock the screen — confirmed.** Dominic asked (2026-09-05) whether the device could be
+locked at each reminder to force the child to stop. An Apple Frameworks engineer answers this
+directly on the developer forums: *"Locking and unlocking the device is not possible via the Screen
+Time API."* There is no other public API for it either; device lock is MDM-only (supervised devices,
+an MDM server — a different product). Do not look for a workaround.
+
 **Phase 1 design direction — the real answer.** Use the ManagedSettings shield *as the warning*:
 at the 5-minute mark apply the shield to the selected content with a custom `ShieldConfiguration`
 ("5 minutes left, {name}. Time to finish up." + a primary button), and have the ShieldAction
@@ -278,9 +284,25 @@ take over. Repeat at 1 minute; at 0 the shield stays. This is the mechanism that
 "transition assistant" different from a timer. Timing depends on DeviceActivity events at the
 warning marks, whose reliability Phase 1 must measure on device (D-006's known limitation).
 
-**Consequences.** `NotificationKind` gains no new cases now. Task 010/011/012 scope grows: shield
-configuration + ShieldAction extension targets (two more bundle IDs in the entitlement request —
-`docs/entitlement-request.md` must list them). Copy for the shield goes through the §7 checklist.
+**What the shield API actually allows (verified against current docs, 2026-09-05).**
+`ShieldConfiguration` takes `backgroundBlurStyle`, `backgroundColor`, `icon`, `title`, `subtitle`,
+`primaryButtonLabel`, `primaryButtonBackgroundColor`, `secondaryButtonLabel` (and submenu items);
+anything left `nil` uses the system default. `ShieldActionDelegate.handle(action:for:completionHandler:)`
+receives the button press and answers with a `ShieldActionResponse`. So the interstitial is:
+custom icon + "5 minutes left, {name}" + "Next: LEGO" + a primary button; pressing it lifts the
+shield for the remaining minutes. Functionally stronger than a screen lock — a lock is dismissed by
+unlocking, whereas the shield requires acknowledging the message before the app is usable again.
+
+Scope it to the parent-selected content, not `.all()`: during screen time the child is by definition
+inside selected content, so shielding that is both sufficient and proportionate (shielding
+everything would interrupt a phone call or a homework app for no reason).
+
+**Consequences.** `NotificationKind` gains no new cases now. Task 010/011/012 scope grows: a
+`ShieldConfigurationExtension` and a `ShieldActionExtension` target — **two more bundle IDs in the
+entitlement request** (`docs/entitlement-request.md` lists them). Copy for the shield goes through
+the §7 checklist. Timing rides on DeviceActivity events at the warning marks, whose reliability is
+D-006's known limitation: the shield is more forceful than a banner but may arrive late. Keep the
+local notification as well — belt and braces.
 
 ---
 

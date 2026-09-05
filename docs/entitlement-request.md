@@ -31,10 +31,19 @@
 
 没有自有域名时的两种做法(Apple 不验证域名所有权,但用自己控制的命名空间更干净):
 
-| 方案 | 主 app | Extension | App Group |
-|---|---|---|---|
-| **A · GitHub 命名空间(推荐)** | `io.github.guodominic.screentimenext` | `io.github.guodominic.screentimenext.monitor` | `group.io.github.guodominic.screentimenext` |
-| B · 个人名 | `com.xiachenguo.screentimenext` | `com.xiachenguo.screentimenext.monitor` | `group.com.xiachenguo.screentimenext` |
+已确定(工程里已在用):
+
+| 用途 | Bundle ID |
+|---|---|
+| 主 app | `io.github.guodominic.screentimenext` |
+| DeviceActivityMonitor extension | `io.github.guodominic.screentimenext.monitor` |
+| ShieldConfiguration extension(D-012 过渡插页) | `io.github.guodominic.screentimenext.shieldconfig` |
+| ShieldAction extension(插页按钮的响应) | `io.github.guodominic.screentimenext.shieldaction` |
+| App Group | `group.io.github.guodominic.screentimenext` |
+| Widget(Live Activity,**不需要** entitlement) | `io.github.guodominic.screentimenext.ScreenTimeNextWidgets` |
+
+**Screen Time 的四个 bundle ID 各要提交一次申请**(Apple:"submit the same request for the
+extension")。Widget 不涉及 Screen Time API,不用申请。
 
 Bundle ID 注册后**不可更改**,而且它与 App Store 展示名无关 —— 所以即便展示名以后改掉 "ScreenTimeNext",Bundle ID 保持不变没有问题。
 
@@ -52,14 +61,12 @@ ScreenTimeNext
 https://github.com/guodominic/ScreenTimeNext
 ```
 
-### Bundle ID — 第一次提交(主 app)
+### Bundle ID — 四次提交,每次填一个
 ```
-io.github.guodominic.screentimenext
-```
-
-### Bundle ID — 第二次提交(extension)
-```
-io.github.guodominic.screentimenext.monitor
+io.github.guodominic.screentimenext              ← 第 1 次(主 app)
+io.github.guodominic.screentimenext.monitor      ← 第 2 次(DeviceActivityMonitor)
+io.github.guodominic.screentimenext.shieldconfig ← 第 3 次(ShieldConfiguration)
+io.github.guodominic.screentimenext.shieldaction ← 第 4 次(ShieldAction)
 ```
 
 ### Which Screen Time frameworks does your app use?
@@ -109,7 +116,29 @@ FamilyActivityPicker, DeviceActivity monitoring and ManagedSettings shielding, t
 cannot perform its function.
 ```
 
-### Describe your app and how it uses Family Controls(extension 用)
+### Describe your app and how it uses Family Controls(第 3、4 次:两个 shield extension 用)
+```
+This bundle is a Screen Time shield extension of ScreenTimeNext
+(main app bundle ID io.github.guodominic.screentimenext, submitted separately).
+
+ScreenTimeNext is a parental control app that helps a child end screen time calmly: a parent sets
+a daily budget for one child on the child's device and selects the content it applies to; the child
+receives reminders before the end and chooses what to do next; when the budget is exhausted the
+selected content is shielded.
+
+Our ShieldConfiguration extension supplies the appearance of the shield we place on the
+parent-selected content: an icon, a short child-friendly message naming how much time is left and
+what the child chose to do next, and a button label. Our ShieldAction extension handles the button
+press: at a reminder point it lifts our own shield so the child can finish the remaining minutes,
+and after the budget is exhausted it explains that time is over and offers no bypass.
+
+Neither extension performs networking, uses analytics, or logs any FamilyActivity token. Both read
+the parent's configuration from the shared App Group container and only modify the named
+ManagedSettingsStore owned by ScreenTimeNext; they never alter settings created by Apple's Screen
+Time or by other apps.
+```
+
+### Describe your app and how it uses Family Controls(第 2 次:DeviceActivityMonitor extension 用)
 ```
 This bundle is the DeviceActivityMonitor app extension of ScreenTimeNext
 (main app bundle ID io.github.guodominic.screentimenext, submitted separately).
@@ -147,7 +176,7 @@ the child sees only the timer, warnings and activity choice.
 |---|---|
 | Screen Time 不是 app 的核心功能 | 说明最后一段明确指出没有这三个框架 app 无法工作 |
 | 用途描述含糊 | 逐框架说明,具体到 named store、threshold、picker |
-| 漏了 extension 的 Bundle ID | 两次提交,互相引用对方的 Bundle ID |
+| 漏了 extension 的 Bundle ID | 四次提交,每次的说明里引用主 app 的 Bundle ID |
 | 数据用于广告/画像 | 无后端、无分析、无广告,写进说明 |
 | 网站空白或无法访问 | GitHub README 已能独立说明产品和隐私 |
 

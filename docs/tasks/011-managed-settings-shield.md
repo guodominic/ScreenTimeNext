@@ -30,6 +30,15 @@ Implement scoped, idempotent shielding and unshielding of the selected content t
 §6.15: when a selected app is opened after time is exhausted, present the system shielding experience where applicable. The app's own experience should frame this as transition, not punishment.
 
 ## Implementation notes
+- **D-012 scope addition — the shield is also the warning, not just the ending.** Build a
+  `ShieldConfigurationExtension` (custom icon, title, subtitle, primary button) and a
+  `ShieldActionExtension` (button lifts our own shield for the remaining minutes). At a reminder
+  mark the child's app is covered full-screen until they acknowledge; after the budget is spent the
+  shield stays. This is the answer to "can we force the child to stop and look" — iOS cannot lock
+  the screen for a third party (verified), and this is stronger anyway.
+- Verify `ShieldConfiguration` / `ShieldActionDelegate` / `ShieldActionResponse` against the
+  installed SDK before writing against them (Rule 8).
+- Scope shields to the parent-selected content, never `.all()` — do not interrupt a phone call.
 - Use a **named** `ManagedSettingsStore` dedicated to ScreenTimeNext. Clearing that store must never touch settings written by Apple's own Screen Time or by another parental-control app on the same device.
 - Verify the current `ManagedSettingsStore` / `ShieldSettings` API surface against the installed SDK.
 - The service must be callable from **both** the app and the extension. Keep it free of any assumption that a UI exists.

@@ -34,7 +34,9 @@ it. Full material package, paste-ready form answers and the ordered checklist ar
 2. Push the repository to GitHub (used as the "developer website").
 3. Register two App IDs + one App Group ID (`docs/entitlement-request.md` §三).
 4. Create the App Store Connect record; point its privacy policy URL at `PRIVACY.md`.
-5. Submit the distribution request **twice** — main app and DeviceActivityMonitor extension.
+5. Submit the distribution request **four times** — main app, DeviceActivityMonitor,
+   ShieldConfiguration and ShieldAction extensions (the last two are the D-012 transition
+   interstitial, the mechanism that actually makes a child stop and look).
 6. Record submission date and case ID below; check Capability Requests weekly.
 
 **Meanwhile.** Tasks 001–003, 006–009, 014, 015 need no entitlement; Tasks 004–013 can proceed on
