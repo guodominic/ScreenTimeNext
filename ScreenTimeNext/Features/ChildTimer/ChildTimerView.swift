@@ -22,7 +22,7 @@ struct ChildTimerView: View {
 
     var body: some View {
         ZStack {
-            tint.opacity(0.12).ignoresSafeArea()
+            stateColor.opacity(0.12).ignoresSafeArea()
             VStack(spacing: 24) {
                 Spacer()
                 content
@@ -127,7 +127,7 @@ struct ChildTimerView: View {
         return h > 0 ? String(format: "%d:%02d:%02d", h, m, sec) : String(format: "%d:%02d", m, sec)
     }
 
-    private var tint: Color {
+    private var stateColor: Color {
         switch snapshot.displayState {
         case .idle, .active, .extended: return .accentColor
         case .warning10: return .yellow

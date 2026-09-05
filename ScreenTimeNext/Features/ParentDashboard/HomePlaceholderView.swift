@@ -31,7 +31,7 @@ struct HomePlaceholderView: View {
                         ChildTimerView(services: services)
                     }
                     Button("End session now", role: .destructive) {
-                        try? SessionController(storage: services.storage).endEarly()
+                        _ = try? SessionController(storage: services.storage).endEarly()
                     }
                 }
                 Section("What's next") {
