@@ -365,6 +365,53 @@ the DeviceActivity extension at warning marks.
 `NSSupportsLiveActivities = YES` on the app target. Two more bundle IDs are NOT needed for the
 entitlement request (no Screen Time API in the widget).
 
+---
+
+## D-015 — Blocklist vs. allowlist for protected content: category-first, not `.all(except:)`
+**Date:** 2026-09-05 · **Status:** accepted (design); implementation is Task 005/011, Phase 1
+
+**Context.** Dominic proposed inverting PRD §6.4: instead of the parent picking what to limit,
+limit everything potentially entertaining (browser included) and let the parent pick exceptions.
+The instinct is right — **the blocklist leaks**. Limit YouTube and the child opens TikTok; limit
+both and the child opens Safari → youtube.com. PRD §17 already notes shielding an app does not
+shield its web version. A budget with holes in it teaches a child to find the holes.
+
+**What the platform actually allows (verified 2026-09-05).**
+1. **The app cannot pre-select anything.** `ApplicationToken`s exist only once a human picks apps in
+   `FamilyActivityPicker`; there is no API to enumerate installed apps or construct a category token.
+   So "default to all entertainment apps" cannot be a default *the app sets* — it can only be a
+   default *the parent taps*.
+2. **`.all()` works** — it shields nearly everything (Messages and friends depend on the system's
+   "Always Allowed" list).
+3. **`.all(except:)` is broken.** Documented as an allowlist, but exempted apps are still shielded,
+   with a *generic* shield — `ShieldConfigurationDataSource` is not consulted, so our transition
+   interstitial (D-012) would not even render. An Apple Frameworks Engineer: *"There are known
+   issues in this area."* Radar FB15500605, filed Oct 2024, unresolved as of the reports we found.
+   Building V1's core model on a broken API would be a bad bet.
+
+**Decision — category-first selection.** Keep the blocklist shape (§6.4), but stop steering parents
+toward individual apps. `FamilyActivityPicker` lets a parent select whole **categories** in a few
+taps, and it exposes **web domain categories** separately. So the recommended setup becomes:
+
+- Entertainment + Games + Social Networking categories, and
+- the matching **web categories**, which is what closes the browser hole.
+
+Onboarding says this in plain language and treats picking individual apps as the exception, not the
+norm. This gets most of the coverage Dominic wants, using APIs that work, and keeps our custom
+interstitial rendering.
+
+**Not adopted, and why.**
+- `.all(except:)` — broken, and it would silence D-012's interstitial. Revisit if Apple fixes
+  FB15500605; the storage model (an opaque `SelectionSnapshot`) already allows the swap.
+- `.all()` at the end of the budget ("the device is done for today") — coherent, and it *works*,
+  but it would also shield a homework app or a dictionary, which contradicts "Transition, not
+  punishment". Closer to a Downtime feature, and §4 puts scheduling out of V1.
+
+**Consequences.** Task 005 gains the category-first onboarding design (copy done in Phase 0, real
+picker in Phase 1). Task 011 shields exactly what the selection names, still never `.all()`.
+Honesty constraint (§17) unchanged: even category coverage is not airtight, and no copy may claim
+it is.
+
 <!-- Template for new entries:
 
 ## D-NNN — <short imperative title>

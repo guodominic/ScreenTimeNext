@@ -1,8 +1,13 @@
-//  AppSelectionStepView.swift — PRD §6.4
+//  AppSelectionStepView.swift — PRD §6.4, D-015 (category-first)
 //
 //  Phase 0: the picker is mocked. Task 005 swaps `SelectionPickerButton` for the
-//  FamilyActivityPicker wrapper from ScreenTime/Selection/ (D-001). This step never sees
-//  app names or tokens — only the display-safe summary (PRD §16).
+//  FamilyActivityPicker wrapper from ScreenTime/Selection/ (D-001). This step never sees app names
+//  or tokens — only the display-safe summary (PRD §16).
+//
+//  The copy here is the product decision, not decoration: parents who pick two or three apps by
+//  name get a budget the child walks around (TikTok instead of YouTube, Safari instead of either).
+//  Categories — including WEB categories — are what actually hold.
+
 import SwiftUI
 import ScreenTimeNextCore
 
@@ -25,11 +30,36 @@ struct AppSelectionStepView: View {
                 Button("Change selection") { viewModel.clearSelection() }
                     .buttonStyle(.bordered)
             } else {
+                advice
                 SelectionPickerButton { snapshot in
                     viewModel.applySelection(snapshot)
                 }
             }
         }
+    }
+
+    /// D-015 — the one piece of advice that decides whether the budget means anything.
+    private var advice: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label {
+                Text("Pick **categories**, not single apps").font(.subheadline)
+            } icon: {
+                Image(systemName: "square.stack.3d.up.fill").foregroundStyle(Theme.coral)
+            }
+            Text("Choosing “Games”, “Entertainment” and “Social” covers apps you haven't thought of — and the ones \(name) installs next.")
+                .font(.footnote).foregroundStyle(.secondary)
+
+            Divider().padding(.vertical, 2)
+
+            Label {
+                Text("Include the **website** categories too").font(.subheadline)
+            } icon: {
+                Image(systemName: "globe").foregroundStyle(Theme.sky)
+            }
+            Text("Otherwise the browser is an open door: the app is paused, the website version isn't.")
+                .font(.footnote).foregroundStyle(.secondary)
+        }
+        .card(tint: Theme.coral)
     }
 }
 
@@ -39,35 +69,40 @@ struct SelectionSummaryView: View {
 
     var body: some View {
         HStack(spacing: 16) {
-            stat(summary.applicationCount, "apps")
-            stat(summary.categoryCount, "categories")
-            stat(summary.webDomainCount, "websites")
+            stat(summary.applicationCount, "apps", "app.badge")
+            stat(summary.categoryCount, "categories", "square.stack.3d.up.fill")
+            stat(summary.webDomainCount, "websites", "globe")
         }
         .padding()
         .frame(maxWidth: .infinity)
         .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Theme.coral.opacity(0.12)))
     }
 
-    private func stat(_ count: Int, _ label: String) -> some View {
-        VStack {
-            Text("\(count)").font(.title2.bold())
+    private func stat(_ count: Int, _ label: String, _ symbol: String) -> some View {
+        VStack(spacing: 4) {
+            Image(systemName: symbol).font(.footnote).foregroundStyle(Theme.coral)
+            Text("\(count)").font(.title2.bold()).contentTransition(.numericText())
             Text(label).font(.caption).foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
     }
 }
 
-/// Phase 0 stand-in for Apple's FamilyActivityPicker. Produces a plausible sample selection.
+/// Phase 0 stand-in for Apple's FamilyActivityPicker. Produces a category-first sample selection,
+/// so the preview shows the shape we recommend rather than a handful of named apps.
 struct SelectionPickerButton: View {
     let onPick: (SelectionSnapshot) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Button("Choose Apps & Categories") {
-                onPick(MockScreenTimeSelectionService.sampleSnapshot(apps: 3, categories: 1, webDomains: 0))
+            Button {
+                onPick(MockScreenTimeSelectionService.sampleSnapshot(apps: 0, categories: 3, webDomains: 2))
+            } label: {
+                Label("Choose Apps & Categories", systemImage: "plus.circle.fill")
             }
             .buttonStyle(.bordered)
-            Text("Preview build: uses a sample selection. The real picker arrives with Screen Time access.")
+            .tint(Theme.coral)
+            Text("Preview build: uses a sample selection. Apple's real picker arrives with Screen Time access.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }

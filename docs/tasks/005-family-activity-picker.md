@@ -27,6 +27,15 @@ Present Apple's `FamilyActivityPicker` and persist the resulting `FamilyActivity
 §13: the `FamilyActivitySelection` remains the source of truth. Do not replace privacy-preserving Apple tokens with invented app-name identifiers.
 
 ## Implementation notes
+- **D-015 category-first.** Steer the parent to select *categories* (Entertainment, Games, Social
+  Networking) and the matching **web domain categories** — the latter is what stops
+  Safari → youtube.com defeating the budget. Individual apps are the exception, not the norm.
+  Onboarding copy for this shipped in Phase 0; this task wires the real picker behind it.
+- Do **not** use `ActivityCategoryPolicy.all(except:)`: documented as an allowlist but confirmed
+  broken (exempted apps still shielded, and `ShieldConfigurationDataSource` is not consulted, which
+  would kill the D-012 interstitial). Apple: "known issues in this area", FB15500605. Re-check when
+  building; the opaque `SelectionSnapshot` means adopting it later is a service-layer change only.
+- Tokens exist only after a human picks in the picker — nothing can be pre-selected programmatically.
 - `FamilyActivityPicker` is an Apple SwiftUI view and must bind to a `FamilyActivitySelection`. This is the **one documented exception** to Rule 1 — see `docs/DECISIONS.md` D-001. Keep the exception in a single wrapper view; the rest of the feature layer sees only the opaque snapshot.
 - Verify the current serialization approach for `FamilyActivitySelection` against the installed SDK. Do not assume a specific encoding is stable across OS versions — handle a decode failure by treating the selection as empty and prompting the parent to reselect, never by crashing.
 - The selection must be written to the App Group container, because the extension needs it (Task 012).
