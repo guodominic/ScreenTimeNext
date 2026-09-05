@@ -56,10 +56,13 @@ final class NotificationPlanTests: XCTestCase {
     /// Dominic's case: 8-minute budget, reminders 10/5/1 → 10 is dropped, 5 and 1 fire.
     func testReminderEqualToOrLongerThanBudgetIsDropped() {
         var config = ScreenTimeConfiguration.default
-        config.warningOffsetsSeconds = [600, 480, 300, 60]   // normalizes to [600, 480, 300]
+        config.warningOffsetsSeconds = [600, 480, 300, 60]
+        XCTAssertEqual(config.warningOffsetsSeconds, [600, 480, 300],
+                       "assignment normalizes too — the three longest, earliest-first")
         let window = SessionWindow(startedAt: start, budgetSeconds: 480)
         let plan = NotificationPlan.make(for: window, configuration: config, childName: "Ivy", now: start)
-        XCTAssertEqual(plan.map { Int($0.fireDate.timeIntervalSince(start)) }, [180, 480], "only the 5-minute reminder fits (8 − 5 = 3 min in)")
+        XCTAssertEqual(plan.map { Int($0.fireDate.timeIntervalSince(start)) }, [180, 480],
+                       "600 and 480 don't fit an 8-minute window; only the 5-minute one does (3 min in)")
     }
 
     // MARK: Controller integration

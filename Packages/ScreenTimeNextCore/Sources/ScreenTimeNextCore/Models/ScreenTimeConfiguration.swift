@@ -10,12 +10,23 @@ import Foundation
 public struct ScreenTimeConfiguration: Codable, Equatable, Sendable {
 
     /// Daily budget in SECONDS (PRD §12). Convert to minutes at the presentation layer only.
-    public var dailyBudgetSeconds: Int
+    /// Always clamped to `budgetRangeSeconds`, however it is set.
+    public var dailyBudgetSeconds: Int {
+        get { storedBudgetSeconds }
+        set { storedBudgetSeconds = Self.clampBudget(newValue) }
+    }
 
-    /// Seconds before the end at which to warn. Normalized: unique, clamped to `warningOffsetRange`,
-    /// sorted descending (earliest first), at most `maxWarnings`. Empty = no warnings; the
+    /// Seconds before the end at which to warn. Always normalized — unique, clamped to
+    /// `warningOffsetRange`, sorted descending (earliest first), at most `maxWarnings` — however it
+    /// is set, so no caller can leave an impossible configuration behind. Empty = no warnings; the
     /// "finished" notification is always sent.
-    public var warningOffsetsSeconds: [Int]
+    public var warningOffsetsSeconds: [Int] {
+        get { storedWarningOffsets }
+        set { storedWarningOffsets = Self.normalizedOffsets(newValue) }
+    }
+
+    private var storedBudgetSeconds: Int
+    private var storedWarningOffsets: [Int]
 
     /// The activities the parent approved for the child to choose from. PRD §6.7.
     public var selectedActivities: [TransitionActivity]
@@ -38,8 +49,8 @@ public struct ScreenTimeConfiguration: Codable, Equatable, Sendable {
         warningOffsetsSeconds: [Int] = ScreenTimeConfiguration.defaultWarningOffsets,
         selectedActivities: [TransitionActivity] = []
     ) {
-        self.dailyBudgetSeconds = Self.clampBudget(dailyBudgetSeconds)
-        self.warningOffsetsSeconds = Self.normalizedOffsets(warningOffsetsSeconds)
+        self.storedBudgetSeconds = Self.clampBudget(dailyBudgetSeconds)
+        self.storedWarningOffsets = Self.normalizedOffsets(warningOffsetsSeconds)
         self.selectedActivities = selectedActivities
     }
 

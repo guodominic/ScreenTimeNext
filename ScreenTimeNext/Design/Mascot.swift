@@ -65,15 +65,27 @@ struct Mascot: View {
         }
     }
 
+    /// Sleepy Pip sways; everyone else stays upright.
+    private var sway: Double {
+        guard mood == .sleepy else { return 0 }
+        return bobbing ? 3 : -3
+    }
+
+    private var animatedFigure: some View {
+        // Squash on the way down, stretch on the way up — the trick that makes a bouncing shape
+        // feel alive rather than merely translated.
+        let sx: CGFloat = bobbing ? 0.98 : 1.03
+        let sy: CGFloat = bobbing ? 1.03 : 0.97
+        return figure
+            .offset(y: bobbing ? -lift : lift)
+            .scaleEffect(x: sx, y: sy, anchor: .bottom)
+            .rotationEffect(.degrees(sway))
+    }
+
     var body: some View {
         ZStack {
             groundShadow
-            figure
-                .offset(y: bobbing ? -lift : lift)
-                // Squash on the way down, stretch on the way up — the trick that makes a
-                // bouncing shape feel alive rather than merely translated.
-                .scaleEffect(x: bobbing ? 0.98 : 1.03, y: bobbing ? 1.03 : 0.97, anchor: .bottom)
-                .rotationEffect(.degrees(mood == .sleepy && bobbing ? 3 : mood == .sleepy ? -3 : 0))
+            animatedFigure
         }
         .frame(width: size, height: size)
         .animation(.easeInOut(duration: loopDuration).repeatForever(autoreverses: true), value: phase)
@@ -101,9 +113,10 @@ struct Mascot: View {
     }
 
     private var groundShadow: some View {
-        Ellipse()
+        let shadowW: CGFloat = size * (bobbing ? 0.34 : 0.44)
+        return Ellipse()
             .fill(Color.black.opacity(0.10))
-            .frame(width: size * (bobbing ? 0.34 : 0.44), height: size * 0.055)
+            .frame(width: shadowW, height: size * 0.055)
             .blur(radius: size * 0.012)
             .offset(y: size * 0.46)
             .animation(.easeInOut(duration: loopDuration).repeatForever(autoreverses: true), value: phase)
@@ -120,39 +133,50 @@ struct Mascot: View {
         .offset(y: size * 0.40)
     }
 
+    private var bodyGradient: LinearGradient {
+        LinearGradient(colors: [tint.opacity(0.92), tint.opacity(0.70)],
+                       startPoint: .top, endPoint: .bottom)
+    }
+
+    /// A little belly patch, so the body isn't a flat slab.
+    private var bellyPatch: some View {
+        Ellipse()
+            .fill(Color.white.opacity(0.22))
+            .frame(width: bodyW * 0.55, height: bodyH * 0.55)
+            .offset(y: bodyH * 0.10)
+    }
+
     private var bodyShape: some View {
         RoundedRectangle(cornerRadius: size * 0.16, style: .continuous)
-            .fill(
-                LinearGradient(colors: [tint.opacity(0.92), tint.opacity(0.70)],
-                               startPoint: .top, endPoint: .bottom)
-            )
+            .fill(bodyGradient)
             .frame(width: bodyW, height: bodyH)
-            .overlay(
-                // A little belly patch, so the body isn't a flat slab.
-                Ellipse()
-                    .fill(.white.opacity(0.22))
-                    .frame(width: bodyW * 0.55, height: bodyH * 0.55)
-                    .offset(y: bodyH * 0.10)
-            )
+            .overlay(bellyPatch)
             .offset(y: size * 0.26)
     }
 
+    private var headGradient: LinearGradient {
+        LinearGradient(colors: [tint.opacity(1.0), tint.opacity(0.78)],
+                       startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
+
+    /// Gloss highlight — the cheapest thing that makes a flat circle look round.
+    private var headGloss: some View {
+        let w: CGFloat = head * 0.34
+        let h: CGFloat = head * 0.20
+        return Ellipse()
+            .fill(Color.white.opacity(0.32))
+            .frame(width: w, height: h)
+            .rotationEffect(.degrees(-22))
+            .offset(x: -head * 0.19, y: -head * 0.26)
+    }
+
     private var headShape: some View {
-        Circle()
-            .fill(
-                LinearGradient(colors: [tint.opacity(1.0), tint.opacity(0.78)],
-                               startPoint: .topLeading, endPoint: .bottomTrailing)
-            )
-            .frame(width: head, height: head)
-            .overlay(
-                // Gloss highlight — the single cheapest thing that makes a flat circle look round.
-                Ellipse()
-                    .fill(.white.opacity(0.32))
-                    .frame(width: head * 0.34, height: head * 0.20)
-                    .rotationEffect(.degrees(-22))
-                    .offset(x: -head * 0.19, y: -head * 0.26)
-            )
-            .overlay(Circle().stroke(.white.opacity(0.35), lineWidth: size * 0.014))
+        let d: CGFloat = head
+        return Circle()
+            .fill(headGradient)
+            .frame(width: d, height: d)
+            .overlay(headGloss)
+            .overlay(Circle().stroke(Color.white.opacity(0.35), lineWidth: size * 0.014))
             .shadow(color: tint.opacity(0.35), radius: size * 0.07, y: size * 0.035)
             .offset(y: -size * 0.08)
             .rotationEffect(.degrees(headTilt), anchor: .bottom)
@@ -233,28 +257,37 @@ struct Mascot: View {
         }
     }
 
+    private var eyeW: CGFloat { head * 0.24 }
+    private var pupilW: CGFloat { eyeW * (mood == .hurrying ? 0.62 : 0.52) }
+    private var eyesClosed: Bool { mood == .sleepy || blink }
+
+    private var openEye: some View {
+        let w = eyeW
+        let p = pupilW
+        let shine = w * 0.20
+        return ZStack {
+            Circle().fill(Color.white).frame(width: w, height: w)
+            Circle()
+                .fill(Color(red: 0.15, green: 0.18, blue: 0.27))
+                .frame(width: p, height: p)
+                .offset(x: pupilOffset.x * w, y: pupilOffset.y * w)
+            Circle().fill(Color.white)
+                .frame(width: shine, height: shine)
+                .offset(x: w * 0.14, y: -w * 0.16)
+        }
+        .frame(width: w, height: w)
+    }
+
+    /// A contented closed arc rather than a flat line.
+    private var closedEye: some View {
+        ClosedEye()
+            .stroke(Color.white, style: StrokeStyle(lineWidth: head * 0.045, lineCap: .round))
+            .frame(width: eyeW, height: eyeW * 0.4)
+    }
+
     @ViewBuilder
     private var eye: some View {
-        let w = head * 0.24
-        if mood == .sleepy || blink {
-            // A contented closed arc rather than a flat line.
-            ClosedEye()
-                .stroke(.white, style: StrokeStyle(lineWidth: head * 0.045, lineCap: .round))
-                .frame(width: w, height: w * 0.4)
-        } else {
-            ZStack {
-                Circle().fill(.white).frame(width: w, height: w)
-                Circle()
-                    .fill(Color(red: 0.15, green: 0.18, blue: 0.27))
-                    .frame(width: w * (mood == .hurrying ? 0.62 : 0.52),
-                           height: w * (mood == .hurrying ? 0.62 : 0.52))
-                    .offset(x: pupilOffset.x * w, y: pupilOffset.y * w)
-                Circle().fill(.white)
-                    .frame(width: w * 0.20, height: w * 0.20)
-                    .offset(x: w * 0.14, y: -w * 0.16)
-            }
-            .frame(width: w, height: w)
-        }
+        if eyesClosed { closedEye } else { openEye }
     }
 
     /// Pupils drift: up-and-aside when thinking, a slow glance the rest of the time.
@@ -280,20 +313,25 @@ struct Mascot: View {
         .allowsHitTesting(false)
     }
 
+    private var openMouth: some View {
+        let mw: CGFloat = head * (mood == .cheering ? 0.30 : 0.24)
+        let mh: CGFloat = head * (mood == .cheering ? 0.24 : 0.20)
+        return ZStack {
+            Ellipse()
+                .fill(Color(red: 0.34, green: 0.15, blue: 0.21))
+                .frame(width: mw, height: mh)
+            Ellipse()                       // tongue
+                .fill(Theme.coral.opacity(0.85))
+                .frame(width: head * 0.14, height: head * 0.08)
+                .offset(y: head * 0.06)
+        }
+    }
+
     @ViewBuilder
     private var mouth: some View {
         switch mood {
         case .cheering, .hurrying:
-            ZStack {
-                Ellipse()
-                    .fill(Color(red: 0.34, green: 0.15, blue: 0.21))
-                    .frame(width: head * (mood == .cheering ? 0.30 : 0.24),
-                           height: head * (mood == .cheering ? 0.24 : 0.20))
-                Ellipse()                       // tongue
-                    .fill(Theme.coral.opacity(0.85))
-                    .frame(width: head * 0.14, height: head * 0.08)
-                    .offset(y: head * 0.06)
-            }
+            openMouth
         case .thinking:
             Capsule()
                 .fill(.white.opacity(0.9))
@@ -312,16 +350,21 @@ struct Mascot: View {
 
     // MARK: Arms
 
+    private func hand(far: Bool) -> some View {
+        let d: CGFloat = size * 0.085
+        return Circle()
+            .fill(tint.opacity(far ? 0.72 : 0.95))
+            .frame(width: d, height: d)
+            .offset(y: size * 0.10)
+    }
+
     private func arm(side: CGFloat, far: Bool) -> some View {
-        Capsule()
+        let w: CGFloat = size * 0.075
+        let h: CGFloat = size * 0.24
+        return Capsule()
             .fill(tint.opacity(far ? 0.72 : 0.92))
-            .frame(width: size * 0.075, height: size * 0.24)
-            .overlay(
-                Circle()                        // a little hand
-                    .fill(tint.opacity(far ? 0.72 : 0.95))
-                    .frame(width: size * 0.085, height: size * 0.085)
-                    .offset(y: size * 0.10)
-            )
+            .frame(width: w, height: h)
+            .overlay(hand(far: far))
             .offset(x: side * size * 0.24, y: size * 0.20)
             .rotationEffect(.degrees(armAngle(side: side)), anchor: .top)
             .animation(.easeInOut(duration: loopDuration).repeatForever(autoreverses: true), value: phase)

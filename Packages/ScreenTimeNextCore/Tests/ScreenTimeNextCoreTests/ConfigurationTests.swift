@@ -59,6 +59,17 @@ final class ConfigurationTests: XCTestCase {
         XCTAssertEqual(ScreenTimeConfiguration.maxWarningOffset(forBudgetSeconds: 120), 60)
     }
 
+    /// The invariant holds however the value is set — this is what the notification test caught.
+    func testDirectAssignmentIsNormalizedToo() {
+        var c = ScreenTimeConfiguration.default
+        c.warningOffsetsSeconds = [60, 60, 900, 5000, 0, -3, 120]
+        XCTAssertEqual(c.warningOffsetsSeconds, [900, 120, 60])
+        c.dailyBudgetSeconds = 99_999
+        XCTAssertEqual(c.dailyBudgetSeconds, 7200)
+        c.dailyBudgetSeconds = 1
+        XCTAssertEqual(c.dailyBudgetSeconds, 120)
+    }
+
     func testDefaultOffsetsForBudget() {
         XCTAssertEqual(ScreenTimeConfiguration.defaultWarningOffsets(forBudgetSeconds: 60 * 60), [600, 300, 60])
         XCTAssertEqual(ScreenTimeConfiguration.defaultWarningOffsets(forBudgetSeconds: 12 * 60), [600, 300, 60])

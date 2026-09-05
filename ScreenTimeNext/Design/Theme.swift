@@ -7,7 +7,9 @@
 import SwiftUI
 import ScreenTimeNextCore
 
-enum Theme {
+/// `nonisolated`: pure constants and pure functions, so any view — main-actor or not — can read
+/// them without an isolation warning (the app target defaults to MainActor isolation).
+nonisolated enum Theme {
     // Palette
     static let sky      = Color(red: 0.36, green: 0.62, blue: 0.98)
     static let mint     = Color(red: 0.31, green: 0.80, blue: 0.62)
