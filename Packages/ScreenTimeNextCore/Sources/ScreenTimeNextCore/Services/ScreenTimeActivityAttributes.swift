@@ -4,7 +4,7 @@
 //  D-014. The ActivityKit attributes shared by the app (which starts the activity) and the
 //  widget extension (which renders it). Guarded so the package still builds for macOS tests.
 
-#if canImport(ActivityKit)
+#if canImport(ActivityKit) && os(iOS)
 import ActivityKit
 import Foundation
 

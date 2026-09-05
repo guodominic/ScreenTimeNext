@@ -7,17 +7,63 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		18862832304BDB6500CB1A52 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 18862831304BDB6500CB1A52 /* WidgetKit.framework */; };
+		18862834304BDB6500CB1A52 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 18862833304BDB6500CB1A52 /* SwiftUI.framework */; };
+		18862843304BDB6700CB1A52 /* ScreenTimeNextWidgetsExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 1886282F304BDB6500CB1A52 /* ScreenTimeNextWidgetsExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		18CD1D74304BBA47006BAE45 /* ScreenTimeNextCore in Frameworks */ = {isa = PBXBuildFile; productRef = 18CD1D73304BBA47006BAE45 /* ScreenTimeNextCore */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		18862841304BDB6700CB1A52 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 000000000000000000000000 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 1886282E304BDB6500CB1A52;
+			remoteInfo = ScreenTimeNextWidgetsExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		18862844304BDB6700CB1A52 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			dstPath = "";
+			dstSubfolder = PlugIns;
+			files = (
+				18862843304BDB6700CB1A52 /* ScreenTimeNextWidgetsExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		000000000000000000000120 /* ScreenTimeNext.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ScreenTimeNext.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		1886282F304BDB6500CB1A52 /* ScreenTimeNextWidgetsExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ScreenTimeNextWidgetsExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		18862831304BDB6500CB1A52 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		18862833304BDB6500CB1A52 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		18862847304BDB6700CB1A52 /* Exceptions for "ScreenTimeNextWidgets" folder in "ScreenTimeNextWidgetsExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 1886282E304BDB6500CB1A52 /* ScreenTimeNextWidgetsExtension */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		000000000000000000000010 /* ScreenTimeNext */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = ScreenTimeNext;
+			sourceTree = "<group>";
+		};
+		18862835304BDB6500CB1A52 /* ScreenTimeNextWidgets */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				18862847304BDB6700CB1A52 /* Exceptions for "ScreenTimeNextWidgets" folder in "ScreenTimeNextWidgetsExtension" target */,
+			);
+			path = ScreenTimeNextWidgets;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -29,6 +75,13 @@
 				18CD1D74304BBA47006BAE45 /* ScreenTimeNextCore in Frameworks */,
 			);
 		};
+		1886282C304BDB6500CB1A52 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+				18862834304BDB6500CB1A52 /* SwiftUI.framework in Frameworks */,
+				18862832304BDB6500CB1A52 /* WidgetKit.framework in Frameworks */,
+			);
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -36,6 +89,8 @@
 			isa = PBXGroup;
 			children = (
 				000000000000000000000010 /* ScreenTimeNext */,
+				18862835304BDB6500CB1A52 /* ScreenTimeNextWidgets */,
+				18862830304BDB6500CB1A52 /* Frameworks */,
 				000000000000000000000020 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -44,8 +99,18 @@
 			isa = PBXGroup;
 			children = (
 				000000000000000000000120 /* ScreenTimeNext.app */,
+				1886282F304BDB6500CB1A52 /* ScreenTimeNextWidgetsExtension.appex */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		18862830304BDB6500CB1A52 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				18862831304BDB6500CB1A52 /* WidgetKit.framework */,
+				18862833304BDB6500CB1A52 /* SwiftUI.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -58,8 +123,12 @@
 				000000000000000120000000 /* Sources */,
 				000000000000000130000000 /* Frameworks */,
 				000000000000000140000000 /* Resources */,
+				18862844304BDB6700CB1A52 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
+			);
+			dependencies = (
+				18862842304BDB6700CB1A52 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				000000000000000000000010 /* ScreenTimeNext */,
@@ -72,6 +141,24 @@
 			productReference = 000000000000000000000120 /* ScreenTimeNext.app */;
 			productType = "com.apple.product-type.application";
 		};
+		1886282E304BDB6500CB1A52 /* ScreenTimeNextWidgetsExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 18862848304BDB6700CB1A52 /* Build configuration list for PBXNativeTarget "ScreenTimeNextWidgetsExtension" */;
+			buildPhases = (
+				1886282B304BDB6500CB1A52 /* Sources */,
+				1886282C304BDB6500CB1A52 /* Frameworks */,
+				1886282D304BDB6500CB1A52 /* Resources */,
+			);
+			buildRules = (
+			);
+			fileSystemSynchronizedGroups = (
+				18862835304BDB6500CB1A52 /* ScreenTimeNextWidgets */,
+			);
+			name = ScreenTimeNextWidgetsExtension;
+			productName = ScreenTimeNextWidgetsExtension;
+			productReference = 1886282F304BDB6500CB1A52 /* ScreenTimeNextWidgetsExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -79,11 +166,14 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 2630;
+				LastSwiftUpdateCheck = 2700;
 				LastUpgradeCheck = 2700;
 				TargetAttributes = {
 					000000000000000100000000 = {
 						CreatedOnToolsVersion = 26.3;
+					};
+					1886282E304BDB6500CB1A52 = {
+						CreatedOnToolsVersion = 27.0;
 					};
 				};
 			};
@@ -105,12 +195,18 @@
 			projectRoot = "";
 			targets = (
 				000000000000000100000000 /* ScreenTimeNext */,
+				1886282E304BDB6500CB1A52 /* ScreenTimeNextWidgetsExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		000000000000000140000000 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
+		1886282D304BDB6500CB1A52 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			files = (
 			);
@@ -123,7 +219,20 @@
 			files = (
 			);
 		};
+		1886282B304BDB6500CB1A52 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		18862842304BDB6700CB1A52 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 1886282E304BDB6500CB1A52 /* ScreenTimeNextWidgetsExtension */;
+			targetProxy = 18862841304BDB6700CB1A52 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		000000000000000011000000 /* Debug configuration for PBXProject "ScreenTimeNext" */ = {
@@ -334,6 +443,71 @@
 			};
 			name = Release;
 		};
+		18862845304BDB6700CB1A52 /* Debug configuration for PBXNativeTarget "ScreenTimeNextWidgetsExtension" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = UL96K6Z74J;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = ScreenTimeNextWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = ScreenTimeNextWidgets;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.guodominic.screentimenext.ScreenTimeNextWidgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		18862846304BDB6700CB1A52 /* Release configuration for PBXNativeTarget "ScreenTimeNextWidgetsExtension" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = UL96K6Z74J;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = ScreenTimeNextWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = ScreenTimeNextWidgets;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.guodominic.screentimenext.ScreenTimeNextWidgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -350,6 +524,14 @@
 			buildConfigurations = (
 				000000000000000111000000 /* Debug configuration for PBXNativeTarget "ScreenTimeNext" */,
 				000000000000000112000000 /* Release configuration for PBXNativeTarget "ScreenTimeNext" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		18862848304BDB6700CB1A52 /* Build configuration list for PBXNativeTarget "ScreenTimeNextWidgetsExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				18862845304BDB6700CB1A52 /* Debug configuration for PBXNativeTarget "ScreenTimeNextWidgetsExtension" */,
+				18862846304BDB6700CB1A52 /* Release configuration for PBXNativeTarget "ScreenTimeNextWidgetsExtension" */,
 			);
 			defaultConfigurationName = Release;
 		};

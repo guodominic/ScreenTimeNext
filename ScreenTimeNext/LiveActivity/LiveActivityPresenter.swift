@@ -8,7 +8,7 @@
 import Foundation
 import ScreenTimeNextCore
 
-#if canImport(ActivityKit)
+#if canImport(ActivityKit) && os(iOS)
 import ActivityKit
 
 nonisolated final class LiveActivityPresenter: SessionPresenting, @unchecked Sendable {
