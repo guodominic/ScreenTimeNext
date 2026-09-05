@@ -11,6 +11,7 @@ import ScreenTimeNextCore
 struct ChildTimerView: View {
     @Environment(\.services) private var services
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.dismiss) private var dismiss
     @State private var viewModel: ChildTimerViewModel
 
     init(services: ServiceContainer) {
@@ -40,7 +41,14 @@ struct ChildTimerView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { viewModel.refresh() }
         }
-        .navigationBarBackButtonHidden(snapshot.window != nil)   // no way out mid-session (§7.6)
+        .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                // D-011: the way back is for parents. A press-and-hold is enough friction for a
+                // 5–12-year-old without making a parent dig for it (§7.5 / §7.6).
+                ParentGateButton { dismiss() }
+            }
+        }
     }
 
     // MARK: States
@@ -144,6 +152,32 @@ struct ChildTimerView: View {
         case .warning5, .warning1: return .orange
         case .finished: return .pink
         }
+    }
+}
+
+/// A "Parents" control that opens on press-and-hold. A tap only shows the hint.
+struct ParentGateButton: View {
+    let onUnlock: () -> Void
+    @State private var showHint = false
+
+    var body: some View {
+        Label(showHint ? "Hold to go back" : "Parents", systemImage: "lock.fill")
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 10).padding(.vertical, 6)
+            .background(Capsule().fill(.thinMaterial))
+            .contentShape(Capsule())
+            .onTapGesture {
+                showHint = true
+                Task {
+                    try? await Task.sleep(for: .seconds(2))
+                    showHint = false
+                }
+            }
+            .onLongPressGesture(minimumDuration: 1.0) {
+                onUnlock()
+            }
+            .accessibilityLabel("Parents. Press and hold to go back.")
     }
 }
 

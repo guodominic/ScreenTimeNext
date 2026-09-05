@@ -237,6 +237,21 @@ Phase 0 validation will ask for. Allow Once, by contrast, only means something w
 confirmation; the mock shield's state is set to `temporarilyExtended` for the duration so the
 Phase 1 swap is a service change only.
 
+---
+
+## D-011 — Leaving the child timer: a press-and-hold "Parents" control
+**Date:** 2026-09-05 · **Status:** accepted
+
+**Context.** Task 007 hid the back button during a session (§7.6: the child should not reach
+parent screens). In practice the parent had no way back either, which is the wrong trade.
+
+**Decision.** The timer hides the system back button and shows a "Parents" control in its place.
+A tap shows "Hold to go back"; a one-second press-and-hold returns to the dashboard. Everything on
+the dashboard that matters (End session, Extend) is additionally behind a confirmation.
+
+**Consequences.** Enough friction for a young child, no friction for a parent. Not a security
+boundary — the real boundary is the shield (Phase 1); this is UX only.
+
 <!-- Template for new entries:
 
 ## D-NNN — <short imperative title>
