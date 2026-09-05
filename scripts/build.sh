@@ -10,4 +10,5 @@ xattr -cr ScreenTimeNext Packages 2>/dev/null || true
 DEVELOPER_DIR="$XCODE/Contents/Developer" xcodebuild \
   -project ScreenTimeNext.xcodeproj -scheme ScreenTimeNext \
   -destination 'generic/platform=iOS Simulator' \
+  -derivedDataPath "$HOME/Library/Caches/ScreenTimeNext.derived" \
   -quiet build 2>&1 | tail -40 && echo "BUILD OK"

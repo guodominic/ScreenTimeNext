@@ -23,4 +23,8 @@ echo "Using $XCODE"
 # ("resource fork, Finder information, or similar detritus not allowed"). Files written
 # through the Claude desktop mount tend to pick these up.
 xattr -cr . 2>/dev/null || true
-DEVELOPER_DIR="$XCODE/Contents/Developer" swift test "$@" 2>&1 | tail -40
+# Build OUTSIDE the repo: anything written under ~/Desktop (iCloud sync) or through the Claude
+# mount keeps re-acquiring those attributes, and codesign then rejects the test bundle.
+SCRATCH="$HOME/Library/Caches/ScreenTimeNextCore.build"
+rm -rf .build
+DEVELOPER_DIR="$XCODE/Contents/Developer" swift test --scratch-path "$SCRATCH" "$@" 2>&1 | tail -40
