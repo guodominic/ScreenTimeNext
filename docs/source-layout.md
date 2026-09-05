@@ -57,5 +57,9 @@ recursively. An extension folder nested there would be compiled into the app. So
 
 ## Running the tests
 ```bash
-cd Packages/ScreenTimeNextCore && swift test
+./scripts/test.sh     # from the repo root
+./scripts/build.sh    # simulator build, no signing needed
 ```
+Xcode's Product › Test is greyed out for the package on the Xcode 27 beta (the app scheme cannot
+see package test targets, and the package's autocreated scheme lists 0 test targets). The scripts
+use Xcode's toolchain through SwiftPM instead; Xcode lives at `~/Downloads/Xcode-beta.app`.

@@ -51,7 +51,8 @@ A UI-only timer is only a prototype.
 - Xcode 26 synchronized folders: a `.swift` file written under `ScreenTimeNext/` or the package's
   `Sources/` is compiled automatically. Never put non-source files (README, .gitkeep) under
   `ScreenTimeNext/` — they would ship inside the app bundle.
-- Run the package tests from Terminal: `cd Packages/ScreenTimeNextCore && swift test`.
+- Tests: `./scripts/test.sh` (Xcode's toolchain via SwiftPM). Simulator build: `./scripts/build.sh`.
+  Xcode 27 beta cannot run package tests from the app scheme — do not try to fix that in the scheme.
 - The task file's **PRD detail** section is authoritative for behavior; `docs/prd/` has the full text.
 - Do not silently change architecture to work around an API limitation. If an Apple API is
   unavailable or entitlement-gated, mark the task **BLOCKED**, write the required manual step into
