@@ -96,9 +96,18 @@ public struct ParentPickerPreferences: Codable, Equatable, Sendable {
         if text.hasPrefix("www.") { text.removeFirst(4) }
         if let slash = text.firstIndex(of: "/") { text = String(text[text.startIndex..<slash]) }
         text = text.trimmingCharacters(in: .whitespaces)
-        // A domain needs a dot and no spaces. This is a sanity check, not validation: iOS decides
-        // what it can actually match, and rejecting something it would have accepted is worse.
-        guard text.contains("."), !text.contains(" "), text.count >= 3 else { return nil }
+        guard !text.contains(" ") else { return nil }
+
+        // A sanity check, not validation. iOS decides what it can actually match, and rejecting
+        // something it would have accepted is worse than letting an odd one through — so the only
+        // things refused are shapes that cannot be a domain at all: fewer than two labels, an empty
+        // label ("..", "a..b"), or a single-character last label. No real top-level domain is one
+        // character, so "a.b" is a typo, and a typo in this list is an entry that silently blocks
+        // nothing while the parent believes it does.
+        let labels = text.split(separator: ".", omittingEmptySubsequences: false)
+        guard labels.count >= 2,
+              labels.allSatisfy({ !$0.isEmpty }),
+              (labels.last?.count ?? 0) >= 2 else { return nil }
         return text
     }
 

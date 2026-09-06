@@ -145,9 +145,17 @@ final class BlockedWebsiteTests: XCTestCase {
     }
 
     func testObviousNonDomainsAreRejected() {
-        for typed in ["", "   ", "youtube", "two words.com", "..", "a.b"] {
+        // "a.b" is the interesting one: no real top-level domain is a single character, so it is a
+        // typo — and a typo here is an entry that blocks nothing while the parent believes it does.
+        for typed in ["", "   ", "youtube", "two words.com", "..", "a.b", "a..b", ".com", "com."] {
             XCTAssertNil(ParentPickerPreferences.normalizedDomain(typed), typed)
         }
+    }
+
+    /// Multi-label domains must survive — the rule refuses shapes that cannot be a domain, and
+    /// `bbc.co.uk` very much can.
+    func testMultiLabelDomainsAreKept() {
+        XCTAssertEqual(ParentPickerPreferences.normalizedDomain("https://www.bbc.co.uk/news"), "bbc.co.uk")
     }
 
     func testAddingIsIdempotentAcrossSpellings() {
