@@ -13,8 +13,8 @@ in the same commit as the work. If this file and a task's front-matter disagree,
 | 001 | [Project Foundation](001-project-foundation.md) | done | — | — | PASS (ext. target + capabilities blocked by gate) | build OK, 16/16 tests; `./scripts/test.sh` |
 | 002 | [App Architecture](002-app-architecture.md) | done | 001 | — | PASS | 26/26 tests; import check automated |
 | 003 | [Parent Onboarding](003-parent-onboarding.md) | done | 002 | QA-01 | PASS | 32/32; QA-01 verified on device |
-| 004 | [Family Controls Authorization](004-family-controls-authorization.md) | not_started | 002, 003 | QA-02 | — | **unblocked** — entitlement signing since 2026-09-06 |
-| 005 | [Family Activity Picker](005-family-activity-picker.md) | not_started | 004 | QA-03, QA-04 | — | |
+| 004 | [Family Controls Authorization](004-family-controls-authorization.md) | done | 002, 003 | QA-02 | PASS (build) / NEEDS MANUAL DEVICE TEST | real AuthorizationCenter, `.individual` (D-025); four states rendered |
+| 005 | [Family Activity Picker](005-family-activity-picker.md) | in_progress | 004 | QA-03, QA-04 | — | picker + coding + App Group store wired (D-026); "my usual" still stores tiles |
 | 006 | [Screen Time Configuration](006-screen-time-configuration.md) | done | 002 | QA-05 | PASS (App Group at gate) | 40/40; FileStorageService |
 | 007 | [Child Timer UI](007-child-timer-ui.md) | done | 006 | QA-06, QA-07 | PASS / device check pending | 51/51; SessionController |
 | 008 | [Warning State Engine](008-warning-state-engine.md) | done | 006 | QA-07 | PASS | transition-table tests; batched run |

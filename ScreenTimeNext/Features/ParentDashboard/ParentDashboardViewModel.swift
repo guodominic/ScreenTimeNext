@@ -22,6 +22,9 @@ final class ParentDashboardViewModel {
     /// "fifteen minutes" is two taps from launch.
     var quickMinutes: Int = ScreenTimeConfiguration.defaultBudgetSeconds / 60
     private(set) var authorization: ScreenTimeAuthorizationStatus = .notDetermined
+    /// Task 004 — a request in flight, and whatever went wrong last time. Both are parent-facing.
+    private(set) var isRequestingAuthorization = false
+    private(set) var authorizationError: String?
 
     private let services: ServiceContainer
     private let controller: SessionController
@@ -71,6 +74,33 @@ final class ParentDashboardViewModel {
     }
 
     // MARK: Parent actions
+
+    /// Task 004 / QA-02 — ask for Family Controls access. Every failure ends somewhere the parent
+    /// can act: a message that names the fix, never a dead end.
+    func requestAuthorization() {
+        guard !isRequestingAuthorization else { return }
+        isRequestingAuthorization = true
+        authorizationError = nil
+        Task {
+            defer { isRequestingAuthorization = false }
+            do {
+                authorization = try await services.authorization.requestAuthorization()
+            } catch ScreenTimeAuthorizationError.denied {
+                authorization = await services.authorization.status
+                authorizationError = nil      // the row already explains a decline and offers Settings
+            } catch ScreenTimeAuthorizationError.entitlementUnavailable {
+                authorization = await services.authorization.status
+                authorizationError = "Screen Time access isn't available in this build."
+            } catch let ScreenTimeAuthorizationError.unknown(message) {
+                authorization = await services.authorization.status
+                authorizationError = message
+            } catch {
+                authorization = await services.authorization.status
+                authorizationError = "Something went wrong. Please try again."
+            }
+        }
+    }
+
 
     /// Nudge the idle dial by one step — a minute under 15, two above (D-017).
     func adjustQuickMinutes(_ direction: Int) {

@@ -732,6 +732,62 @@ a reset and a kill.
   (an App Store privacy request, say), it needs its own method rather than a quiet re-widening of
   this one.
 
+## D-025 — Enrol as `.individual`, not `.child`
+**Date:** 2026-09-06 · **Status:** accepted · **Task:** 004
+
+**Context.** `AuthorizationCenter.requestAuthorization(for:)` takes a `FamilyControlsMember`.
+`.child` authenticates against a parent's Apple Account, so the child cannot undo it from Settings —
+the stronger gate by far. It also requires the device to be signed into a child account inside a
+Family Sharing group, and fails with `invalidAccountType` otherwise.
+
+**Decision.** `.individual`.
+
+The failure mode decides it. D-016's whole scene is a parent picking up the device with a child
+already waiting; `.child` on the very common "family iPad signed in with a parent's account" is a
+dead end at exactly that moment, and the error it gives ("not signed into a valid iCloud account")
+does not tell the parent what to do about it. `.individual` enrols whoever is on the device behind
+Face ID / Touch ID and works everywhere.
+
+**Consequences.**
+- The child can revoke access in Settings. That is a real loss, and it is one §17 already accepts:
+  ScreenTimeNext is not tamper-proof, D-011's press-and-hold "Parents" control is the in-app gate,
+  and revocation is DETECTED rather than prevented — hence the `.revoked` state below.
+- Apple exposes three states (`notDetermined` / `denied` / `approved`); the app renders four. The
+  difference is a latch in the adapter recording that approval once happened, so a later `denied`
+  is reported as "was turned off" — a different situation for a parent, with a different fix.
+- `.child` remains a genuine upgrade for households that do have Family Sharing configured. Worth
+  revisiting as a choice once real families have used it (§21), not before.
+
+**Also from Task 004:** `AuthorizationStatus` has a case the published documentation does not list —
+`.approvedWithDataAccess`, which only the compiler revealed. It is treated as approved. This is
+precisely what Rule 8 ("verify against the installed SDK") is for; the docs were not enough.
+
+## D-026 — The picker wrapper is Rule 1's only exception, and it stays one file
+**Date:** 2026-09-06 · **Status:** accepted · **Task:** 005
+
+**Context.** `FamilyActivityPicker` is an Apple SwiftUI view that must bind to a live
+`FamilyActivitySelection`, so the framework type and the view layer have to meet somewhere. D-001
+allowed this as the single documented exception to Rule 1.
+
+**Decision.** `ScreenTimeNext/ScreenTime/Selection/` holds all three pieces and nothing else does:
+- `FamilyActivityPickerScreen` — hosts Apple's picker, hands back an opaque `SelectionSnapshot`.
+- `FamilyActivitySelectionCoding` — the only place the two representations are both in scope.
+- `AppGroupSelectionService` — persists the snapshot into the App Group so the extensions can read
+  it (Rule 5), without ever looking inside the payload.
+
+**Consequences.**
+- The category tiles from D-018 cannot select anything enforceable — only a human tapping in
+  Apple's picker produces tokens (B-005). Where Screen Time access exists, the real selection now
+  OUTRANKS the tiles and the screen says so; where it does not, the tiles remain the Phase 0
+  preview. The green shield on that row is deliberately gated on access being granted as well as a
+  selection existing: a badge claiming enforcement while nothing is enforced would be the worst
+  kind of lie this app could tell.
+- A record that fails to decode is reported (`decodingFailed`), never silently treated as "nothing
+  picked" — §6.4. "You picked nothing" and "we lost what you picked" need different screens.
+- Still open for the next pass: "My usual" saves category tiles, not a real selection. Once it
+  saves the snapshot instead, one tap re-applies a real, enforceable choice — which is the version
+  of that feature actually worth having.
+
 <!-- Template for new entries:
 
 ## D-NNN — <short imperative title>

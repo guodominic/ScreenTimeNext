@@ -35,6 +35,7 @@ struct ParentDashboardView: View {
         NavigationStack {
             List {
                 heroSection
+                if viewModel.authorization != .approved { screenTimeAccessSection }
                 if viewModel.notificationsDenied { notificationAlertSection }
                 contentSection
                 whatsNextSection
@@ -243,6 +244,20 @@ struct ParentDashboardView: View {
                         Text(activity.displayName).fontWeight(.medium)
                     }
                 }
+            }
+        }
+    }
+
+    /// Task 004 — shown only while access is missing, for the same reason as the notification row
+    /// below: a dashboard of things that are fine is noise, but this one means nothing is being
+    /// enforced, which the parent cannot discover any other way.
+    private var screenTimeAccessSection: some View {
+        Section {
+            ScreenTimeAccessRow(status: viewModel.authorization,
+                                isRequesting: viewModel.isRequestingAuthorization,
+                                onRequest: { viewModel.requestAuthorization() })
+            if let error = viewModel.authorizationError {
+                Text(error).font(.footnote).foregroundStyle(.red)
             }
         }
     }

@@ -19,6 +19,7 @@ struct SettingsView: View {
     @State private var selection: SelectionSnapshot?
     @State private var picker = ContentPickerModel()
     @State private var pickerLoaded = false
+    @State private var screenTimeApproved = false
     @State private var existingProfileID: UUID?
     @State private var errorText: String?
 
@@ -84,7 +85,8 @@ struct SettingsView: View {
                         .listRowBackground(Color.clear)
                 }
                 NavigationLink {
-                    ContentPickerScreen(model: picker) { selection = $0 }
+                    ContentPickerScreen(model: picker,
+                                        screenTimeAccessAvailable: screenTimeApproved) { selection = $0 }
                 } label: {
                     Label(selection == nil ? "Pick apps and categories" : "Change what's covered",
                           systemImage: "square.grid.2x2.fill")
@@ -112,6 +114,7 @@ struct SettingsView: View {
             }
         }
         .onAppear(perform: load)
+        .task { screenTimeApproved = await services.authorization.status == .approved }
         .onChange(of: budgetMinutes) { _, newBudget in
             // A shorter budget can invalidate every reminder at once — re-clamp the whole set
             // rather than each dial on its own, so the descending rule survives (D-019).
@@ -142,6 +145,9 @@ struct SettingsView: View {
             picker = ContentPickerModel.loaded(from: services.storage, autosaving: true)
             pickerLoaded = true
         }
+        // Task 005 — hand the model whatever Apple's picker produced last time, so reopening it
+        // shows the parent's choices ticked instead of a blank slate.
+        picker.realSelection = selection
     }
 
     private func save() {

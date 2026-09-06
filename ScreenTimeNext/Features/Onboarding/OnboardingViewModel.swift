@@ -33,6 +33,8 @@ final class OnboardingViewModel {
         self.services = services
         // D-019/D-021 — a re-run of setup opens on what the parent already picked and arranged.
         picker = ContentPickerModel.loaded(from: services.storage)
+        // Task 005 — a re-run of setup keeps whatever Apple's picker produced before.
+        picker.realSelection = try? services.selection.loadSelection()
     }
 
     func advance(to step: OnboardingStep) { path.append(step) }

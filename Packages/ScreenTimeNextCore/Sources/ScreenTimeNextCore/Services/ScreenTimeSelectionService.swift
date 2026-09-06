@@ -69,6 +69,9 @@ public enum ScreenTimeSelectionError: Error, Sendable {
     /// never crash and never fall back to an invented identifier.
     case decodingFailed
     case notAuthorized
+    /// Task 005 — the container could not be written to (App Group unreachable, disk full).
+    /// Distinct from `decodingFailed`: the record is fine, we just could not keep it.
+    case containerUnavailable
 }
 
 /// PRD §6.4, §13. Implemented for real in Task 005; mocked in Task 002.

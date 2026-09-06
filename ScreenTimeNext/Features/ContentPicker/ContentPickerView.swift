@@ -24,6 +24,10 @@ final class ContentPickerModel {
     var categories: Set<ContentCategory> = []
     /// Individual apps chosen through Apple's picker. Phase 0 can only be given a sample count.
     var applicationCount: Int = 0
+    /// Task 005 — the real thing, once Screen Time access exists: an opaque record of what the
+    /// parent picked in Apple's picker. When this is set it OUTRANKS the category tiles, because
+    /// it is the only selection that can actually shield anything (B-005).
+    var realSelection: SelectionSnapshot?
     /// The row order, as the parent arranged it. Always complete — see `completeOrder`.
     var order: [ContentCategory]
     /// The parent's own "my usual" set, applied by one tap.
@@ -57,8 +61,12 @@ final class ContentPickerModel {
     }
 
     var summary: SelectionSummary {
-        ContentCategory.summary(categories: categories, apps: applicationCount)
+        realSelection?.summary ?? ContentCategory.summary(categories: categories, apps: applicationCount)
     }
+
+    /// True once the parent has picked through Apple's picker — i.e. once the selection can be
+    /// enforced rather than merely displayed.
+    var hasRealSelection: Bool { !(realSelection?.summary.isEmpty ?? true) }
 
     var isEmpty: Bool { summary.isEmpty }
 
@@ -156,6 +164,9 @@ final class ContentPickerModel {
     /// payload is the selection adapter's business and this screen never touches it (§13/§16 —
     /// scripts/privacy-audit.sh fails the build if it does).
     func snapshot(basedOn existing: SelectionSnapshot?) -> SelectionSnapshot? {
+        // Task 005 — a real selection is passed through untouched. Re-summarising it would be
+        // wrong: its counts came from Apple's tokens, not from anything this screen knows.
+        if let realSelection { return realSelection }
         guard !isEmpty else { return nil }
         return existing?.withSummary(summary) ?? .phase0Placeholder(summary: summary)
     }
@@ -170,7 +181,14 @@ struct ContentPickerView: View {
     var subheadline: String?
 
     @State private var showAppPickerNote = false
+    @State private var showSystemPicker = false
     @State private var isReordering = false
+
+    /// A stored selection only MEANS anything while Screen Time access exists. Without it, even a
+    /// real snapshot enforces nothing, and a green shield saying otherwise would be a lie. Phase 0
+    /// placeholder records also land here, which is the other reason the judgement belongs in the
+    /// view rather than in the model: only the view knows whether access was granted.
+    private var isEnforceable: Bool { screenTimeAccessAvailable && model.hasRealSelection }
 
     var body: some View {
         List {
@@ -185,6 +203,13 @@ struct ContentPickerView: View {
         .sheet(isPresented: $showAppPickerNote) {
             SpecificAppsNote(onUseSample: { model.applicationCount = 3 })
                 .presentationDetents([.medium])
+        }
+        .sheet(isPresented: $showSystemPicker) {
+            NavigationStack {
+                FamilyActivityPickerScreen(existing: model.realSelection) { picked in
+                    model.realSelection = picked
+                }
+            }
         }
     }
 
@@ -366,28 +391,37 @@ struct ContentPickerView: View {
 
     // MARK: Specific apps
 
+    /// Task 005 — with Screen Time access this opens Apple's own picker, which is the only thing
+    /// that can produce enforceable tokens (B-005). Without it, the honest explanation.
     private var appSection: some View {
         Section {
-            Button { showAppPickerNote = true } label: { appRowLabel }
-                .buttonStyle(.plain)
-                .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
-                .listRowBackground(Color.clear)
+            Button {
+                if screenTimeAccessAvailable { showSystemPicker = true } else { showAppPickerNote = true }
+            } label: {
+                appRowLabel
+            }
+            .buttonStyle(.plain)
+            .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
+            .listRowBackground(Color.clear)
         } header: {
-            Text("Specific apps")
+            Text(screenTimeAccessAvailable ? "Apps and websites" : "Specific apps")
+        } footer: {
+            if isEnforceable {
+                Text("These are what the timer actually covers. The tiles above are a shortcut for choosing them.")
+            }
         }
     }
 
     private var appRowLabel: some View {
         HStack(spacing: 12) {
-            IconChip(symbol: "plus.app.fill", color: Theme.lavender, size: 34)
+            IconChip(symbol: isEnforceable ? "checkmark.shield.fill" : "plus.app.fill",
+                     color: isEnforceable ? Theme.grass : Theme.lavender, size: 34)
             VStack(alignment: .leading, spacing: 2) {
-                Text(model.applicationCount == 0
-                     ? "Pick individual apps"
-                     : "\(model.applicationCount) apps picked")
+                Text(appRowTitle)
                     .font(.system(.body, design: .rounded).weight(.semibold))
                     .foregroundStyle(Color.primary)
                 Text(screenTimeAccessAvailable
-                     ? "Opens Apple's app picker"
+                     ? "Opens Apple's picker — the only place real choices can be made"
                      : "Needs Screen Time access")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -400,6 +434,18 @@ struct ContentPickerView: View {
         .padding(12)
         .background(RoundedRectangle(cornerRadius: 18, style: .continuous)
             .fill(Color(.secondarySystemBackground)))
+    }
+
+    private var appRowTitle: String {
+        if isEnforceable {
+            let s = model.summary
+            var parts: [String] = []
+            if s.categoryCount > 0 { parts.append("\(s.categoryCount) categories") }
+            if s.applicationCount > 0 { parts.append("\(s.applicationCount) apps") }
+            if s.webDomainCount > 0 { parts.append("\(s.webDomainCount) websites") }
+            return parts.isEmpty ? "Change what's covered" : parts.joined(separator: " · ")
+        }
+        return screenTimeAccessAvailable ? "Choose what's covered" : "Pick individual apps"
     }
 
     /// A stable colour per row, so the list reads as a set of friendly tiles rather than a form.
