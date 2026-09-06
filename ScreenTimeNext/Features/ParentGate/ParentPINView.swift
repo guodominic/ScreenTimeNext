@@ -26,6 +26,9 @@ struct ParentPINView: View {
     /// Cancel button would just be a way for a child to skip the gate. Declared BEFORE the two
     /// closures so the memberwise initialiser still takes `onSuccess` as a trailing closure.
     var canCancel: Bool = true
+    /// D-045 — when set, `.unlock` offers Face ID first and falls back to this keypad. Never set
+    /// for `.create` or `.change`: choosing a new PIN is not something a face can do.
+    var biometrics: (any ParentUnlockService)? = nil
     /// `.unlock` passes nil; `.create` and `.change` pass the new PIN to store.
     let onSuccess: (ParentPIN?) -> Void
     var onCancel: () -> Void = {}
@@ -39,6 +42,11 @@ struct ParentPINView: View {
     @State private var isWaiting = false
     @State private var shake = 0
     @State private var message: String?
+    /// D-045 — what this device actually has, and whether we have already offered it once. Offered
+    /// once per appearance: a parent who cancelled the sheet wants the keypad, and re-presenting it
+    /// would be an argument.
+    @State private var biometricKind: BiometricKind = .none
+    @State private var didOfferBiometrics = false
 
     private var pinToMatch: ParentPIN? {
         switch mode {
@@ -71,6 +79,20 @@ struct ParentPINView: View {
                 .disabled(isWaiting)
                 .opacity(isWaiting ? 0.4 : 1)
 
+            // D-045 — a second chance at the face, for the parent who cancelled the sheet or came
+            // back to it. Only ever a shortcut: the keypad above it always works.
+            if biometricKind != .none, case .unlock = mode {
+                Button {
+                    Task { await tryBiometrics() }
+                } label: {
+                    Label("Use \(biometricKind.displayName)", systemImage: symbolForBiometrics)
+                        .font(.subheadline.weight(.semibold))
+                }
+                .buttonStyle(.bordered)
+                .tint(Theme.sky)
+                .disabled(isWaiting)
+            }
+
             if canCancel {
                 Button("Cancel") { onCancel(); dismiss() }
                     .font(.footnote)
@@ -80,6 +102,13 @@ struct ParentPINView: View {
         .padding(.vertical, 24)
         .readableWidth(420)
         .animation(.snappy, value: digits)
+        .task {
+            guard case .unlock = mode, let biometrics else { return }
+            biometricKind = await biometrics.available
+            guard biometricKind != .none, !didOfferBiometrics else { return }
+            didOfferBiometrics = true
+            await tryBiometrics()
+        }
     }
 
     // MARK: Pieces
@@ -204,6 +233,36 @@ struct ParentPINView: View {
         }
         onSuccess(pin)
         dismiss()
+    }
+
+    /// D-045 — success here is exactly as good as typing the PIN, and no better: it satisfies the
+    /// same gate, and a failure leaves the parent on the same keypad. `.cancelled` says nothing at
+    /// all, because the parent chose the keypad and does not need to be told.
+    private func tryBiometrics() async {
+        guard let biometrics, case .unlock = mode else { return }
+        do {
+            try await biometrics.authenticate(reason: "Unlock ScreenTimeNext's parent controls")
+            lockout.reset()
+            onSuccess(nil)
+            dismiss()
+        } catch ParentUnlockError.cancelled {
+            message = nil
+        } catch ParentUnlockError.biometricsUnavailable {
+            // Enrollment removed, or too many failures locked it out. Clearing this hides the
+            // button rather than leaving one that cannot work.
+            biometricKind = .none
+        } catch {
+            withAnimation(.default) { shake += 1 }
+            message = "That didn't match. Use your PIN."
+        }
+    }
+
+    private var symbolForBiometrics: String {
+        switch biometricKind {
+        case .touchID: return "touchid"
+        case .opticID: return "opticid"
+        default:       return "faceid"
+        }
     }
 
     private func fail(_ text: String) {

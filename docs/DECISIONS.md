@@ -1095,6 +1095,15 @@ disagrees with, and ending a session asked "are you sure?" behind a gate that ha
   after the parent has already chosen a length — never before they have seen what the app does.
 - A parent who forgets the PIN still has "Start over" on the dashboard, which clears it (D-031).
 
+**Bug this caused, fixed 2026-09-06.** The greeting can be advanced two ways — the timer and a tap
+— so a flag stopped it happening twice. But the greeting is the ROOT of the navigation stack, and
+SwiftUI keeps a root alive while a destination sits on top of it, so the flag survived the trip
+back: a parent who tapped Back landed on a greeting where nothing worked and had no way forward at
+all. It is reset from `.onChange(of: viewModel.path)` rather than `.task` or `.onAppear`, because
+neither is guaranteed to run again for a view that never actually went away. Coming back shows the
+greeting settled and waits for a tap — it does NOT replay and walk the parent forward again, which
+would make it a screen they cannot choose to stay on.
+
 ## D-037 — One daily schedule, midnight to midnight, restarted only when it would differ
 **Date:** 2026-09-06 · **Status:** accepted
 
@@ -1430,6 +1439,49 @@ to report which was tapped. That is the only list a system shield can show, so:
   minutes away. Declining a menu is a UI decision, not a reason to end screen time early.
 - A child who has already chosen gets the plain reminder instead: re-asking reads as "that wasn't
   good enough", and costs a tap for nothing.
+
+## D-045 — Face ID is a shortcut past the PIN, and it is off by default
+**Date:** 2026-09-06 · **Status:** accepted · extends D-031/D-036
+
+**Context.** Dominic asked whether the parent gate could be Face ID — defaulting to Face ID with
+the PIN as a fallback. It is the right instinct everywhere else and the wrong default here, for one
+reason that is specific to this app:
+
+**ScreenTimeNext is usually installed on the child's own iPad, and the face enrolled on a child's
+iPad is the child's.** Face ID there is not a gate, it is a door held open: the child glances at the
+screen, lands on the parent dashboard, and gives themselves more time. On a shared family iPad with
+the parent's face enrolled it is genuinely better than typing — but the app cannot tell the two
+situations apart, and guessing wrong fails silently and in the child's favour.
+
+**Decision.** The PIN stays the gate. Face ID is an opt-in shortcut, off until a parent turns it on
+in Settings, with the reason written next to the switch rather than in a help page: *"Only if this
+iPad recognises YOUR face. If it recognises your child's, this lets them straight through."*
+
+**The line that matters most.**
+
+```swift
+.deviceOwnerAuthenticationWithBiometrics   // biometrics only              ← what we use
+.deviceOwnerAuthentication                 // biometrics, then the DEVICE PASSCODE
+```
+
+The second is the usual choice and would defeat the whole feature: the device passcode is the one a
+child types to unlock their own iPad every day. When Face ID fails our fallback is our own PIN — the
+one thing in this app the child has never been told. For the same reason `biometryLockout` is
+treated as *unavailable* rather than as a failure: clearing a lockout needs the device passcode, and
+that is exactly the door we are refusing to open.
+
+**Consequences.**
+- Offered only on the unlock pad — the gate a parent passes several times a day. Changing the PIN
+  still requires the keypad: proving who you are in order to set a new PIN is the one moment a face
+  cannot stand in for typing.
+- Offered once per appearance. A parent who dismissed the sheet wants the keypad, and re-presenting
+  it would be an argument.
+- A fresh `LAContext` every time: `canEvaluatePolicy` caches for the life of the context, so a
+  reused one keeps reporting "enrolled" after a parent removes their face.
+- The preference lives with the parent's other work and survives "Start over" (D-024). The PIN does
+  not (D-031) — a forgotten PIN must always have a way out, and this must not become one.
+- `NSFaceIDUsageDescription` is set on the app target; without it iOS terminates the app the first
+  time it asks.
 
 <!-- Template for new entries:
 

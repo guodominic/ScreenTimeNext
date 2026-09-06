@@ -15,6 +15,9 @@ public struct ServiceContainer: Sendable {
     public let storage: any ScreenTimeStorageService
     public let notifications: any NotificationScheduling
     public let presence: any SessionPresenting
+    /// D-045 — proving a parent is present without the keypad. Defaulted, because it is a
+    /// shortcut: everything works with the mock, which offers nothing.
+    public let unlock: any ParentUnlockService
 
     public init(
         authorization: any ScreenTimeAuthorizationService,
@@ -23,8 +26,10 @@ public struct ServiceContainer: Sendable {
         shield: any ScreenTimeShieldService,
         storage: any ScreenTimeStorageService,
         notifications: any NotificationScheduling = MockNotificationScheduler(),
-        presence: any SessionPresenting = MockSessionPresenter()
+        presence: any SessionPresenting = MockSessionPresenter(),
+        unlock: any ParentUnlockService = MockParentUnlockService()
     ) {
+        self.unlock = unlock
         self.authorization = authorization
         self.selection = selection
         self.monitoring = monitoring
@@ -92,7 +97,8 @@ public struct ServiceContainer: Sendable {
                             monitoring: any ScreenTimeMonitoringService = MockScreenTimeMonitoringService(),
                             shield: any ScreenTimeShieldService = MockScreenTimeShieldService(),
                             notifications: any NotificationScheduling = MockNotificationScheduler(),
-                            presence: any SessionPresenting = MockSessionPresenter()) -> ServiceContainer {
+                            presence: any SessionPresenting = MockSessionPresenter(),
+                            unlock: any ParentUnlockService = MockParentUnlockService()) -> ServiceContainer {
         let storage: any ScreenTimeStorageService
         if let file = try? FileStorageService.shared() {
             storage = file
@@ -101,7 +107,7 @@ public struct ServiceContainer: Sendable {
         }
         return ServiceContainer(authorization: authorization, selection: selection,
                                 monitoring: monitoring, shield: shield, storage: storage,
-                                notifications: notifications, presence: presence)
+                                notifications: notifications, presence: presence, unlock: unlock)
     }
 
     /// True when the storage lives in the App Group — i.e. when an extension could read it.

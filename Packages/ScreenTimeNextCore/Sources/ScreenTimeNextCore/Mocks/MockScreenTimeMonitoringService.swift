@@ -62,3 +62,32 @@ public final class MockScreenTimeMonitoringService: ScreenTimeMonitoringService,
     public var stopCount: Int { lock.withLock { _stopCount } }
     public func failNextStart(with error: ScreenTimeMonitoringError) { lock.withLock { _failNext = error } }
 }
+
+/// D-045 — a face that is whatever the test says it is.
+public final class MockParentUnlockService: ParentUnlockService, @unchecked Sendable {
+    private let lock = NSLock()
+    private var _available: BiometricKind
+    private var _result: Result<Void, ParentUnlockError>
+    private var _attempts = 0
+
+    public init(available: BiometricKind = .none, result: Result<Void, ParentUnlockError> = .success(())) {
+        _available = available
+        _result = result
+    }
+
+    public var available: BiometricKind {
+        get async { lock.withLock { _available } }
+    }
+
+    public func authenticate(reason: String) async throws {
+        try lock.withLock {
+            _attempts += 1
+            if case .failure(let error) = _result { throw error }
+        }
+    }
+
+    // MARK: Test controls
+    public var attempts: Int { lock.withLock { _attempts } }
+    public func set(available: BiometricKind) { lock.withLock { _available = available } }
+    public func set(result: Result<Void, ParentUnlockError>) { lock.withLock { _result = result } }
+}

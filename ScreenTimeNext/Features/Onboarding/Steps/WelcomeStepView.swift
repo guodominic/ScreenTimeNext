@@ -24,9 +24,18 @@ struct WelcomeStepView: View {
 
     /// How far through the greeting we are. Each step reveals one thing.
     @State private var beat = 0
-    /// The advance can be reached two ways (the timer and a tap) and must only happen once —
-    /// twice would push the time step onto the stack twice.
+    /// The advance can be reached two ways (the timer and a tap) and must only happen once per
+    /// visit — twice would push the time step onto the stack twice.
+    ///
+    /// Per VISIT is the part that was wrong. This is the root of the navigation stack, so SwiftUI
+    /// keeps it alive while the time step sits on top of it and the flag survived the trip back:
+    /// a parent who tapped Back landed on a greeting where nothing worked, with no way forward at
+    /// all. `.onChange(of: viewModel.path)` resets it, rather than `.task` or `.onAppear`, because
+    /// neither is guaranteed to run again for a root view that never actually went away.
     @State private var hasAdvanced = false
+    /// Whether the greeting has already played. Coming back must NOT restart the animation and
+    /// walk the parent forward again — that would be a screen they cannot stay on.
+    @State private var hasPlayedOnce = false
     @State private var sparkle = false
 
     /// When each beat lands, and when the flow moves on. Front-loaded rather than spread evenly:
@@ -77,7 +86,17 @@ struct WelcomeStepView: View {
         .accessibilityHint("Tap to continue to the timer.")
         .accessibilityAddTraits(.isButton)
         .navigationBarTitleDisplayMode(.inline)
-        .task { await play() }
+        .task {
+            guard !hasPlayedOnce else { return }
+            hasPlayedOnce = true
+            await play()
+        }
+        .onChange(of: viewModel.path) { _, path in
+            guard path.isEmpty else { return }
+            // Back on the greeting. Show it settled and wait: a tap anywhere goes on again.
+            hasAdvanced = false
+            beat = beatDelays.count
+        }
     }
 
     /// One `Task`, cancelled with the view. Beats rather than nested `withAnimation` completions,

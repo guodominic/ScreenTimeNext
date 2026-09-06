@@ -24,6 +24,9 @@ struct SettingsView: View {
     /// D-039 — built-ins the parent removed. Hidden, not deleted: they are `static let`s in code,
     /// and a family that drops "Bath" and wants it back should not have to retype it.
     @State private var hiddenActivityIDs: [String] = []
+    /// D-045 — the Face ID shortcut, and what this device can actually offer.
+    @State private var usesBiometrics = false
+    @State private var biometricKind: BiometricKind = .none
     @State private var showActivityEditor = false
     @State private var editingActivity: TransitionActivity?
     @State private var parentPIN: ParentPIN?
@@ -74,6 +77,22 @@ struct SettingsView: View {
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                     }
+                }
+                // D-045 — offered only once a PIN exists, because this is a shortcut PAST the
+                // PIN, not an alternative to it.
+                if parentPIN != nil, biometricKind != .none {
+                    Toggle(isOn: $usesBiometrics) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Use \(biometricKind.displayName) instead of typing")
+                                .fontWeight(.semibold)
+                            // The whole decision, in the place where it is made. A parent who
+                            // reads this and turns it on anyway has made an informed choice; one
+                            // who is told nothing has had it made for them.
+                            Text("Only if this iPad recognises YOUR face. If it recognises your child's, this lets them straight through — your PIN still works either way.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    .onChange(of: usesBiometrics) { _, _ in persistGatePreference() }
                 }
                 if parentPIN != nil {
                     Button("Turn the PIN off", role: .destructive) { setPIN(nil) }
@@ -175,6 +194,8 @@ struct SettingsView: View {
         }
         .environment(\.editMode, .constant(isReorderingActivities ? .active : .inactive))
         .sheet(isPresented: $showPINEditor) {
+            // No biometrics here on purpose: proving who you are to CHANGE the PIN is the one
+            // moment the keypad has to be the answer (D-045).
             ParentPINView(mode: parentPIN.map { ParentPINView.Mode.change(existing: $0) } ?? .create) { pin in
                 setPIN(pin)
             }
@@ -195,6 +216,7 @@ struct SettingsView: View {
         }
         .onAppear(perform: load)
         .task { screenTimeApproved = await services.authorization.status == .approved }
+        .task { biometricKind = await services.unlock.available }
         .onChange(of: budgetMinutes) { _, newBudget in
             // A shorter budget can invalidate every reminder at once — re-clamp the whole set
             // rather than each dial on its own, so the descending rule survives (D-019).
@@ -291,6 +313,14 @@ struct SettingsView: View {
 
     /// D-029 — written straight away, the D-022 rule: a parent who adds an activity and leaves
     /// should not lose it because they did not also press Save.
+    /// D-045 / D-022 — written the moment the switch moves. A gate setting that waits for a Save
+    /// button is a gate a parent thinks they changed and did not.
+    private func persistGatePreference() {
+        guard var preferences = try? services.storage.loadPickerPreferences() else { return }
+        preferences.gate = ParentGatePreference(usesBiometrics: usesBiometrics)
+        try? services.storage.save(preferences)
+    }
+
     private func persistCustomActivities() {
         guard var preferences = try? services.storage.loadPickerPreferences() else { return }
         preferences.customActivities = customActivities
@@ -316,6 +346,7 @@ struct SettingsView: View {
         let preferences = (try? services.storage.loadPickerPreferences()) ?? .default
         customActivities = preferences.customActivities
         hiddenActivityIDs = preferences.hiddenActivityIDs
+        usesBiometrics = preferences.gate.usesBiometrics
         activityOrder = preferences.activityOrder
         parentPIN = try? services.storage.loadParentPIN()
         selection = try? services.selection.loadSelection()

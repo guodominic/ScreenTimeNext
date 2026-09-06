@@ -92,7 +92,11 @@ struct ChildTimerView: View {
                 .presentationDetents([.large])
                 .interactiveDismissDisabled(true)
             case .unlock:
-                ParentPINView(mode: .unlock, storedPIN: viewModel.parentPIN) { _ in
+                // D-045 — Face ID only when the parent turned it on, and only here: this is the
+                // gate they pass many times a day, which is what makes a shortcut worth having.
+                ParentPINView(mode: .unlock,
+                              storedPIN: viewModel.parentPIN,
+                              biometrics: viewModel.usesBiometrics ? services.unlock : nil) { _ in
                     dismiss()
                 }
                 .presentationDetents([.large])

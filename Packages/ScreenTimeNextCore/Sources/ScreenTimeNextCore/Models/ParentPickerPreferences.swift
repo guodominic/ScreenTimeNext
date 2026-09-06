@@ -42,6 +42,10 @@ public struct ParentPickerPreferences: Codable, Equatable, Sendable {
     /// row.
     public var activityOrder: [String]
 
+    /// D-045 — whether the parent gate accepts Face ID as a shortcut past the PIN. Off unless the
+    /// parent turned it on; see `ParentUnlockService` for why that default is the whole decision.
+    public var gate: ParentGatePreference
+
     /// D-039 — built-ins the parent removed, by id.
     ///
     /// Hidden rather than deleted, for two reasons. A built-in is a `static let` in code, so there
@@ -59,7 +63,9 @@ public struct ParentPickerPreferences: Codable, Equatable, Sendable {
                 savedSelections: [SavedSelection] = [],
                 blockedWebsites: [String] = [],
                 activityOrder: [String] = [],
-                hiddenActivityIDs: [String] = []) {
+                hiddenActivityIDs: [String] = [],
+                gate: ParentGatePreference = .default) {
+        self.gate = gate
         self.customActivities = customActivities
         self.savedSelections = savedSelections
         self.blockedWebsites = Self.tidied(blockedWebsites)
@@ -140,7 +146,7 @@ public struct ParentPickerPreferences: Codable, Equatable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case customActivities, savedSelections
-        case blockedWebsites, activityOrder, hiddenActivityIDs
+        case blockedWebsites, activityOrder, hiddenActivityIDs, gate
     }
 
     public init(from decoder: Decoder) throws {
@@ -150,7 +156,8 @@ public struct ParentPickerPreferences: Codable, Equatable, Sendable {
             savedSelections: try c.decodeIfPresent([SavedSelection].self, forKey: .savedSelections) ?? [],
             blockedWebsites: try c.decodeIfPresent([String].self, forKey: .blockedWebsites) ?? [],
             activityOrder: try c.decodeIfPresent([String].self, forKey: .activityOrder) ?? [],
-            hiddenActivityIDs: try c.decodeIfPresent([String].self, forKey: .hiddenActivityIDs) ?? []
+            hiddenActivityIDs: try c.decodeIfPresent([String].self, forKey: .hiddenActivityIDs) ?? [],
+            gate: try c.decodeIfPresent(ParentGatePreference.self, forKey: .gate) ?? .default
         )
     }
 }

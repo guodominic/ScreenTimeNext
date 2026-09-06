@@ -21,6 +21,9 @@ final class ChildTimerViewModel {
     /// D-031 / D-036 — nil means no PIN is set yet, which after D-036 can only be true on the
     /// very first visit to this screen: arriving here without one is what triggers setting one.
     private(set) var parentPIN: ParentPIN?
+    /// D-045 — the parent turned on the Face ID shortcut. Re-read with everything else, so turning
+    /// it off in Settings takes effect on the very next unlock.
+    private(set) var usesBiometrics = false
 
     private let controller: SessionController
     private let storage: any ScreenTimeStorageService
@@ -61,6 +64,7 @@ final class ChildTimerViewModel {
         childName = (try? storage.loadChildProfile())?.name ?? ""
         availableActivities = (try? controller.availableActivities()) ?? TransitionActivity.allCases
         parentPIN = try? storage.loadParentPIN()
+        usesBiometrics = ((try? storage.loadPickerPreferences()) ?? .default).gate.usesBiometrics
     }
 
     func disappeared() {

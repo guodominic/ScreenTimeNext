@@ -39,7 +39,8 @@ struct ScreenTimeNextApp: App {
                      monitoring: DeviceActivityMonitoringService(),
                      shield: ManagedSettingsShieldService(storage: storage),
                      notifications: UserNotificationScheduler(),
-                     presence: LiveActivityPresenter())
+                     presence: LiveActivityPresenter(),
+                     unlock: LocalAuthenticationUnlockService())
     }
 
     var body: some Scene {
