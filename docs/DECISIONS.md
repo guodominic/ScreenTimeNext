@@ -1483,6 +1483,41 @@ that is exactly the door we are refusing to open.
 - `NSFaceIDUsageDescription` is set on the app target; without it iOS terminates the app the first
   time it asks.
 
+## D-046 — Unlocking lands you on the dashboard, and the face asks before the keypad does
+**Date:** 2026-09-06 · **Status:** accepted · fixes two things D-045 exposed
+
+**Context.** Two reports from the first run with Face ID on, and they are worth separating because
+only one of them is really about Face ID.
+
+**1. Unlocking bounced the parent straight back to the timer.** `RootView` re-presents the child
+timer whenever the scene becomes active and a session exists — which is right when a CHILD opens
+the app mid-session, and wrong the moment a parent has just proved they are a parent. Face ID made
+it obvious rather than causing it: its system sheet takes the scene inactive and hands it back
+active, so the unlock and the bounce happened in the same breath. The PIN had the identical bug,
+quieter — glance at a notification, come back, and the dashboard is gone.
+
+**Decision.** `RootView` remembers that a parent came through the gate (the timer cover closing IS
+that event, since the gate is the only way out of it — D-036) and stops auto-presenting until one
+of three things happens: they open the timer themselves, they start a session, or **the app goes to
+the `.background`**. That last one is the whole design: `.background` means the app really went
+away and the device may be back in the child's hands, while `.inactive` is a system sheet, the app
+switcher or the notification shade — the parent never left. Distinguishing those two scene phases
+is what makes "stay where I put you" and "protect the session from the child" both true.
+
+**2. The keypad was on screen underneath the Face ID sheet.** It asked a parent to do two things
+at once and made the shortcut look like extra work.
+
+**Decision.** One at a time. The pad opens in a "deciding" state (nothing offered while we ask the
+device what it has — a keypad that appears and then vanishes is worse than a short wait), then
+shows the face and "Looking for you…", and reveals the keypad only when the face does not work
+out: cancelled, unrecognised, or unavailable. "Use your PIN instead" is always there for the parent
+who would rather type.
+
+**Consequences.**
+- The subtitle changes with the stage. "Enter your PIN" printed under a Face ID sheet is an
+  instruction for a screen that is not on screen.
+- A failed match still says so, on the keypad, where the next attempt happens.
+
 <!-- Template for new entries:
 
 ## D-NNN — <short imperative title>

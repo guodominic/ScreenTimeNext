@@ -48,6 +48,14 @@ struct ParentPINView: View {
     @State private var biometricKind: BiometricKind = .none
     @State private var didOfferBiometrics = false
 
+    /// D-046 — the two screens are shown one AFTER the other, never together.
+    ///
+    /// Showing a keypad behind the Face ID sheet asks a parent to do two things at once and makes
+    /// the shortcut look like extra work. So: the face gets its turn, and the keypad appears only
+    /// if it does not work out.
+    private enum Stage { case decidingHowToAsk, waitingForFace, keypad }
+    @State private var stage: Stage = .keypad
+
     private var pinToMatch: ParentPIN? {
         switch mode {
         case .unlock: return storedPIN
@@ -68,29 +76,45 @@ struct ParentPINView: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 32)
 
-            dots
-                .modifier(ShakeEffect(travel: CGFloat(shake)))
+            switch stage {
+            case .decidingHowToAsk:
+                // A moment, while we ask the device what it has. Nothing to decide yet, so nothing
+                // is offered — a keypad that appears and then vanishes is worse than a short wait.
+                ProgressView().padding(.vertical, 24)
 
-            if let message {
-                Text(message).font(.footnote).foregroundStyle(Theme.ruby)
-            }
+            case .waitingForFace:
+                Image(systemName: symbolForBiometrics)
+                    .font(.system(size: 56))
+                    .foregroundStyle(Theme.sky)
+                    .padding(.vertical, 8)
+                Button("Use your PIN instead") { withAnimation(.snappy) { stage = .keypad } }
+                    .font(.subheadline.weight(.semibold))
 
-            keypad
-                .disabled(isWaiting)
-                .opacity(isWaiting ? 0.4 : 1)
+            case .keypad:
+                dots
+                    .modifier(ShakeEffect(travel: CGFloat(shake)))
 
-            // D-045 — a second chance at the face, for the parent who cancelled the sheet or came
-            // back to it. Only ever a shortcut: the keypad above it always works.
-            if biometricKind != .none, case .unlock = mode {
-                Button {
-                    Task { await tryBiometrics() }
-                } label: {
-                    Label("Use \(biometricKind.displayName)", systemImage: symbolForBiometrics)
-                        .font(.subheadline.weight(.semibold))
+                if let message {
+                    Text(message).font(.footnote).foregroundStyle(Theme.ruby)
                 }
-                .buttonStyle(.bordered)
-                .tint(Theme.sky)
-                .disabled(isWaiting)
+
+                keypad
+                    .disabled(isWaiting)
+                    .opacity(isWaiting ? 0.4 : 1)
+
+                // D-045 — a second chance at the face, for the parent who cancelled the sheet or
+                // came back to it. Only ever a shortcut: the keypad above it always works.
+                if biometricKind != .none, case .unlock = mode {
+                    Button {
+                        Task { await tryBiometrics() }
+                    } label: {
+                        Label("Use \(biometricKind.displayName)", systemImage: symbolForBiometrics)
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(Theme.sky)
+                    .disabled(isWaiting)
+                }
             }
 
             if canCancel {
@@ -102,11 +126,17 @@ struct ParentPINView: View {
         .padding(.vertical, 24)
         .readableWidth(420)
         .animation(.snappy, value: digits)
+        .animation(.snappy, value: stage)
         .task {
-            guard case .unlock = mode, let biometrics else { return }
-            biometricKind = await biometrics.available
-            guard biometricKind != .none, !didOfferBiometrics else { return }
+            guard case .unlock = mode, biometrics != nil, !didOfferBiometrics else { return }
             didOfferBiometrics = true
+            stage = .decidingHowToAsk
+            biometricKind = await biometrics?.available ?? .none
+            guard biometricKind != .none else {
+                stage = .keypad
+                return
+            }
+            stage = .waitingForFace
             await tryBiometrics()
         }
     }
@@ -169,6 +199,10 @@ struct ParentPINView: View {
     }
 
     private var subtitle: String {
+        // D-046 — "Enter your PIN" while the Face ID sheet is up is an instruction for a screen
+        // that is not on screen.
+        if stage == .waitingForFace { return "Looking for you…" }
+        if stage == .decidingHowToAsk { return "" }
         switch mode {
         case .unlock:
             return "Enter your PIN to change the timer or open settings."
@@ -246,17 +280,23 @@ struct ParentPINView: View {
             onSuccess(nil)
             dismiss()
         } catch ParentUnlockError.cancelled {
+            // The parent chose to type. Nothing to say about it.
             message = nil
+            stage = .keypad
         } catch ParentUnlockError.biometricsUnavailable {
             // Enrollment removed, or too many failures locked it out. Clearing this hides the
             // button rather than leaving one that cannot work.
             biometricKind = .none
+            stage = .keypad
         } catch {
             withAnimation(.default) { shake += 1 }
             message = "That didn't match. Use your PIN."
+            stage = .keypad
         }
     }
 
+    /// The subtitle has to change with the stage: "Enter your PIN" over a Face ID sheet is an
+    /// instruction for a screen that is not there.
     private var symbolForBiometrics: String {
         switch biometricKind {
         case .touchID: return "touchid"

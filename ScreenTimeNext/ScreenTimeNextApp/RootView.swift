@@ -18,6 +18,14 @@ struct RootView: View {
     @State private var showChildTimer = false
     /// A notification tapped before the app finished routing — honoured once `route` settles.
     @State private var pendingTimerRequest = false
+    /// D-046 — a parent came through the gate and is on the dashboard on purpose.
+    ///
+    /// Without this, `presentTimerIfSessionExists` fires on every return to `.active` and drags
+    /// them straight back to the timer. Face ID made it obvious — its system sheet takes the scene
+    /// inactive and hands it back active, so unlocking bounced the parent out of the screen they
+    /// had just unlocked — but the PIN had the same bug more quietly: glance at a notification,
+    /// come back, and the dashboard is gone.
+    @State private var parentIsAtTheDashboard = false
 
     var body: some View {
         Group {
@@ -31,7 +39,11 @@ struct RootView: View {
                 }
             case .home:
                 ParentDashboardView(services: services,
-                                    onOpenTimer: { showChildTimer = true },
+                                    onOpenTimer: {
+                                        // Chosen, so the auto-present rule applies again from here.
+                                        parentIsAtTheDashboard = false
+                                        showChildTimer = true
+                                    },
                                     onReset: { reset() })
             }
         }
@@ -43,9 +55,17 @@ struct RootView: View {
         // During a session the device is the child's: however the app is opened, the timer is
         // what they see. The Parents control (D-011) is the way to the dashboard.
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active {
+            switch phase {
+            case .active:
                 honourPendingTimerRequest()
                 presentTimerIfSessionExists()
+            case .background:
+                // D-046 — the app really went away, so the device may be back in the child's
+                // hands. `.inactive` deliberately does NOT do this: that is a system sheet (Face
+                // ID), the app switcher, or the notification shade, and the parent never left.
+                parentIsAtTheDashboard = false
+            default:
+                break
             }
         }
         // A warning was tapped. If routing hasn't finished yet (cold launch straight from the
@@ -58,6 +78,11 @@ struct RootView: View {
             NavigationStack {
                 ChildTimerView(services: services)
             }
+        }
+        .onChange(of: showChildTimer) { wasShowing, isShowing in
+            // Dismissed rather than presented: the only way out of the timer is the parent gate
+            // (D-036), so this closing IS a parent arriving at the dashboard.
+            if wasShowing && !isShowing { parentIsAtTheDashboard = true }
         }
     }
 
@@ -76,6 +101,8 @@ struct RootView: View {
 
     private func presentTimerIfSessionExists() {
         guard route == .home else { return }
+        // D-046 — the parent unlocked their way out here. Leave them where they meant to be.
+        guard !parentIsAtTheDashboard else { return }
         if (try? services.makeSessionController().tick())?.window != nil {
             showChildTimer = true
         }
