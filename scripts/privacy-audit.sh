@@ -14,9 +14,19 @@ net=$(grep -rnE 'URLSession|NWConnection|import Network\b|CFNetwork|import WebKi
       --include='*.swift' ScreenTimeNext Packages DeviceActivityMonitorExtension 2>/dev/null || true)
 [ -n "$net" ] && report "networking API found — V1 has no backend (§16)" "$net"
 
-# 2) No http(s) literals except in comments/docs.
-urls=$(grep -rnE '"https?://' --include='*.swift' ScreenTimeNext Packages DeviceActivityMonitorExtension 2>/dev/null || true)
-[ -n "$urls" ] && report "URL literal found in source" "$urls"
+# 2) No http(s) ENDPOINT literals in shipping source.
+#
+# What this rule is for: an address something could be sent to. It is not for the string "https://"
+# on its own, which is a scheme prefix — D-033 strips one from a domain a parent typed, and there is
+# no way to write that code without naming the thing being stripped. So the pattern now requires at
+# least one character after the slashes, which is the difference between a prefix and a destination.
+#
+# Test sources are excluded, as they already are for logging (rule 3): they never ship, and website
+# normalisation cannot be tested without example URLs to normalise. If a real endpoint ever appears
+# in shipping code, rules 1 and 3 still catch the machinery around it.
+urls=$(grep -rnE '"https?://[^"]' --include='*.swift' ScreenTimeNext Packages DeviceActivityMonitorExtension 2>/dev/null \
+       | grep -v '/Tests/' || true)
+[ -n "$urls" ] && report "URL endpoint literal found in shipping source" "$urls"
 
 # 3) No logging calls in production sources (tests excluded). print/NSLog/os_log/Logger.
 logs=$(grep -rnE '\bprint\(|NSLog\(|os_log\(|\bLogger\(|\.log\(' --include='*.swift' \
