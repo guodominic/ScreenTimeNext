@@ -154,6 +154,7 @@ final class ContentPickerModel {
         merged.favourites = favourites
         merged.favouritesAreCustom = favouritesAreCustom
         merged.savedSelections = savedSelections
+        merged.blockedWebsites = blockedWebsites
         return merged
     }
 
@@ -163,6 +164,24 @@ final class ContentPickerModel {
     /// created inside Apple's picker (no public API turns a string into a `WebDomainToken`), so
     /// remembering the selection that contains it is the only way to stop them typing it again.
     var savedSelections: [SavedSelection] = []
+
+    /// D-033 — websites the parent typed. Blocked by name, not by token, so unlike everything else
+    /// on this screen they do NOT come from Apple's picker.
+    var blockedWebsites: [String] = []
+
+    @discardableResult
+    func addWebsite(_ raw: String) -> Bool {
+        var preferences = ParentPickerPreferences(blockedWebsites: blockedWebsites)
+        guard preferences.addWebsite(raw) else { return false }
+        blockedWebsites = preferences.blockedWebsites
+        saveArrangement()
+        return true
+    }
+
+    func removeWebsite(_ domain: String) {
+        blockedWebsites.removeAll { $0 == domain }
+        saveArrangement()
+    }
 
     var canSaveCurrentSelection: Bool { realSelection != nil }
 
@@ -218,6 +237,7 @@ final class ContentPickerModel {
                                        autosave: autosaving ? storage : nil,
                                        selectionStore: selection)
         model.savedSelections = preferences.savedSelections
+        model.blockedWebsites = preferences.blockedWebsites
         // D-027 — a stored selection is loaded here, so the picker opens on what the parent chose
         // last time whatever route they took to get here.
         model.realSelection = try? selection?.loadSelection()
@@ -257,6 +277,8 @@ struct ContentPickerView: View {
     @State private var showCoveredContent = false
     @State private var showSaveSetSheet = false
     @State private var isReordering = false
+    @State private var newWebsite = ""
+    @State private var websiteError: String?
 
     /// A stored selection only MEANS anything while Screen Time access exists. Without it, even a
     /// real snapshot enforces nothing, and a green shield saying otherwise would be a lie. Phase 0
@@ -270,6 +292,7 @@ struct ContentPickerView: View {
             countSection
             categorySection
             appSection
+            websiteSection
         }
         .listSectionSpacing(12)
         .environment(\.editMode, .constant(isReordering ? .active : .inactive))
@@ -340,7 +363,7 @@ struct ContentPickerView: View {
     private var countRow: some View {
         let pills = HStack(spacing: 10) {
             countPill(model.summary.categoryCount, "categories", "square.stack.3d.up.fill", Theme.sky)
-            countPill(model.summary.webDomainCount, "websites", "globe", Theme.mint)
+            countPill(model.blockedWebsites.count, "websites", "globe", Theme.mint)
             countPill(model.summary.applicationCount, "apps", "app.badge", Theme.lavender)
         }
         if isEnforceable {
@@ -525,6 +548,61 @@ struct ContentPickerView: View {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .stroke(isOn ? color.opacity(0.55) : Color.clear, lineWidth: 2)
             )
+    }
+
+    // MARK: Websites (D-033)
+
+    /// Typed, not picked. `ManagedSettings` blocks a domain from a plain string, so this is the one
+    /// part of "what's covered" that does not need Apple's picker — and the one place a parent can
+    /// name a site the picker would never have offered them.
+    private var websiteSection: some View {
+        Section {
+            ForEach(model.blockedWebsites, id: \.self) { domain in
+                HStack(spacing: 12) {
+                    IconChip(symbol: "globe", color: Theme.mint, size: 30)
+                    Text(domain).font(.system(.body, design: .rounded))
+                    Spacer(minLength: 0)
+                }
+                .swipeActions {
+                    Button(role: .destructive) { model.removeWebsite(domain) } label: {
+                        Label("Remove", systemImage: "trash")
+                    }
+                }
+            }
+            HStack(spacing: 10) {
+                IconChip(symbol: "plus", color: Theme.mint, size: 30)
+                TextField("youtube.com", text: $newWebsite)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .keyboardType(.URL)
+                    .submitLabel(.done)
+                    .onSubmit(addTypedWebsite)
+                Button("Add", action: addTypedWebsite)
+                    .buttonStyle(.bordered)
+                    .tint(Theme.mint)
+                    .disabled(newWebsite.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+            if let websiteError {
+                Text(websiteError).font(.caption).foregroundStyle(Theme.ruby)
+            }
+        } header: {
+            Text("Websites")
+        } footer: {
+            Text("Type a site to block it in every browser, including private browsing. Swipe to remove.")
+        }
+    }
+
+    private func addTypedWebsite() {
+        let typed = newWebsite
+        guard !typed.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        if model.addWebsite(typed) {
+            newWebsite = ""
+            websiteError = nil
+        } else {
+            websiteError = ParentPickerPreferences.normalizedDomain(typed) == nil
+                ? "That doesn't look like a website address."
+                : "That one's already on the list."
+        }
     }
 
     // MARK: Specific apps

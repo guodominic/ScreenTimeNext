@@ -129,3 +129,78 @@ final class CustomActivityTests: XCTestCase {
         XCTAssertEqual(set.subtitle, "2 categories · 1 app")
     }
 }
+
+// MARK: - D-033
+
+final class BlockedWebsiteTests: XCTestCase {
+
+    /// The same site typed five ways is one site. A parent who pastes a full URL should not end up
+    /// with a second entry that blocks nothing extra.
+    func testDomainsAreNormalised() {
+        let expected = "youtube.com"
+        for typed in ["youtube.com", "  YouTube.com ", "https://youtube.com",
+                      "http://www.youtube.com/feed/subscriptions", "WWW.YouTube.COM/"] {
+            XCTAssertEqual(ParentPickerPreferences.normalizedDomain(typed), expected, typed)
+        }
+    }
+
+    func testObviousNonDomainsAreRejected() {
+        for typed in ["", "   ", "youtube", "two words.com", "..", "a.b"] {
+            XCTAssertNil(ParentPickerPreferences.normalizedDomain(typed), typed)
+        }
+    }
+
+    func testAddingIsIdempotentAcrossSpellings() {
+        var prefs = ParentPickerPreferences()
+        XCTAssertTrue(prefs.addWebsite("youtube.com"))
+        XCTAssertFalse(prefs.addWebsite("https://WWW.YouTube.com/watch"), "same site, different spelling")
+        XCTAssertFalse(prefs.addWebsite("not a domain"))
+        XCTAssertEqual(prefs.blockedWebsites, ["youtube.com"])
+    }
+
+    func testWebsitesSurviveStartOverAndARoundTrip() throws {
+        let storage = InMemoryScreenTimeStorageService()
+        var prefs = ParentPickerPreferences()
+        prefs.addWebsite("roblox.com")
+        prefs.addWebsite("tiktok.com")
+        try storage.save(prefs)
+
+        try storage.eraseAll()      // D-024 — the family's list is theirs, not the child's setup
+        XCTAssertEqual(try storage.loadPickerPreferences().blockedWebsites, ["roblox.com", "tiktok.com"])
+    }
+
+    // MARK: Activity order
+
+    func testActivitiesFollowTheParentsOrder() {
+        let piano = TransitionActivity.custom(displayName: "Piano", symbolName: "music.note")
+        let prefs = ParentPickerPreferences(customActivities: [piano],
+                                            activityOrder: [piano.id, "outside", "lego"])
+        let ordered = prefs.allActivities
+        XCTAssertEqual(ordered.prefix(3).map(\.id), [piano.id, "outside", "lego"])
+        XCTAssertEqual(ordered.count, 9, "and nothing is lost")
+    }
+
+    /// A saved order written before an activity existed — or after one was deleted — must never
+    /// hide a row. Same contract as `ContentCategory.completeOrder`.
+    func testAStaleOrderCannotHideAnActivity() {
+        let prefs = ParentPickerPreferences(activityOrder: ["reading", "deleted.thing"])
+        let ordered = prefs.allActivities
+        XCTAssertEqual(ordered.first?.id, "reading")
+        XCTAssertEqual(ordered.count, TransitionActivity.allCases.count)
+        XCTAssertEqual(Set(ordered.map(\.id)), Set(TransitionActivity.allCases.map(\.id)))
+    }
+
+    func testNoSavedOrderMeansCatalogueOrder() {
+        XCTAssertEqual(ParentPickerPreferences().allActivities.map(\.id),
+                       TransitionActivity.allCases.map(\.id))
+    }
+
+    func testOrderAndWebsitesRoundTrip() throws {
+        var prefs = ParentPickerPreferences(activityOrder: ["outside", "lego"])
+        prefs.addWebsite("example.com")
+        let decoded = try JSONDecoder().decode(ParentPickerPreferences.self,
+                                               from: try JSONEncoder().encode(prefs))
+        XCTAssertEqual(decoded.activityOrder, ["outside", "lego"])
+        XCTAssertEqual(decoded.blockedWebsites, ["example.com"])
+    }
+}

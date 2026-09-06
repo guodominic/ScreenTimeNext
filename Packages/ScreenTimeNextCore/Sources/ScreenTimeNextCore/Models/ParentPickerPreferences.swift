@@ -35,6 +35,19 @@ public struct ParentPickerPreferences: Codable, Equatable, Sendable {
     /// the things the parent made.
     public var customActivities: [TransitionActivity]
 
+    /// D-033 — websites the parent typed, blocked by name rather than by token.
+    ///
+    /// This is a SECOND, unrelated mechanism to the selection: `ManagedSettings` can block a domain
+    /// from a plain string (`WebDomain(domain:)` + `blockedByFilter = .specific(...)`), with no
+    /// token and no picker involved. It lives here rather than in the configuration because a
+    /// family's list of blocked sites is theirs and should outlive a reset (D-024).
+    public var blockedWebsites: [String]
+
+    /// D-033 — the order the parent dragged their "what's next" activities into, by id. Ids that
+    /// no longer exist are ignored, and anything missing is appended, so the list can never lose a
+    /// row (same contract as `categoryOrder`).
+    public var activityOrder: [String]
+
     /// D-030 — whole selections the parent saved and named, so a set of apps, categories and
     /// WEBSITES can be re-applied with one tap instead of retyped. A website can only be created
     /// inside Apple's picker (no public API turns a string into a `WebDomainToken`), so
@@ -45,17 +58,61 @@ public struct ParentPickerPreferences: Codable, Equatable, Sendable {
                 favourites: [ContentCategory] = ContentCategory.defaultFavourites,
                 favouritesAreCustom: Bool = false,
                 customActivities: [TransitionActivity] = [],
-                savedSelections: [SavedSelection] = []) {
+                savedSelections: [SavedSelection] = [],
+                blockedWebsites: [String] = [],
+                activityOrder: [String] = []) {
         self.categoryOrder = ContentCategory.completeOrder(categoryOrder)
         self.favourites = favourites
         self.favouritesAreCustom = favouritesAreCustom
         self.customActivities = customActivities
         self.savedSelections = savedSelections
+        self.blockedWebsites = Self.tidied(blockedWebsites)
+        self.activityOrder = activityOrder
     }
 
-    /// The built-in eight plus whatever the parent added, in a stable order.
+    /// The built-in eight plus whatever the parent added, in the order they arranged.
     public var allActivities: [TransitionActivity] {
-        TransitionActivity.allCases + customActivities
+        let everything = TransitionActivity.allCases + customActivities
+        guard !activityOrder.isEmpty else { return everything }
+        var byID = Dictionary(uniqueKeysWithValues: everything.map { ($0.id, $0) })
+        var ordered: [TransitionActivity] = []
+        for id in activityOrder {
+            if let activity = byID.removeValue(forKey: id) { ordered.append(activity) }
+        }
+        // Anything the saved order never heard of goes on the end, in catalogue order. A stale
+        // order can therefore never hide an activity — the same rule as `completeOrder`.
+        ordered.append(contentsOf: everything.filter { byID[$0.id] != nil })
+        return ordered
+    }
+
+    /// Normalises a typed domain: trims, lowercases, drops a scheme and any path. `youtube.com`,
+    /// `https://YouTube.com/feed` and ` youtube.com ` are the same site, and a parent who typed the
+    /// long one should not end up with a second entry that blocks nothing extra.
+    public static func normalizedDomain(_ raw: String) -> String? {
+        var text = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        for prefix in ["https://", "http://"] where text.hasPrefix(prefix) {
+            text.removeFirst(prefix.count)
+        }
+        if text.hasPrefix("www.") { text.removeFirst(4) }
+        if let slash = text.firstIndex(of: "/") { text = String(text[text.startIndex..<slash]) }
+        text = text.trimmingCharacters(in: .whitespaces)
+        // A domain needs a dot and no spaces. This is a sanity check, not validation: iOS decides
+        // what it can actually match, and rejecting something it would have accepted is worse.
+        guard text.contains("."), !text.contains(" "), text.count >= 3 else { return nil }
+        return text
+    }
+
+    private static func tidied(_ domains: [String]) -> [String] {
+        var seen = Set<String>()
+        return domains.compactMap(normalizedDomain).filter { seen.insert($0).inserted }
+    }
+
+    /// Adds a typed domain. Returns false when it is not usable or is already there.
+    @discardableResult
+    public mutating func addWebsite(_ raw: String) -> Bool {
+        guard let domain = Self.normalizedDomain(raw), !blockedWebsites.contains(domain) else { return false }
+        blockedWebsites.append(domain)
+        return true
     }
 
     public static let `default` = ParentPickerPreferences()
@@ -67,6 +124,7 @@ public struct ParentPickerPreferences: Codable, Equatable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case categoryOrder, favourites, favouritesAreCustom, customActivities, savedSelections
+        case blockedWebsites, activityOrder
     }
 
     public init(from decoder: Decoder) throws {
@@ -76,7 +134,9 @@ public struct ParentPickerPreferences: Codable, Equatable, Sendable {
             favourites: try c.decodeIfPresent([ContentCategory].self, forKey: .favourites) ?? ContentCategory.defaultFavourites,
             favouritesAreCustom: try c.decodeIfPresent(Bool.self, forKey: .favouritesAreCustom) ?? false,
             customActivities: try c.decodeIfPresent([TransitionActivity].self, forKey: .customActivities) ?? [],
-            savedSelections: try c.decodeIfPresent([SavedSelection].self, forKey: .savedSelections) ?? []
+            savedSelections: try c.decodeIfPresent([SavedSelection].self, forKey: .savedSelections) ?? [],
+            blockedWebsites: try c.decodeIfPresent([String].self, forKey: .blockedWebsites) ?? [],
+            activityOrder: try c.decodeIfPresent([String].self, forKey: .activityOrder) ?? []
         )
     }
 }

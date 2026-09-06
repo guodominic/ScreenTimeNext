@@ -25,8 +25,17 @@ struct SettingsView: View {
     @State private var editingActivity: TransitionActivity?
     @State private var parentPIN: ParentPIN?
     @State private var showPINEditor = false
+    @State private var activityOrder: [String] = []
+    @State private var isReorderingActivities = false
 
-    private var allActivities: [TransitionActivity] { TransitionActivity.allCases + customActivities }
+    /// D-033 — the parent's own order, built by the same rule as the category list: their
+    /// arrangement first, anything it has never heard of appended, so a stale order cannot hide a
+    /// row.
+    private var orderedActivities: [TransitionActivity] {
+        ParentPickerPreferences(customActivities: customActivities,
+                                activityOrder: activityOrder).allActivities
+    }
+    private var allActivities: [TransitionActivity] { orderedActivities }
     @State private var existingProfileID: UUID?
     @State private var errorText: String?
 
@@ -89,21 +98,29 @@ struct SettingsView: View {
             }
 
             Section {
-                ForEach(allActivities) { activity in
+                ForEach(orderedActivities) { activity in
                     activityRow(activity)
                 }
+                .onMove(perform: moveActivities)
                 Button { editingActivity = nil; showActivityEditor = true } label: {
                     Label("Add your own", systemImage: "plus.circle.fill")
                         .fontWeight(.semibold)
                         .foregroundStyle(Theme.mint)
                 }
+                .moveDisabled(true)
             } header: {
-                Text("What's next")
+                HStack {
+                    Text("What's next")
+                    Spacer()
+                    Button(isReorderingActivities ? "Done" : "Reorder") { isReorderingActivities.toggle() }
+                        .font(.caption.weight(.bold))
+                        .textCase(nil)
+                }
             } footer: {
                 // D-029 — "all eight" stopped being true the moment a parent could add a ninth.
                 Text(activities.isEmpty
                      ? "None picked — everything here will be offered."
-                     : "\(activities.count) picked. Swipe a custom one to edit or delete it.")
+                     : "\(activities.count) picked. Swipe a custom one to edit or delete it; Reorder to arrange them.")
             }
 
             Section {
@@ -142,6 +159,7 @@ struct SettingsView: View {
                 Button("Save") { save() }
             }
         }
+        .environment(\.editMode, .constant(isReorderingActivities ? .active : .inactive))
         .sheet(isPresented: $showPINEditor) {
             ParentPINView(mode: parentPIN.map { ParentPINView.Mode.change(existing: $0) } ?? .create) { pin in
                 setPIN(pin)
@@ -203,6 +221,13 @@ struct SettingsView: View {
         try? services.storage.save(pin)
     }
 
+    private func moveActivities(from source: IndexSet, to destination: Int) {
+        var ids = orderedActivities.map(\.id)
+        ids.move(fromOffsets: source, toOffset: destination)
+        activityOrder = ids
+        persistCustomActivities()
+    }
+
     private func remove(_ activity: TransitionActivity) {
         customActivities.removeAll { $0 == activity }
         activities.remove(activity)
@@ -214,6 +239,7 @@ struct SettingsView: View {
     private func persistCustomActivities() {
         guard var preferences = try? services.storage.loadPickerPreferences() else { return }
         preferences.customActivities = customActivities
+        preferences.activityOrder = activityOrder
         try? services.storage.save(preferences)
     }
 
@@ -231,7 +257,9 @@ struct SettingsView: View {
         while mins.count < ScreenTimeConfiguration.maxWarnings { mins.append(0) }
         warningMinutes = mins
         activities = Set(config.selectedActivities)
-        customActivities = (try? services.storage.loadPickerPreferences())?.customActivities ?? []
+        let preferences = (try? services.storage.loadPickerPreferences()) ?? .default
+        customActivities = preferences.customActivities
+        activityOrder = preferences.activityOrder
         parentPIN = try? services.storage.loadParentPIN()
         selection = try? services.selection.loadSelection()
         // Only on first appear: coming back from the picker must not undo what was just arranged.

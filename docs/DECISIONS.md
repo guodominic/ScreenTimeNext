@@ -978,6 +978,43 @@ it is the one that changes what ScreenTimeNext *is*.
 over an app that cannot yet hold a limit is a feature on top of nothing. Then D-030 sets should be
 addressable by name, then the CloudKit record and the §16 rewrite, then the parent app.
 
+## D-033 — Websites are blocked by name, not by token (correcting D-030)
+**Date:** 2026-09-06 · **Status:** accepted · **Corrects:** D-030
+
+**Context.** D-030 concluded that a parent cannot type a website into this app, because there is no
+public API that turns a string into a `WebDomainToken`. That part is true, and it was the wrong
+conclusion — I had only looked at the selection route.
+
+**`ManagedSettings` blocks a domain from a plain string, with no token and no picker:**
+
+```swift
+store.webContent.blockedByFilter = .specific([WebDomain(domain: "youtube.com")])
+```
+
+`WebDomain(domain:)` is a public initialiser, and `FilterPolicy.specific(_:)` blocks exactly the
+domains given. It even covers private browsing. Nothing about tokens applies here at all.
+
+**Decision.** The parent types websites into a list of their own, stored as plain strings in
+`ParentPickerPreferences`, applied by Task 011 through `blockedByFilter`. Typed domains are
+normalised — trimmed, lowercased, scheme / `www.` / path stripped — so `youtube.com`,
+`https://WWW.YouTube.com/feed` and a trailing space are one entry rather than three that each block
+the same thing.
+
+**Consequences.**
+- The websites count on the picker screen now comes from THIS list, not from the selection
+  snapshot. Two sources on one row, and the difference is real: apps and categories are tokens the
+  parent picked, websites are text the parent wrote.
+- The list lives with the parent's other work and survives "Start over" (D-024). A family's blocked
+  sites are theirs.
+- D-030's saved sets keep their value for apps and categories; websites no longer need them.
+- **The lesson worth keeping:** "there is no API for X" was established by checking one framework.
+  The answer lived in a different one. A negative finding about Apple's APIs is only as good as the
+  breadth of the search behind it, and mine was one framework wide.
+
+**Also in this pass:** "what's next" activities are drag-reorderable, with the same
+never-hide-a-row contract as the category order — the parent's arrangement first, anything the
+saved order has not heard of appended.
+
 <!-- Template for new entries:
 
 ## D-NNN — <short imperative title>
