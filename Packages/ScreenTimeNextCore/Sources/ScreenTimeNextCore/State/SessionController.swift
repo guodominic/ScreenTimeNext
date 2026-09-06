@@ -131,7 +131,10 @@ public final class SessionController: @unchecked Sendable {
     /// fixed set when the parent picked none ("no preference" rather than "nothing").
     public func availableActivities() throws -> [TransitionActivity] {
         let chosen = try storage.loadConfiguration().selectedActivities
-        return chosen.isEmpty ? TransitionActivity.allCases : chosen
+        guard chosen.isEmpty else { return chosen }
+        // D-029 — "no preference" means everything on offer, which now includes whatever the
+        // parent invented, not just our eight.
+        return (try? storage.loadPickerPreferences().allActivities) ?? TransitionActivity.allCases
     }
 
     /// The child picks what to do next (PRD §6.11). Persists on the current window.

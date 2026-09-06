@@ -20,6 +20,11 @@ struct SettingsView: View {
     @State private var picker = ContentPickerModel()
     @State private var pickerLoaded = false
     @State private var screenTimeApproved = false
+    @State private var customActivities: [TransitionActivity] = []
+    @State private var showActivityEditor = false
+    @State private var editingActivity: TransitionActivity?
+
+    private var allActivities: [TransitionActivity] { TransitionActivity.allCases + customActivities }
     @State private var existingProfileID: UUID?
     @State private var errorText: String?
 
@@ -57,25 +62,21 @@ struct SettingsView: View {
             }
 
             Section {
-                ForEach(TransitionActivity.allCases) { activity in
-                    Button {
-                        if activities.contains(activity) { activities.remove(activity) } else { activities.insert(activity) }
-                    } label: {
-                        HStack {
-                            Label(activity.displayName, systemImage: activity.symbolName)
-                                .foregroundStyle(Theme.color(for: activity))
-                                .fontWeight(.medium)
-                            Spacer()
-                            if activities.contains(activity) {
-                                Image(systemName: "checkmark.circle.fill").foregroundStyle(Theme.color(for: activity))
-                            }
-                        }
-                    }
+                ForEach(allActivities) { activity in
+                    activityRow(activity)
+                }
+                Button { editingActivity = nil; showActivityEditor = true } label: {
+                    Label("Add your own", systemImage: "plus.circle.fill")
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Theme.mint)
                 }
             } header: {
                 Text("What's next")
             } footer: {
-                Text(activities.isEmpty ? "None picked — all eight will be offered." : "\(activities.count) picked.")
+                // D-029 — "all eight" stopped being true the moment a parent could add a ninth.
+                Text(activities.isEmpty
+                     ? "None picked — everything here will be offered."
+                     : "\(activities.count) picked. Swipe a custom one to edit or delete it.")
             }
 
             Section {
@@ -114,6 +115,17 @@ struct SettingsView: View {
                 Button("Save") { save() }
             }
         }
+        .sheet(isPresented: $showActivityEditor) {
+            ActivityEditorSheet(existing: editingActivity) { saved in
+                if let index = customActivities.firstIndex(of: saved) {
+                    customActivities[index] = saved          // same id — a rename, not a new one
+                } else {
+                    customActivities.append(saved)
+                    activities.insert(saved)                 // a parent who adds one means to use it
+                }
+                persistCustomActivities()
+            }
+        }
         .onAppear(perform: load)
         .task { screenTimeApproved = await services.authorization.status == .approved }
         .onChange(of: budgetMinutes) { _, newBudget in
@@ -122,6 +134,47 @@ struct SettingsView: View {
             let cap = ScreenTimeConfiguration.maxWarningOffset(forBudgetSeconds: newBudget * 60) / 60
             warningMinutes = ScreenTimeConfiguration.clampedDescendingMinutes(warningMinutes, capMinutes: cap)
         }
+    }
+
+    @ViewBuilder
+    private func activityRow(_ activity: TransitionActivity) -> some View {
+        Button {
+            if activities.contains(activity) { activities.remove(activity) } else { activities.insert(activity) }
+        } label: {
+            HStack {
+                Label(activity.displayName, systemImage: activity.symbolName)
+                    .foregroundStyle(Theme.color(for: activity))
+                    .fontWeight(.medium)
+                Spacer()
+                if activities.contains(activity) {
+                    Image(systemName: "checkmark.circle.fill").foregroundStyle(Theme.color(for: activity))
+                }
+            }
+        }
+        // Only the family's own activities can be changed or removed; the built-in eight are ours.
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            if activity.isCustom {
+                Button(role: .destructive) { remove(activity) } label: { Label("Delete", systemImage: "trash") }
+                Button { editingActivity = activity; showActivityEditor = true } label: {
+                    Label("Edit", systemImage: "pencil")
+                }
+                .tint(Theme.sky)
+            }
+        }
+    }
+
+    private func remove(_ activity: TransitionActivity) {
+        customActivities.removeAll { $0 == activity }
+        activities.remove(activity)
+        persistCustomActivities()
+    }
+
+    /// D-029 — written straight away, the D-022 rule: a parent who adds an activity and leaves
+    /// should not lose it because they did not also press Save.
+    private func persistCustomActivities() {
+        guard var preferences = try? services.storage.loadPickerPreferences() else { return }
+        preferences.customActivities = customActivities
+        try? services.storage.save(preferences)
     }
 
     // MARK: Load / save
@@ -138,6 +191,7 @@ struct SettingsView: View {
         while mins.count < ScreenTimeConfiguration.maxWarnings { mins.append(0) }
         warningMinutes = mins
         activities = Set(config.selectedActivities)
+        customActivities = (try? services.storage.loadPickerPreferences())?.customActivities ?? []
         selection = try? services.selection.loadSelection()
         // Only on first appear: coming back from the picker must not undo what was just arranged.
         if !pickerLoaded {
@@ -156,13 +210,15 @@ struct SettingsView: View {
         let config = ScreenTimeConfiguration(
             dailyBudgetSeconds: budgetMinutes * 60,
             warningOffsetsSeconds: warningMinutes.map { min($0 * 60, ScreenTimeConfiguration.maxWarningOffset(forBudgetSeconds: budgetMinutes * 60)) },
-            selectedActivities: TransitionActivity.allCases.filter { activities.contains($0) },
+            selectedActivities: allActivities.filter { activities.contains($0) },
             selectedCategories: picker.order.filter { picker.categories.contains($0) }
         )
         do {
             try services.storage.save(profile)
             try services.storage.save(config)
-            try services.storage.save(picker.preferences)   // D-024 — its own record
+            // D-024/D-029 — merged, so saving this screen cannot delete the custom activities or
+            // saved selections the picker screen owns.
+            try services.storage.save(picker.preferences(mergedInto: try? services.storage.loadPickerPreferences()))
             // D-027 — a real selection has already been written by the picker itself. Re-saving
             // this screen's older copy of it would undo the parent's most recent choice, so the
             // real one wins and only a Phase 0 placeholder is written from here.

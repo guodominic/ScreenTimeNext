@@ -18,7 +18,9 @@ nonisolated final class LiveActivityPresenter: SessionPresenting, @unchecked Sen
         let content = ScreenTimeActivityAttributes.ContentState(
             startedAt: state.startedAt,
             endsAt: state.endsAt,
-            chosenActivityRaw: state.chosenActivity?.rawValue,
+            chosenActivityRaw: state.chosenActivity?.id,
+            chosenActivityName: state.chosenActivity?.displayName,
+            chosenActivitySymbol: state.chosenActivity?.symbolName,
             stateName: state.stateName
         )
         // ActivityKit asserts "Call must be made on main thread" — hop to the main actor.
@@ -44,7 +46,9 @@ nonisolated final class LiveActivityPresenter: SessionPresenting, @unchecked Sen
         let content = ScreenTimeActivityAttributes.ContentState(
             startedAt: state.startedAt,
             endsAt: state.endsAt,
-            chosenActivityRaw: state.chosenActivity?.rawValue,
+            chosenActivityRaw: state.chosenActivity?.id,
+            chosenActivityName: state.chosenActivity?.displayName,
+            chosenActivitySymbol: state.chosenActivity?.symbolName,
             stateName: state.stateName
         )
         let dismissAt = Date().addingTimeInterval(Self.finishedLingerSeconds)

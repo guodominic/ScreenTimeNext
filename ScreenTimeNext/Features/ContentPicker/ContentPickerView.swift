@@ -139,14 +139,52 @@ final class ContentPickerModel {
     /// The parent's arrangement — their order and their "usual". Not the ticks: those belong to the
     /// selection the surrounding screen commits (Start, or Settings' Save).
     private func saveArrangement() {
-        autosave.map { try? $0.save(preferences) }
+        guard let autosave else { return }
+        try? autosave.save(preferences(mergedInto: try? autosave.loadPickerPreferences()))
     }
 
     /// D-024 — written to their own record, which "Start over" leaves alone.
-    var preferences: ParentPickerPreferences {
-        ParentPickerPreferences(categoryOrder: order,
-                                favourites: favourites,
-                                favouritesAreCustom: favouritesAreCustom)
+    ///
+    /// D-029 — it MERGES rather than replaces. This record also holds the parent's custom
+    /// activities and saved selections, which this screen knows nothing about; constructing a fresh
+    /// one here would have silently deleted them the next time a row was dragged.
+    func preferences(mergedInto existing: ParentPickerPreferences?) -> ParentPickerPreferences {
+        var merged = existing ?? .default
+        merged.categoryOrder = ContentCategory.completeOrder(order)
+        merged.favourites = favourites
+        merged.favouritesAreCustom = favouritesAreCustom
+        merged.savedSelections = savedSelections
+        return merged
+    }
+
+    // MARK: Saved selections (D-030)
+
+    /// Whole selections the parent named. The reason this exists is websites: a domain can only be
+    /// created inside Apple's picker (no public API turns a string into a `WebDomainToken`), so
+    /// remembering the selection that contains it is the only way to stop them typing it again.
+    var savedSelections: [SavedSelection] = []
+
+    var canSaveCurrentSelection: Bool { realSelection != nil }
+
+    func saveCurrentSelection(named name: String) {
+        guard let realSelection else { return }
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        if let index = savedSelections.firstIndex(where: { $0.name.caseInsensitiveCompare(trimmed) == .orderedSame }) {
+            savedSelections[index].snapshot = realSelection      // same name means replace, not duplicate
+        } else {
+            savedSelections.append(SavedSelection(name: trimmed, snapshot: realSelection))
+        }
+        saveArrangement()
+    }
+
+    func apply(_ saved: SavedSelection) {
+        applyRealSelection(saved.snapshot)
+    }
+
+    func delete(_ saved: SavedSelection) {
+        savedSelections.removeAll { $0.id == saved.id }
+        saveArrangement()
     }
 
     func clear() {
@@ -179,6 +217,7 @@ final class ContentPickerModel {
                                        favouritesAreCustom: preferences.favouritesAreCustom,
                                        autosave: autosaving ? storage : nil,
                                        selectionStore: selection)
+        model.savedSelections = preferences.savedSelections
         // D-027 — a stored selection is loaded here, so the picker opens on what the parent chose
         // last time whatever route they took to get here.
         model.realSelection = try? selection?.loadSelection()
@@ -187,7 +226,7 @@ final class ContentPickerModel {
 
     /// Commit everything: the arrangement to its own record, the ticks to the configuration.
     func persist(to storage: any ScreenTimeStorageService) {
-        try? storage.save(preferences)
+        try? storage.save(preferences(mergedInto: try? storage.loadPickerPreferences()))
         guard var config = try? storage.loadConfiguration() else { return }
         config.selectedCategories = order.filter { categories.contains($0) }   // stored in row order
         try? storage.save(config)
@@ -216,6 +255,7 @@ struct ContentPickerView: View {
     @State private var showAppPickerNote = false
     @State private var showSystemPicker = false
     @State private var showCoveredContent = false
+    @State private var showSaveSetSheet = false
     @State private var isReordering = false
 
     /// A stored selection only MEANS anything while Screen Time access exists. Without it, even a
@@ -237,6 +277,10 @@ struct ContentPickerView: View {
         .sheet(isPresented: $showAppPickerNote) {
             SpecificAppsNote(onUseSample: { model.applicationCount = 3 })
                 .presentationDetents([.medium])
+        }
+        .sheet(isPresented: $showSaveSetSheet) {
+            SaveSelectionSetSheet { name in model.saveCurrentSelection(named: name) }
+                .presentationDetents([.height(240)])
         }
         .sheet(isPresented: $showCoveredContent) {
             if let snapshot = model.realSelection {
@@ -337,6 +381,9 @@ struct ContentPickerView: View {
             .tint(Theme.coral)
             .disabled(!model.hasFavourites)
 
+            if isEnforceable || !model.savedSelections.isEmpty {
+                savedSetsMenu
+            }
             if model.justSavedFavourites {
                 // The button disappears the moment it works (the selection now matches), so
                 // without this nothing tells the parent the save happened.
@@ -368,6 +415,41 @@ struct ContentPickerView: View {
         }
         .listRowBackground(Color.clear)
         .listRowInsets(EdgeInsets(top: 0, leading: 4, bottom: 4, trailing: 4))
+    }
+
+    /// D-030 — one tap re-applies a whole saved selection, websites included.
+    private var savedSetsMenu: some View {
+        Menu {
+            if model.savedSelections.isEmpty {
+                Text("No saved sets yet")
+            } else {
+                ForEach(model.savedSelections) { saved in
+                    Button {
+                        model.apply(saved)
+                    } label: {
+                        Text("\(saved.name) — \(saved.subtitle)")
+                    }
+                }
+                Divider()
+                Menu("Delete a set") {
+                    ForEach(model.savedSelections) { saved in
+                        Button(role: .destructive) { model.delete(saved) } label: { Text(saved.name) }
+                    }
+                }
+            }
+            if model.canSaveCurrentSelection {
+                Divider()
+                Button { showSaveSetSheet = true } label: {
+                    Label("Save this as a set…", systemImage: "square.and.arrow.down")
+                }
+            }
+        } label: {
+            Label(model.savedSelections.isEmpty ? "Saved sets" : "Saved sets (\(model.savedSelections.count))",
+                  systemImage: "bookmark.fill")
+                .font(.footnote.weight(.semibold))
+        }
+        .buttonStyle(.bordered)
+        .tint(Theme.mint)
     }
 
     private var usualLabel: String {
@@ -544,6 +626,35 @@ struct ContentPickerScreen: View {
                     }
                 }
             }
+    }
+}
+
+/// D-030 — naming a set. Kept to one field and two buttons: this appears mid-task, while a parent
+/// is already deciding something else.
+private struct SaveSelectionSetSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let onSave: (String) -> Void
+    @State private var name = ""
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("School nights, weekend, holidays…", text: $name)
+                } footer: {
+                    Text("Saves everything currently picked — apps, categories and websites — so you can bring it all back with one tap.")
+                }
+            }
+            .navigationTitle("Name this set")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") { onSave(name); dismiss() }
+                        .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+        }
     }
 }
 

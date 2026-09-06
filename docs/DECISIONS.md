@@ -861,6 +861,58 @@ know is worse than a sentence we can stand behind.
 - Every place showing counts should offer the sheet. A number the parent cannot check is a number
   they have to take on trust, and this app asks for enough trust already.
 
+## D-029 — "What's next" belongs to the family
+**Date:** 2026-09-06 · **Status:** accepted · **Task:** 009 (revisited)
+
+**Context.** `TransitionActivity` was a fixed enum of eight, and the PRD said so: "V1 does not
+support custom or free-text activities." That was the wrong call. §6.11's whole premise is that the
+child picks something they actually want to do, and a fixed list undercuts it the moment the real
+answer is piano, or the dog, or Nana's house.
+
+**Decision.** A struct with an id, name, invitation and symbol. The eight ship as built-ins; a
+parent adds their own in Settings, and they live on the device.
+
+**Consequences and the traps inside them.**
+- **Identity is the id alone**, not the whole value. A rename must not orphan a choice already
+  stored on a running session — the child picked THAT activity, whatever it is called now. Custom
+  ids are UUIDs, so two families' "Piano" never collide.
+- **Codable decodes a bare string.** Everything written while this was an enum encoded as its raw
+  value, and real devices are full of those in sessions, windows and configurations. An id we no
+  longer recognise decodes to a readable placeholder rather than throwing: a deleted custom
+  activity must not take a running session down with it.
+- **A built-in is re-resolved from its id**, not restored from disk, so improving its copy in a
+  later version reaches families who already have it saved.
+- **The Live Activity carries the name and icon, not just the id.** The widget is a separate
+  process and cannot read the parent's list, so an id alone would render a family's "Piano" as
+  nothing at all.
+- **`Theme.color(for:)` maps by id** with a hand-rolled stable hash for customs. `hashValue` would
+  have been the obvious choice and is wrong: Swift seeds it per process, so an activity would
+  change colour every time the app relaunched.
+- **A near-miss worth recording.** `ContentPickerModel.preferences` built a fresh
+  `ParentPickerPreferences`, so the next row drag would have silently deleted every custom activity.
+  It merges now. Any screen that owns part of a shared record must merge into it, never replace it.
+
+## D-030 — Saved selection sets, because a website can only be typed once
+**Date:** 2026-09-06 · **Status:** accepted · **Task:** 005
+
+**Context.** The request was to type a website into the app and have it remembered as an option for
+next time. The first half cannot be built: there is no public API that turns a string into a
+`WebDomainToken`. A domain becomes real only when a person types it inside Apple's
+`FamilyActivityPicker`.
+
+**Decision.** Remember the whole SELECTION instead, under a name the parent chooses — "School
+nights", "Weekend". Re-applying it brings back every app, category and website in one tap, so a
+domain is typed once in its lifetime rather than once per use. That is the outcome the request was
+actually after.
+
+**Consequences.**
+- Sets live in `ParentPickerPreferences`, so a reset keeps them (D-024) — they are the parent's
+  work, not the child's setup.
+- The snapshot stays opaque here as everywhere: a set carries it, never reads it. The subtitle is
+  counts only (§16).
+- Saving under an existing name replaces that set rather than making a second one with the same
+  name, because two identical labels in a menu help nobody.
+
 <!-- Template for new entries:
 
 ## D-NNN — <short imperative title>

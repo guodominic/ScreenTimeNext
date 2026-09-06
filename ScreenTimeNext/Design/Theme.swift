@@ -72,17 +72,34 @@ nonisolated enum Theme {
         return LinearGradient(colors: [c.opacity(0.55), c.opacity(0.15)], startPoint: .topLeading, endPoint: .bottomTrailing)
     }
 
+    /// D-029 — activities are no longer a fixed enum, so this maps by id and gives anything a
+    /// parent adds a stable colour of its own. Hashing the id rather than using the list position
+    /// means a custom activity keeps its colour when others are added or removed around it.
     static func color(for activity: TransitionActivity) -> Color {
-        switch activity {
-        case .lego:       return coral
-        case .drawing:    return lavender
-        case .reading:    return sky
-        case .outside:    return mint
-        case .snack:      return sun
-        case .bath:       return Color(red: 0.40, green: 0.80, blue: 0.95)
-        case .homework:   return peach
-        case .familyTime: return Color(red: 0.95, green: 0.55, blue: 0.75)
+        switch activity.id {
+        case "lego":       return coral
+        case "drawing":    return lavender
+        case "reading":    return sky
+        case "outside":    return mint
+        case "snack":      return sun
+        case "bath":       return Color(red: 0.40, green: 0.80, blue: 0.95)
+        case "homework":   return peach
+        case "familyTime": return Color(red: 0.95, green: 0.55, blue: 0.75)
+        default:           return customPalette[stableIndex(of: activity.id, count: customPalette.count)]
         }
+    }
+
+    private static let customPalette: [Color] = [
+        coral, lavender, sky, mint, sun, peach, grass, tangerine
+    ]
+
+    /// A deterministic index from a string. `hashValue` is deliberately NOT used: Swift seeds it
+    /// per process, so an activity would change colour every time the app relaunched.
+    private static func stableIndex(of id: String, count: Int) -> Int {
+        guard count > 0 else { return 0 }
+        var hash: UInt64 = 5381
+        for byte in id.utf8 { hash = (hash &* 33) &+ UInt64(byte) }
+        return Int(hash % UInt64(count))
     }
 
     /// The parent-side hero gradient.
