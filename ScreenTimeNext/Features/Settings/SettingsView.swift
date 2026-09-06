@@ -79,7 +79,7 @@ struct SettingsView: View {
             }
 
             Section {
-                if let summary = selection?.summary, !summary.isEmpty {
+                if let summary = (picker.realSelection ?? selection)?.summary, !summary.isEmpty {
                     SelectionSummaryView(summary: summary)
                         .listRowInsets(EdgeInsets())
                         .listRowBackground(Color.clear)
@@ -96,6 +96,7 @@ struct SettingsView: View {
                     Button("Clear selection", role: .destructive) {
                         selection = nil
                         picker.clear()
+                        picker.applyRealSelection(nil)      // D-027 — clears the stored one too
                     }
                 }
             } header: {
@@ -142,12 +143,11 @@ struct SettingsView: View {
         if !pickerLoaded {
             // D-022 — autosaving: "Save as my usual" and a drag write themselves immediately here,
             // rather than waiting for this screen's own Save button.
-            picker = ContentPickerModel.loaded(from: services.storage, autosaving: true)
+            picker = ContentPickerModel.loaded(from: services.storage,
+                                               selection: services.selection,
+                                               autosaving: true)
             pickerLoaded = true
         }
-        // Task 005 — hand the model whatever Apple's picker produced last time, so reopening it
-        // shows the parent's choices ticked instead of a blank slate.
-        picker.realSelection = selection
     }
 
     private func save() {
@@ -163,10 +163,15 @@ struct SettingsView: View {
             try services.storage.save(profile)
             try services.storage.save(config)
             try services.storage.save(picker.preferences)   // D-024 — its own record
-            if let selection {
-                try services.selection.save(selection)
-            } else {
-                try services.selection.clearSelection()
+            // D-027 — a real selection has already been written by the picker itself. Re-saving
+            // this screen's older copy of it would undo the parent's most recent choice, so the
+            // real one wins and only a Phase 0 placeholder is written from here.
+            if picker.realSelection == nil {
+                if let selection {
+                    try services.selection.save(selection)
+                } else {
+                    try services.selection.clearSelection()
+                }
             }
             // D-019 — a running session must obey the new settings, not just the next one.
             // This re-derives the window's end from the new daily budget and reschedules

@@ -788,6 +788,45 @@ allowed this as the single documented exception to Rule 1.
   saves the snapshot instead, one tap re-applies a real, enforceable choice — which is the version
   of that feature actually worth having.
 
+## D-027 — The picker saves itself, and a revoke reads as `.notDetermined`
+**Date:** 2026-09-06 · **Status:** accepted · **Task:** 004, 005 (device findings)
+
+**Context.** Two failures on the device, from the first real run of Tasks 004/005.
+
+**QA-04 failed: the selection did not survive a relaunch.** The chain was: pick in Apple's picker →
+Done → Done again on the wrapper screen → Save in Settings → disk. Four steps, and three of them
+are labelled as if the work is already finished. Anyone who picked and walked away lost their
+choice.
+
+This is D-022 for the second time. That decision said "a control whose label is a verb must
+complete that verb by itself", and I then built a new four-step chain anyway. So the rule is
+restated here with teeth: **a save that depends on a later screen's save is a bug, not a design.**
+
+**Decision.** `ContentPickerModel` takes the selection service and `applyRealSelection(_:)` writes
+the moment Apple's picker returns. `loaded(from:selection:)` reads it back, so the picker opens on
+the parent's last choice by whichever route they arrive. Settings' own Save no longer overwrites a
+real selection with its older `@State` copy — that would have quietly undone the newest choice —
+and "Clear selection" clears the stored one rather than just the screen's.
+
+Writing a selection does not mark the app as set up (`hasStoredConfiguration()` is a different
+record), so this is safe during first-run setup too.
+
+**QA-14 wrong: revoking showed "Screen Time access needed".** Turning access off in iOS Settings
+resets the status to `.notDetermined`, not `.denied` — so the latch that turns "denied after having
+been approved" into `.revoked` never fired, and the parent was shown the first-run message as if
+they had never been asked. It hid the only thing that mattered: it used to be on, and nothing is
+being enforced now.
+
+**Decision.** The latch applies to `.notDetermined` too (and to any future case). And because the
+underlying status really is `.notDetermined` after a revoke, the recovery path changed: `.revoked`
+now offers "Turn it back on", which genuinely brings the system sheet back, with Settings beside it
+as the fallback. `.denied` keeps Settings only — after a decline in the sheet, iOS will not show it
+again, so a "try again" button there would do nothing at all.
+
+**Consequences.** Apple's status is not a state machine you can read literally; `.notDetermined`
+means "no answer right now", not "never asked". Any future authorization logic should assume the
+same, and any new save button should be checked against the D-022 rule before it ships.
+
 <!-- Template for new entries:
 
 ## D-NNN — <short imperative title>

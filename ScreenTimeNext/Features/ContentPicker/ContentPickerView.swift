@@ -38,6 +38,13 @@ final class ContentPickerModel {
     /// button simply vanishes (the selection now matches) and nothing says the save happened.
     var justSavedFavourites = false
 
+    /// D-027 — where a real selection is written the moment Apple's picker returns one.
+    ///
+    /// Without this the chain was: pick in Apple's picker → Done → Done again on the wrapper →
+    /// Save in Settings → disk. Four steps, three of them labelled as if they had already saved.
+    /// Anyone who picked and walked away lost their choice, which is exactly what happened.
+    private let selectionStore: (any ScreenTimeSelectionService)?
+
     /// D-022 — where "my usual" and the row order are written the moment they change.
     ///
     /// nil during first-run setup, deliberately. `loadConfiguration()` returns defaults rather than
@@ -51,13 +58,30 @@ final class ContentPickerModel {
          order: [ContentCategory] = ContentCategory.defaultOrder,
          favourites: [ContentCategory] = ContentCategory.defaultFavourites,
          favouritesAreCustom: Bool = false,
-         autosave: (any ScreenTimeStorageService)? = nil) {
+         autosave: (any ScreenTimeStorageService)? = nil,
+         selectionStore: (any ScreenTimeSelectionService)? = nil) {
         self.categories = categories
         self.applicationCount = applicationCount
         self.order = ContentCategory.completeOrder(order)
         self.favourites = favourites
         self.favouritesAreCustom = favouritesAreCustom
         self.autosave = autosave
+        self.selectionStore = selectionStore
+    }
+
+    /// Apple's picker came back. Keep it AND write it, in that order, right now.
+    ///
+    /// Writing the selection does not mark the app as set up — that is `hasStoredConfiguration()`,
+    /// a different record — so this is safe during first-run setup too.
+    func applyRealSelection(_ picked: SelectionSnapshot?) {
+        realSelection = picked
+        justSavedFavourites = false
+        guard let selectionStore else { return }
+        if let picked {
+            try? selectionStore.save(picked)
+        } else {
+            try? selectionStore.clearSelection()
+        }
     }
 
     var summary: SelectionSummary {
@@ -142,14 +166,20 @@ final class ContentPickerModel {
     /// opens on the parent's own saved "usual" — which is what makes starting over feel like a
     /// fresh setup rather than losing your work.
     static func loaded(from storage: any ScreenTimeStorageService,
+                       selection: (any ScreenTimeSelectionService)? = nil,
                        autosaving: Bool = false) -> ContentPickerModel {
         let preferences = (try? storage.loadPickerPreferences()) ?? .default
         let ticked = (try? storage.loadConfiguration())?.selectedCategories ?? []
-        return ContentPickerModel(categories: ticked.isEmpty ? preferences.initialSelection : Set(ticked),
-                                  order: preferences.categoryOrder,
-                                  favourites: preferences.favourites,
-                                  favouritesAreCustom: preferences.favouritesAreCustom,
-                                  autosave: autosaving ? storage : nil)
+        let model = ContentPickerModel(categories: ticked.isEmpty ? preferences.initialSelection : Set(ticked),
+                                       order: preferences.categoryOrder,
+                                       favourites: preferences.favourites,
+                                       favouritesAreCustom: preferences.favouritesAreCustom,
+                                       autosave: autosaving ? storage : nil,
+                                       selectionStore: selection)
+        // D-027 — a stored selection is loaded here, so the picker opens on what the parent chose
+        // last time whatever route they took to get here.
+        model.realSelection = try? selection?.loadSelection()
+        return model
     }
 
     /// Commit everything: the arrangement to its own record, the ticks to the configuration.
@@ -207,7 +237,7 @@ struct ContentPickerView: View {
         .sheet(isPresented: $showSystemPicker) {
             NavigationStack {
                 FamilyActivityPickerScreen(existing: model.realSelection) { picked in
-                    model.realSelection = picked
+                    model.applyRealSelection(picked)
                 }
             }
         }

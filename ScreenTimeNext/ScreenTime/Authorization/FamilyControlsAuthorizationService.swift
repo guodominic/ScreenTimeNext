@@ -84,15 +84,19 @@ nonisolated final class FamilyControlsAuthorizationService: ScreenTimeAuthorizat
             defaults.set(true, forKey: Self.approvedOnceKey)
             return .approved
         case .denied:
-            // Denied AFTER having been approved is a different situation for the parent: nothing is
-            // being enforced any more, and the fix is in Settings rather than in this app.
-            return defaults.bool(forKey: Self.approvedOnceKey) ? .revoked : .denied
+            return wasApprovedOnce ? .revoked : .denied
         case .notDetermined:
-            return .notDetermined
+            // D-027 — turning access off in iOS Settings resets the status to `.notDetermined`,
+            // NOT `.denied`. Without the latch here, a parent who revoked was shown "Screen Time
+            // access needed", as if they had never been asked — which hides the one thing they
+            // need to know: it used to be on, and nothing is being enforced now.
+            return wasApprovedOnce ? .revoked : .notDetermined
         @unknown default:
-            return .notDetermined
+            return wasApprovedOnce ? .revoked : .notDetermined
         }
     }
+
+    private var wasApprovedOnce: Bool { defaults.bool(forKey: Self.approvedOnceKey) }
 
     /// Every documented `FamilyControlsError`, mapped to something the parent screens can act on.
     /// The cases are Apple's current set (verified 2026-09-06); `@unknown default` covers growth.

@@ -50,9 +50,35 @@ struct ScreenTimeAccessRow: View {
             .tint(Theme.mint)
             .disabled(isRequesting)
 
-        case .denied, .revoked:
-            // Once denied, iOS will not show the sheet again — only Settings can change it, so
-            // offering "try again" here would be a button that does nothing.
+        case .revoked:
+            // D-027 — revoking in Settings leaves the underlying status at `.notDetermined`, so
+            // asking again really does bring the system sheet back. Offer that first, with Settings
+            // underneath for the case where it does not.
+            HStack(spacing: 10) {
+                Button(action: onRequest) {
+                    if isRequesting {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Label("Turn it back on", systemImage: "arrow.clockwise")
+                            .font(.subheadline.weight(.semibold))
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(Theme.mint)
+                .disabled(isRequesting)
+
+                Button {
+                    if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
+                } label: {
+                    Text("Settings").font(.subheadline.weight(.semibold))
+                }
+                .buttonStyle(.bordered)
+                .tint(.secondary)
+            }
+
+        case .denied:
+            // A decline in the sheet is different: iOS will not show it again, so a "try again"
+            // button here would do nothing at all. Settings is the only route.
             Button {
                 if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
             } label: {
