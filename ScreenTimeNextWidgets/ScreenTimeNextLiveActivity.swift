@@ -5,6 +5,10 @@
 //  (iPhone + iPad). `Text(timerInterval:)` ticks on its own — no process needed (Rule 4).
 //  The state line updates when the app updates the activity (start / choose / extend / warnings
 //  while the app is open); the timer is always live.
+//
+//  D-019 — the mark is Pip, not an SF Symbol: this is the one place the app appears while the
+//  child is in someone else's app, so it should look like ScreenTimeNext. See PipMark.swift for
+//  why the mascot is drawn a second time here rather than shared with the app target.
 
 import ActivityKit
 import WidgetKit
@@ -19,40 +23,59 @@ struct ScreenTimeNextLiveActivity: Widget {
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    Image(systemName: symbol(for: context.state))
-                        .font(.title2)
-                        .foregroundStyle(color(for: context.state.stateName))
+                    PipMark(mood: isFinished(context) ? .cheering : PipMarkMood(stateName: context.state.stateName),
+                            size: 30,
+                            tint: color(for: context.state.stateName))
                         .padding(.leading, 4)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    Text(timerInterval: context.state.startedAt...context.state.endsAt, countsDown: true)
-                        .font(.system(.title2, design: .rounded).bold())
-                        .monospacedDigit()
-                        .multilineTextAlignment(.trailing)
-                        .frame(width: 90)
+                    Group {
+                        if isFinished(context) {
+                            Text("Done").font(.system(.title3, design: .rounded).bold())
+                        } else {
+                            Text(timerInterval: context.state.startedAt...context.state.endsAt, countsDown: true)
+                                .font(.system(.title2, design: .rounded).bold())
+                                .monospacedDigit()
+                        }
+                    }
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: 90)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("\(context.attributes.childName)'s screen time").font(.headline)
-                        Text(line(for: context.state)).font(.subheadline).foregroundStyle(.secondary)
+                        Text(title(for: context.attributes.childName)).font(.headline)
+                        Label {
+                            Text(isFinished(context) ? "Screen time is finished ❤️" : line(for: context.state))
+                        } icon: {
+                            Image(systemName: symbol(for: context.state))
+                        }
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                     }
                 }
             } compactLeading: {
-                Image(systemName: symbol(for: context.state))
-                    .foregroundStyle(color(for: context.state.stateName))
+                PipMark(mood: isFinished(context) ? .cheering : PipMarkMood(stateName: context.state.stateName),
+                        size: 20,
+                        tint: color(for: context.state.stateName))
             } compactTrailing: {
                 Text(timerInterval: context.state.startedAt...context.state.endsAt, countsDown: true)
                     .font(.caption.bold())
                     .monospacedDigit()
                     .frame(width: 46)
             } minimal: {
-                ProgressView(timerInterval: context.state.startedAt...context.state.endsAt, countsDown: true) {
-                    EmptyView()
-                } currentValueLabel: {
-                    EmptyView()
+                // The ring still carries the countdown; Pip sits inside it so the mark is the app's.
+                ZStack {
+                    ProgressView(timerInterval: context.state.startedAt...context.state.endsAt, countsDown: true) {
+                        EmptyView()
+                    } currentValueLabel: {
+                        EmptyView()
+                    }
+                    .progressViewStyle(.circular)
+                    .tint(color(for: context.state.stateName))
+                    PipMark(mood: PipMarkMood(stateName: context.state.stateName),
+                            size: 13,
+                            tint: color(for: context.state.stateName))
                 }
-                .progressViewStyle(.circular)
-                .tint(color(for: context.state.stateName))
             }
         }
     }
@@ -63,27 +86,45 @@ private struct LockScreenView: View {
 
     var body: some View {
         HStack(spacing: 14) {
-            Image(systemName: symbol(for: context.state))
-                .font(.title)
-                .foregroundStyle(.white)
-                .frame(width: 48, height: 48)
-                .background(Circle().fill(color(for: context.state.stateName)))
+            ZStack {
+                Circle().fill(color(for: context.state.stateName))
+                PipMark(mood: isFinished(context) ? .cheering : PipMarkMood(stateName: context.state.stateName),
+                        size: 34, tint: .white)
+            }
+            .frame(width: 48, height: 48)
             VStack(alignment: .leading, spacing: 2) {
-                Text("\(context.attributes.childName)'s screen time").font(.headline)
-                Text(line(for: context.state)).font(.subheadline).foregroundStyle(.secondary)
+                Text(title(for: context.attributes.childName)).font(.headline)
+                Text(isFinished(context) ? "Screen time is finished ❤️" : line(for: context.state))
+                    .font(.subheadline).foregroundStyle(.secondary)
             }
             Spacer()
-            Text(timerInterval: context.state.startedAt...context.state.endsAt, countsDown: true)
-                .font(.system(size: 30, weight: .bold, design: .rounded))
-                .monospacedDigit()
-                .multilineTextAlignment(.trailing)
-                .frame(width: 96)
+            Group {
+                if isFinished(context) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 30, weight: .bold))
+                        .foregroundStyle(color(for: context.state.stateName))
+                } else {
+                    Text(timerInterval: context.state.startedAt...context.state.endsAt, countsDown: true)
+                        .font(.system(size: 30, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                }
+            }
+            .multilineTextAlignment(.trailing)
+            .frame(width: 96)
         }
         .padding(16)
     }
 }
 
 // MARK: - Copy & colors (mirrors the app's Theme without depending on the app target)
+
+/// D-021 — `isStale` means "the app has not been able to update this". The commonest cause is a
+/// force-quit partway through a session: the countdown keeps ticking on its own (it is drawn from
+/// absolute dates, Rule 4) but by the end nothing is left to retire the card. Rendering the stale
+/// state as finished is what stops a dead card claiming a session is still running.
+private func isFinished(_ context: ActivityViewContext<ScreenTimeActivityAttributes>) -> Bool {
+    context.state.stateName == "finished" || context.isStale
+}
 
 private func line(for state: ScreenTimeActivityAttributes.ContentState) -> String {
     switch state.stateName {
@@ -94,6 +135,11 @@ private func line(for state: ScreenTimeActivityAttributes.ContentState) -> Strin
     case "extended":      return "Extra time from a parent"
     default:              return state.chosenActivity.map { "Next: \($0.displayName)" } ?? "Enjoy!"
     }
+}
+
+/// D-016 — the name is optional, so there is a name-less form of every line.
+private func title(for childName: String) -> String {
+    childName.isEmpty ? "Screen time" : "\(childName)'s screen time"
 }
 
 private func symbol(for state: ScreenTimeActivityAttributes.ContentState) -> String {

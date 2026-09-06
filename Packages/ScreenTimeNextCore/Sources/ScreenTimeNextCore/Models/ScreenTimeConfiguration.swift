@@ -31,6 +31,15 @@ public struct ScreenTimeConfiguration: Codable, Equatable, Sendable {
     /// The activities the parent approved for the child to choose from. PRD §6.7.
     public var selectedActivities: [TransitionActivity]
 
+    /// D-021 — the categories currently ticked. Kept so the next launch opens on the same choice
+    /// the parent made last time rather than an empty list.
+    ///
+    /// These are OUR catalogue rows, not Apple's tokens: §16 forbids storing or surfacing the
+    /// opaque `FamilyActivitySelection` tokens, and nothing here is one. In Phase 1 the real
+    /// selection lives in Apple's picker, which persists its own state, and this stays as the
+    /// record of which category rows the parent chose.
+    public var selectedCategories: [ContentCategory]
+
     // MARK: Ranges (D-013)
 
     /// 1–120 minutes. Short budgets are the common case ("you get seven more minutes"), so below
@@ -55,11 +64,13 @@ public struct ScreenTimeConfiguration: Codable, Equatable, Sendable {
     public init(
         dailyBudgetSeconds: Int = ScreenTimeConfiguration.defaultBudgetSeconds,
         warningOffsetsSeconds: [Int] = ScreenTimeConfiguration.defaultWarningOffsets,
-        selectedActivities: [TransitionActivity] = []
+        selectedActivities: [TransitionActivity] = [],
+        selectedCategories: [ContentCategory] = []
     ) {
         self.storedBudgetSeconds = Self.clampBudget(dailyBudgetSeconds)
         self.storedWarningOffsets = Self.normalizedOffsets(warningOffsetsSeconds)
         self.selectedActivities = selectedActivities
+        self.selectedCategories = selectedCategories
     }
 
     public static let `default` = ScreenTimeConfiguration()
@@ -92,6 +103,66 @@ public struct ScreenTimeConfiguration: Codable, Equatable, Sendable {
         min(warningOffsetRange.upperBound, max(0, budget - warningStepSeconds))
     }
 
+    /// D-019 — the reminder dials, made impossible to set wrong.
+    ///
+    /// Reminder 1 fires before reminder 2, which fires before reminder 3, so their minutes-before-
+    /// the-end must strictly DESCEND: 10 / 5 / 1, never 5 / 10 / 2. `normalizedOffsets` used to
+    /// silently re-sort whatever the dials produced, which meant the parent could set 5 / 10 / 2
+    /// and get something else back. This clamps instead, in place, so the illegal state is never
+    /// reachable and nothing is reordered behind the parent's back.
+    ///
+    /// - `changedIndex` is the dial the parent just moved: it keeps its value, and its neighbours
+    ///   give way around it. Pass nil to tidy the whole array (e.g. after the budget shrank).
+    /// - 0 means "off". A slot that is off forces every LATER slot off too: reminder 3 without a
+    ///   reminder 2 is a numbering lie.
+    public static func clampedDescendingMinutes(_ raw: [Int],
+                                                capMinutes: Int,
+                                                changedIndex: Int? = nil) -> [Int] {
+        var m = raw
+        while m.count < maxWarnings { m.append(0) }
+        m = Array(m.prefix(maxWarnings)).map { max(0, min($0, max(0, capMinutes))) }
+
+        let pivot = changedIndex.map { max(0, min($0, maxWarnings - 1)) } ?? 0
+
+        // Everything after the moved dial must be strictly smaller than the slot before it.
+        for i in (pivot + 1)..<maxWarnings {
+            let ceiling = m[i - 1] - 1
+            if m[i - 1] == 0 || ceiling < 1 { m[i] = 0 } else { m[i] = min(m[i], ceiling) }
+        }
+        // Everything before it must be strictly larger — raise it if there is room, otherwise the
+        // moved dial itself has to give way (it cannot be larger than the cap).
+        if pivot > 0 {
+            for i in stride(from: pivot, to: 0, by: -1) where m[i] > 0 {
+                if m[i - 1] <= m[i] {
+                    let raised = m[i] + 1
+                    if raised <= capMinutes { m[i - 1] = raised } else { m[i] = max(0, m[i - 1] - 1) }
+                }
+            }
+            // The backward pass can LOWER a dial that the forward pass already sized against its
+            // old value, leaving a stale neighbour: 15/15/15 with dial 2 moved came out 15/14/14.
+            // One more descending sweep settles it, and it cannot disturb the moved dial — by now
+            // the dial before it is exactly one larger.
+            for i in 1..<maxWarnings {
+                let ceiling = m[i - 1] - 1
+                if m[i - 1] == 0 || ceiling < 1 { m[i] = 0 } else { m[i] = min(m[i], ceiling) }
+            }
+        }
+        // A slot that is off ends the list.
+        if let firstOff = m.firstIndex(of: 0) {
+            for i in firstOff..<maxWarnings { m[i] = 0 }
+        }
+        return m
+    }
+
+    /// The upper bound for dial `index`, given what the other dials currently say. This is what
+    /// makes the dial physically unable to pass its neighbour.
+    public static func warningDialUpperBound(index: Int, minutes: [Int], capMinutes: Int) -> Int {
+        guard index > 0 else { return max(0, capMinutes) }
+        let previous = index - 1 < minutes.count ? minutes[index - 1] : 0
+        guard previous > 1 else { return 0 }
+        return min(max(0, capMinutes), previous - 1)
+    }
+
     /// Drops non-positive values, clamps, de-duplicates, sorts earliest-first, caps at three.
     public static func normalizedOffsets(_ offsets: [Int]) -> [Int] {
         let cleaned = offsets
@@ -104,6 +175,7 @@ public struct ScreenTimeConfiguration: Codable, Equatable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case dailyBudgetSeconds, warningOffsetsSeconds, selectedActivities
+        case selectedCategories
         case warning10Enabled, warning5Enabled, warning1Enabled
     }
 
@@ -122,7 +194,9 @@ public struct ScreenTimeConfiguration: Codable, Equatable, Sendable {
             if try c.decodeIfPresent(Bool.self, forKey: .warning1Enabled) ?? true { legacy.append(60) }
             offsets = legacy
         }
-        self.init(dailyBudgetSeconds: budget, warningOffsetsSeconds: offsets, selectedActivities: activities)
+        let picked = try c.decodeIfPresent([ContentCategory].self, forKey: .selectedCategories) ?? []
+        self.init(dailyBudgetSeconds: budget, warningOffsetsSeconds: offsets, selectedActivities: activities,
+                  selectedCategories: picked)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -130,5 +204,6 @@ public struct ScreenTimeConfiguration: Codable, Equatable, Sendable {
         try c.encode(dailyBudgetSeconds, forKey: .dailyBudgetSeconds)
         try c.encode(warningOffsetsSeconds, forKey: .warningOffsetsSeconds)
         try c.encode(selectedActivities, forKey: .selectedActivities)
+        try c.encode(selectedCategories, forKey: .selectedCategories)
     }
 }

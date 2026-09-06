@@ -27,15 +27,17 @@ struct ParentDashboardView: View {
         self.onReset = onReset
     }
 
-    private var name: String { viewModel.profile?.name ?? "your child" }
+    /// The child's name if the parent gave one. D-018 — never a stand-in like "your child";
+    /// screens that need a heading fall back to something true instead.
+    private var name: String { viewModel.profile?.name ?? "" }
 
     var body: some View {
         NavigationStack {
             List {
                 heroSection
+                if viewModel.notificationsDenied { notificationAlertSection }
                 contentSection
                 whatsNextSection
-                parentSection
                 dangerSection
             }
             .listSectionSpacing(14)
@@ -55,7 +57,7 @@ struct ParentDashboardView: View {
                 if phase == .active { viewModel.reload() }
             }
             .sheet(isPresented: $showShieldPreview) {
-                ShieldPreviewView(childName: viewModel.profile?.name ?? "your child",
+                ShieldPreviewView(childName: name,
                                   activities: viewModel.configuration.selectedActivities.isEmpty
                                       ? TransitionActivity.allCases
                                       : viewModel.configuration.selectedActivities)
@@ -71,48 +73,47 @@ struct ParentDashboardView: View {
 
     // MARK: Sections
 
-    /// D-017 — the ring IS the session: it shows the state and it is the way into the child timer.
-    /// There is no separate "Session" list section any more.
+    /// D-017/D-018 — the ring IS the session: it shows the state and it is the way into the child
+    /// timer, so it carries no label telling you to tap it. Only End and Extend remain, and they
+    /// are real buttons: the card is tappable through `onTapGesture`, not wrapped in a `Button`,
+    /// because a Button inside a Button swallows the inner taps.
     private var heroSection: some View {
         Section {
-            Button(action: onOpenTimer) {
-                VStack(spacing: 16) {
-                    HStack(alignment: .top, spacing: 16) {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(name)
-                                .font(.system(.title2, design: .rounded).bold())
-                            statChip(sessionSymbol, viewModel.sessionStatusText)
-                            statChip("shield.lefthalf.filled", viewModel.protectionText)
-                        }
-                        Spacer(minLength: 0)
-                        Mascot(mood: heroMood, size: 76, tint: .white, animated: false)
-                    }
-
-                    if viewModel.sessionIsRunning || viewModel.session.state == .finished {
-                        runningRing
-                    } else {
-                        quickStart
-                    }
+            VStack(spacing: 16) {
+                HStack(alignment: .top, spacing: 16) {
+                    Text(name.isEmpty ? "Today" : name)
+                        .font(.system(.title2, design: .rounded).bold())
+                    Spacer(minLength: 0)
+                    Mascot(mood: heroMood, size: 76, tint: .white, animated: false)
                 }
-                .foregroundStyle(.white)
-                .padding(20)
-                .background(RoundedRectangle(cornerRadius: 28, style: .continuous).fill(Theme.heroGradient))
+
+                if viewModel.sessionIsRunning || viewModel.session.state == .finished {
+                    runningRing
+                } else {
+                    quickStart
+                }
             }
-            .buttonStyle(.plain)
+            .foregroundStyle(.white)
+            .padding(20)
+            .background(RoundedRectangle(cornerRadius: 28, style: .continuous).fill(Theme.heroGradient))
+            .contentShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .onTapGesture { onOpenTimer() }
+            .accessibilityAddTraits(.isButton)
+            .accessibilityHint("Opens the timer")
             .bounceIn()
             .readableWidth(720)
             .listRowInsets(EdgeInsets())
             .listRowBackground(Color.clear)
         } footer: {
-            Text(viewModel.sessionIsRunning
-                 ? "Tap to open \(name)'s timer. Press and hold “Parents” there to come back."
-                 : "Tap to open the timer.")
+            if viewModel.sessionIsRunning {
+                Text("Press and hold “Parents” in the timer to come back here.")
+            }
         }
     }
 
-    /// Mid-session: the ring, number unobstructed, with "open" made explicit.
+    /// Mid-session: the ring, number unobstructed, and the two controls a parent actually uses.
     private var runningRing: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 12) {
             ZStack {
                 ProgressRing(fraction: viewModel.remainingFraction, lineWidth: 12, color: .white.opacity(0.95))
                 VStack(spacing: 0) {
@@ -128,15 +129,9 @@ struct ParentDashboardView: View {
             .frame(width: 132, height: 132)
 
             HStack(spacing: 12) {
-                Label("Open timer", systemImage: "hourglass")
-                    .font(.system(.subheadline, design: .rounded).bold())
                 if viewModel.sessionIsRunning {
                     Button(role: .destructive) { confirmEndSession = true } label: {
-                        Label("End", systemImage: "stop.fill")
-                            .font(.system(.subheadline, design: .rounded).bold())
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 12).padding(.vertical, 6)
-                            .background(Capsule().fill(.white.opacity(0.22)))
+                        heroChip("End", "stop.fill")
                     }
                     .buttonStyle(.plain)
                     .confirmationDialog("End today's session now?", isPresented: $confirmEndSession, titleVisibility: .visible) {
@@ -148,16 +143,20 @@ struct ParentDashboardView: View {
                 }
                 if viewModel.canExtend {
                     Button { showExtend = true } label: {
-                        Label("Extend", systemImage: "plus")
-                            .font(.system(.subheadline, design: .rounded).bold())
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 12).padding(.vertical, 6)
-                            .background(Capsule().fill(.white.opacity(0.22)))
+                        heroChip("Extend", "plus")
                     }
                     .buttonStyle(.plain)
                 }
             }
         }
+    }
+
+    private func heroChip(_ title: String, _ symbol: String) -> some View {
+        Label(title, systemImage: symbol)
+            .font(.system(.subheadline, design: .rounded).bold())
+            .foregroundStyle(.white)
+            .padding(.horizontal, 16).padding(.vertical, 8)
+            .background(Capsule().fill(.white.opacity(0.22)))
     }
 
     /// Idle: the whole point of the app in two taps — set the minutes, hand it over.
@@ -211,22 +210,6 @@ struct ParentDashboardView: View {
         }
     }
 
-    private var sessionSymbol: String {
-        switch viewModel.session.state {
-        case .idle: return "pause.circle.fill"
-        case .finished: return "checkmark.circle.fill"
-        case .firstWarning, .secondWarning, .finalWarning: return "bell.badge.fill"
-        default: return "play.circle.fill"
-        }
-    }
-
-    private func statChip(_ symbol: String, _ text: String) -> some View {
-        Label(text, systemImage: symbol)
-            .font(.subheadline.weight(.semibold))
-            .padding(.horizontal, 10).padding(.vertical, 5)
-            .background(Capsule().fill(.white.opacity(0.18)))
-    }
-
     private var contentSection: some View {
         Section {
             if viewModel.selectionSummary.isEmpty {
@@ -245,7 +228,7 @@ struct ParentDashboardView: View {
         } header: {
             Text("Protected content")
         } footer: {
-            Text("With Screen Time access, a full-screen message appears inside the app your child is using — at each reminder, and when time is up. Preview it above; enforcement itself arrives with that access.")
+            Text("With Screen Time access, a full-screen message appears inside the app being used — at each reminder, and when time is up. Preview it above; enforcement itself arrives with that access.")
         }
     }
 
@@ -264,28 +247,23 @@ struct ParentDashboardView: View {
         }
     }
 
-    private var parentSection: some View {
+    /// D-018 — the "Status" list is gone: a dashboard of things that are fine is noise. What
+    /// survives is the one line that means the app is not doing its job, shown only when true.
+    private var notificationAlertSection: some View {
         Section {
-            if viewModel.notificationsDenied {
-                Button {
-                    if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
-                } label: {
-                    Label("Notifications are off — reminders only show in the app", systemImage: "bell.slash")
+            Button {
+                if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
+            } label: {
+                HStack(spacing: 12) {
+                    IconChip(symbol: "bell.slash.fill", color: .orange)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Notifications are off").fontWeight(.semibold)
+                        Text("Reminders will only show inside the app.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                 }
-            } else {
-                LabeledContent("Notifications", value: "On")
             }
-            LabeledContent("Screen Time access", value: viewModel.authorizationText)
-            LabeledContent("Reminders", value: reminderSummary)
-        } header: {
-            Text("Status")
         }
-    }
-
-    private var reminderSummary: String {
-        let config = viewModel.configuration
-        let mins = config.effectiveWarningOffsets(forWindowSeconds: config.dailyBudgetSeconds).map { "\($0 / 60)" }
-        return mins.isEmpty ? "Finish only" : mins.joined(separator: " / ") + " min"
     }
 
     private var dangerSection: some View {
@@ -302,10 +280,10 @@ struct ParentDashboardView: View {
                 Button("Erase and start over", role: .destructive) { onReset() }
                 Button("Cancel", role: .cancel) {}
             } message: {
-                Text("Erases \(name)'s profile and all settings on this device. This cannot be undone.")
+                Text("Erases the profile, the budget and the reminders on this device. Your category order and “my usual” are kept. This cannot be undone.")
             }
         } footer: {
-            Text("Erases the child profile and all settings on this device.")
+            Text("Erases the child profile, the budget and the reminders. Your picker arrangement is kept.")
         }
     }
 }
@@ -321,9 +299,11 @@ struct ExtendTimeSheet: View {
         NavigationStack {
             VStack(spacing: 20) {
                 Mascot(mood: .cheering, size: 84, tint: Theme.lavender)
-                Text("Give \(childName) more time")
+                Text(childName.isEmpty ? "More time" : "Give \(childName) more time")
                     .font(.system(.title2, design: .rounded).bold())
-                MinuteDial(minutes: $minutes, range: 2...120, step: 2, color: Theme.lavender)
+                // D-020 — "give five more minutes" is the common case, so extra time gets the
+                // same fine steps as the budget rather than jumping two at a time.
+                MinuteDial.budget($minutes, color: Theme.lavender)
                 Text("Extra minutes are beyond today's budget.")
                     .font(.footnote).foregroundStyle(.secondary)
                 Button { onExtend(minutes); dismiss() } label: { Text("Add \(minutes) minutes") }

@@ -27,17 +27,30 @@ public struct SessionPresenceState: Equatable, Sendable {
 public protocol SessionPresenting: Sendable {
     /// Start or update the presence for the current window.
     func show(_ state: SessionPresenceState)
-    /// End the presence (session finalized, day rolled over, parent ended it).
+    /// D-021 — the window ran out. Show the finished state, then let it dismiss itself.
+    ///
+    /// Distinct from `hide()`: "time is up" is worth seeing on the Lock Screen for a few minutes,
+    /// whereas a session the parent ended, or one that belongs to yesterday, should just go.
+    func finish(_ state: SessionPresenceState)
+    /// End the presence at once (session finalized, day rolled over, parent ended it).
     func hide()
+}
+
+public extension SessionPresenting {
+    /// Presenters that have nothing special to say at the end can just disappear.
+    func finish(_ state: SessionPresenceState) { hide() }
 }
 
 public final class MockSessionPresenter: SessionPresenting, @unchecked Sendable {
     private let lock = NSLock()
     private var _shown: [SessionPresenceState] = []
     private var _hideCount = 0
+    private var _finishCount = 0
     public init() {}
     public func show(_ state: SessionPresenceState) { lock.withLock { _shown.append(state) } }
+    public func finish(_ state: SessionPresenceState) { lock.withLock { _finishCount += 1 } }
     public func hide() { lock.withLock { _hideCount += 1 } }
     public var shown: [SessionPresenceState] { lock.withLock { _shown } }
     public var hideCount: Int { lock.withLock { _hideCount } }
+    public var finishCount: Int { lock.withLock { _finishCount } }
 }

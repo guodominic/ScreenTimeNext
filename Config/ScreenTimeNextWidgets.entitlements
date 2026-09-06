@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- The widget renders the Live Activity from the shared container, so it needs the same group
+	     as the app. It does NOT need Family Controls: it never touches a selection or a shield. -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.io.github.guodominic.screentimenext</string>
+	</array>
+</dict>
+</plist>

@@ -81,6 +81,10 @@ public final class SessionController: @unchecked Sendable {
         try lock.withLock {
             guard let window = try currentWindowLocked() else {
                 lastState = .idle
+                // D-021 — nothing is running, so nothing should be on the Lock Screen. This is what
+                // clears a Live Activity stranded by a force-quit: the app could not end it while it
+                // was not running, so the next launch does.
+                presence?.hide()
                 return try idleSnapshotLocked()
             }
             let current = now()
@@ -172,6 +176,50 @@ public final class SessionController: @unchecked Sendable {
         }
     }
 
+    /// D-019 — the parent changed settings while a session was running. Make the live session obey.
+    ///
+    /// Reminders and activities were always re-read from storage on every tick, so those followed
+    /// on their own. The DAILY BUDGET did not: a window is a wall-clock window (D-006) whose end
+    /// was fixed at Start, so raising the budget from 15 to 30 minutes mid-session changed a number
+    /// on the dashboard and nothing the child could see. That is the bug.
+    ///
+    /// The fix keeps `startedAt` (elapsed time is real and already spent) and moves `endsAt` to
+    /// `now + whatever the new budget still allows`. Shrinking the budget below what has already
+    /// been used ends the session now rather than owing negative time.
+    ///
+    /// `lastState` is reset so the engine re-derives the stage from the new remaining time: without
+    /// this, `WarningStateEngine.next` is monotonic and a session that had reached "1 minute left"
+    /// would stay red after the parent granted twenty more minutes.
+    ///
+    /// Returns the fresh snapshot, or nil when no session is running.
+    @discardableResult
+    public func applyConfigurationChange() throws -> ChildSessionSnapshot? {
+        try lock.withLock {
+            guard let window = try currentWindowLocked() else {
+                notifications?.cancelAll()
+                return nil
+            }
+            let current = now()
+            let config = try storage.loadConfiguration()
+            let recorded = try storage.loadDailyUsage(for: current)?.usedSeconds ?? 0
+            let elapsed = max(0, window.totalSeconds - window.remainingSeconds(at: current))
+            let allowance = config.dailyBudgetSeconds - recorded - elapsed
+
+            // An extension is a deliberate grant beyond the budget (§15) — never claw it back.
+            let granted = window.grantedSeconds
+            let remaining = max(0, allowance + granted)
+
+            let adjusted = SessionWindow(startedAt: window.startedAt,
+                                         endsAt: current.addingTimeInterval(TimeInterval(remaining)),
+                                         chosenActivity: window.chosenActivity,
+                                         budgetSecondsAtStart: window.budgetSecondsAtStart)
+            try storage.save(adjusted)
+            lastState = .idle          // let the snapshot re-derive the stage from the new clock
+            try scheduleNotificationsLocked(for: adjusted)
+            return try snapshotLocked(for: adjusted, at: current)
+        }
+    }
+
     /// A parent ends the session early. Records the time actually used and returns to idle.
     @discardableResult
     public func endEarly() throws -> ChildSessionSnapshot {
@@ -225,6 +273,17 @@ public final class SessionController: @unchecked Sendable {
                                             stateName: lastState.rawValue))
     }
 
+    /// Hand the presenter a final state to show before it dismisses itself.
+    private func presentFinishLocked(for window: SessionWindow) throws {
+        guard let presence else { return }
+        let name = try storage.loadChildProfile()?.name ?? ""
+        presence.finish(SessionPresenceState(childName: name,
+                                             startedAt: window.startedAt,
+                                             endsAt: window.endsAt,
+                                             chosenActivity: window.chosenActivity,
+                                             stateName: ScreenTimeState.finished.rawValue))
+    }
+
     private func remainingBudgetSecondsLocked() throws -> Int {
         let current = now()
         let config = try storage.loadConfiguration()
@@ -246,12 +305,18 @@ public final class SessionController: @unchecked Sendable {
     private func snapshotLocked(for window: SessionWindow, at current: Date) throws -> ChildSessionSnapshot {
         let remaining = window.remainingSeconds(at: current)
         let offsets = try offsetsLocked(for: window)
+        let previous = lastState
         // A controller that did not open this window (dashboard, root routing, relaunch) must adopt
         // it rather than stay idle — this was the "Session: Not started" bug.
         if lastState == .idle {
             lastState = WarningStateEngine.start(remainingSeconds: remaining, warningOffsets: offsets)
         } else {
             lastState = WarningStateEngine.next(current: lastState, remainingSeconds: remaining, warningOffsets: offsets)
+        }
+        // D-021 — the moment the window runs out, retire the Live Activity. Once only: this runs
+        // every second, and `finish` on every tick would restart the dismissal timer forever.
+        if lastState == .finished && previous != .finished {
+            try presentFinishLocked(for: window)
         }
         let reached = WarningStateEngine.reachedWarningIndex(remainingSeconds: remaining, warningOffsets: offsets)
         return ChildSessionSnapshot(

@@ -22,6 +22,54 @@ public enum ShieldMoment: Hashable, Sendable {
     case spentForToday
 }
 
+/// How close the child is to the end — the ONE thing that drives the interstitial's colour and
+/// Pip's expression (D-018).
+///
+/// Before D-018 the card was tinted by the activity the child had chosen, so every reminder came
+/// up a different, arbitrary colour and the screen said nothing about time. Now the ramp is the
+/// message: green while there is room, orange when it is time to wrap up, red on the last stretch,
+/// and only the finish is celebratory.
+public enum ShieldUrgency: String, Hashable, Sendable, CaseIterable {
+    /// First reminder — plenty of runway. Green.
+    case calm
+    /// Middle reminder — start finishing up. Orange.
+    case soon
+    /// Last reminder before the end. Red.
+    case last
+    /// The session just ended. Celebratory, and the only moment that is multi-coloured.
+    case finished
+    /// A protected app opened later with the budget already gone. Quiet, not alarming.
+    case spent
+
+    /// The ramp for reminder `index` of `count`. A lone reminder is the last one, not the first —
+    /// `WarningStateEngine.role(ofWarningAt:count:)` calls index 0 `.firstWarning` for its own
+    /// state-machine reasons, which is not the colour we want when there is only one.
+    public static func forWarning(index: Int, count: Int) -> ShieldUrgency {
+        guard count > 1 else { return .last }
+        if index == 0 { return .calm }
+        if index >= count - 1 { return .last }
+        return .soon
+    }
+
+    /// The ramp implied by the session state, for callers that hold a snapshot rather than an index.
+    public static func from(state: ScreenTimeState) -> ShieldUrgency {
+        switch state {
+        case .idle, .active, .extended: return .calm
+        case .firstWarning:  return .calm
+        case .secondWarning: return .soon
+        case .finalWarning:  return .last
+        case .finished:      return .finished
+        }
+    }
+
+    /// Fallback when only the clock is known: the last minute is red, single digits are orange.
+    public static func fromMinutesLeft(_ minutes: Int) -> ShieldUrgency {
+        if minutes <= 1 { return .last }
+        if minutes <= 5 { return .soon }
+        return .calm
+    }
+}
+
 public struct ShieldPresentation: Hashable, Sendable {
     public let title: String
     public let subtitle: String
@@ -31,23 +79,33 @@ public struct ShieldPresentation: Hashable, Sendable {
     /// True when pressing the primary button should lift ScreenTimeNext's own shield and let the
     /// child continue. False means the button only closes the app — never a bypass (§17).
     public let primaryButtonContinues: Bool
-    /// Which activity's color to tint with, if any; nil means use the app's own accent.
+    /// Which activity was chosen for after, if any. Used for the copy and the small badge — NOT
+    /// for the card's colour any more (D-018); `urgency` owns colour.
     public let activity: TransitionActivity?
+    /// How close the end is. Drives the tint and Pip's expression, and nothing else.
+    public let urgency: ShieldUrgency
 
     public init(title: String, subtitle: String, symbolName: String,
                 primaryButtonLabel: String, primaryButtonContinues: Bool,
-                activity: TransitionActivity?) {
+                activity: TransitionActivity?,
+                urgency: ShieldUrgency) {
         self.title = title
         self.subtitle = subtitle
         self.symbolName = symbolName
         self.primaryButtonLabel = primaryButtonLabel
         self.primaryButtonContinues = primaryButtonContinues
         self.activity = activity
+        self.urgency = urgency
     }
 
     /// The one place shield copy is written. Child-facing: warm, concrete, names what comes next,
     /// never punitive, never technical (§7).
-    public static func make(for moment: ShieldMoment, childName: String) -> ShieldPresentation {
+    ///
+    /// `urgency` is the colour ramp. Pass it when the caller knows which reminder this is (the
+    /// session controller and the preview both do); leave it nil and it is inferred from the clock.
+    public static func make(for moment: ShieldMoment,
+                            childName: String,
+                            urgency: ShieldUrgency? = nil) -> ShieldPresentation {
         let name = childName.trimmingCharacters(in: .whitespacesAndNewlines)
         let addressed = name.isEmpty ? "" : ", \(name)"
 
@@ -66,7 +124,8 @@ public struct ShieldPresentation: Hashable, Sendable {
                 symbolName: activity?.symbolName ?? "hourglass",
                 primaryButtonLabel: minutes == 1 ? "OK, one more minute" : "OK, \(minutes) more minutes",
                 primaryButtonContinues: true,
-                activity: activity
+                activity: activity,
+                urgency: urgency ?? .fromMinutesLeft(minutes)
             )
 
         case let .finished(activity):
@@ -77,7 +136,8 @@ public struct ShieldPresentation: Hashable, Sendable {
                     symbolName: activity.symbolName,
                     primaryButtonLabel: "Let's go!",
                     primaryButtonContinues: false,
-                    activity: activity
+                    activity: activity,
+                    urgency: .finished
                 )
             }
             return ShieldPresentation(
@@ -86,7 +146,8 @@ public struct ShieldPresentation: Hashable, Sendable {
                 symbolName: "hands.clap.fill",
                 primaryButtonLabel: "OK",
                 primaryButtonContinues: false,
-                activity: nil
+                activity: nil,
+                urgency: .finished
             )
 
         case .spentForToday:
@@ -96,7 +157,8 @@ public struct ShieldPresentation: Hashable, Sendable {
                 symbolName: "moon.stars.fill",
                 primaryButtonLabel: "OK",
                 primaryButtonContinues: false,
-                activity: nil
+                activity: nil,
+                urgency: .spent
             )
         }
     }

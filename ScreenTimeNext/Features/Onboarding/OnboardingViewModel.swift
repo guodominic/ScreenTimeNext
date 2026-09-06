@@ -18,6 +18,9 @@ final class OnboardingViewModel {
 
     var path: [OnboardingStep] = []
     var draft = OnboardingDraft()
+    /// D-018 — what the parent ticks on "Pick apps and categories". Owned here so the counts on
+    /// the step, the draft and the Start button never disagree.
+    var picker: ContentPickerModel
 
     var authorization: ScreenTimeAuthorizationStatus = .notDetermined
     var authorizationMessage: String?
@@ -28,6 +31,8 @@ final class OnboardingViewModel {
 
     init(services: ServiceContainer) {
         self.services = services
+        // D-019/D-021 — a re-run of setup opens on what the parent already picked and arranged.
+        picker = ContentPickerModel.loaded(from: services.storage)
     }
 
     func advance(to step: OnboardingStep) { path.append(step) }
@@ -61,12 +66,20 @@ final class OnboardingViewModel {
     func applySelection(_ snapshot: SelectionSnapshot) { draft.selection = snapshot }
     func clearSelection() { draft.selection = nil }
 
+    /// Mirror the picker into the draft after every tap, so `startNow()` never has to reach back
+    /// into a view for state.
+    func selectionChanged() {
+        draft.selection = picker.snapshot(basedOn: draft.selection)
+    }
+
     // MARK: Start
 
     /// Saves the setup and opens the session in one step — the parent hands over a running timer.
     func startNow() -> Bool {
         do {
+            selectionChanged()
             try draft.commit(using: services)
+            picker.persist(to: services.storage)
             _ = try services.makeSessionController().start()
             commitError = nil
             return true

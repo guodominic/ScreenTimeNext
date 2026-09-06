@@ -19,16 +19,45 @@ public struct SessionWindow: Codable, Equatable, Sendable {
     /// carries through to Time's Up and is gone by the next Start. Optional for decode-compat.
     public var chosenActivity: TransitionActivity?
 
-    public init(startedAt: Date, endsAt: Date, chosenActivity: TransitionActivity? = nil) {
+    /// D-019 — how long this window was worth at Start, before any parent extension.
+    ///
+    /// Needed so that re-deriving the window from a changed daily budget can tell "time the budget
+    /// allows" apart from "time a parent deliberately granted on top of it" (§15) and never claws
+    /// an extension back. Windows written before this existed decode as their full length, which
+    /// makes `grantedSeconds` zero — the honest answer when we cannot know.
+    public private(set) var budgetSecondsAtStart: Int
+
+    public init(startedAt: Date, endsAt: Date, chosenActivity: TransitionActivity? = nil,
+                budgetSecondsAtStart: Int? = nil) {
         self.startedAt = startedAt
         self.endsAt = endsAt
         self.chosenActivity = chosenActivity
+        self.budgetSecondsAtStart = budgetSecondsAtStart
+            ?? max(0, Int(endsAt.timeIntervalSince(startedAt).rounded(.down)))
     }
 
     public init(startedAt: Date, budgetSeconds: Int, chosenActivity: TransitionActivity? = nil) {
         self.startedAt = startedAt
         self.endsAt = startedAt.addingTimeInterval(TimeInterval(budgetSeconds))
         self.chosenActivity = chosenActivity
+        self.budgetSecondsAtStart = max(0, budgetSeconds)
+    }
+
+    // MARK: Codable — tolerant of windows written before `budgetSecondsAtStart` existed
+
+    private enum CodingKeys: String, CodingKey {
+        case startedAt, endsAt, chosenActivity, budgetSecondsAtStart
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let started = try c.decode(Date.self, forKey: .startedAt)
+        let ends = try c.decode(Date.self, forKey: .endsAt)
+        self.startedAt = started
+        self.endsAt = ends
+        self.chosenActivity = try c.decodeIfPresent(TransitionActivity.self, forKey: .chosenActivity)
+        self.budgetSecondsAtStart = try c.decodeIfPresent(Int.self, forKey: .budgetSecondsAtStart)
+            ?? max(0, Int(ends.timeIntervalSince(started).rounded(.down)))
     }
 
     /// Total length of the window in seconds.
@@ -48,8 +77,16 @@ public struct SessionWindow: Codable, Equatable, Sendable {
         remainingSeconds(at: now) == 0
     }
 
+    /// Seconds a parent has granted beyond what the budget paid for (§15).
+    public var grantedSeconds: Int { max(0, totalSeconds - budgetSecondsAtStart) }
+
     /// Grant a parent extension (PRD §6.16, §15). Returns a new window; does not mutate in place.
+    /// `budgetSecondsAtStart` is carried over untouched — that is what makes the extra time
+    /// identifiable as a grant later.
     public func extended(bySeconds seconds: Int) -> SessionWindow {
-        SessionWindow(startedAt: startedAt, endsAt: endsAt.addingTimeInterval(TimeInterval(seconds)), chosenActivity: chosenActivity)
+        SessionWindow(startedAt: startedAt,
+                      endsAt: endsAt.addingTimeInterval(TimeInterval(seconds)),
+                      chosenActivity: chosenActivity,
+                      budgetSecondsAtStart: budgetSecondsAtStart)
     }
 }

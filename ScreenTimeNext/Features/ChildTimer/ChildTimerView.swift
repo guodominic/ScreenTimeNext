@@ -6,6 +6,7 @@
 //  D-013: warning copy uses the parent's configured minutes.
 
 import SwiftUI
+import Combine
 import ScreenTimeNextCore
 
 struct ChildTimerView: View {
@@ -53,6 +54,9 @@ struct ChildTimerView: View {
         .onDisappear { viewModel.disappeared() }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { viewModel.refresh() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .configurationDidChange)) { _ in
+            viewModel.configurationChanged()
         }
         .navigationBarBackButtonHidden(true)
         .toolbar {

@@ -69,6 +69,8 @@ nonisolated final class UserNotificationScheduler: NSObject, NotificationSchedul
         // never to the parent dashboard.
         let isOurs = NotificationIdentifier.all.contains(response.notification.request.identifier)
         guard isOurs else { return }
+        // Latch first: on a cold launch this callback runs before RootView is listening.
+        TimerRoutingLatch.shared.request()
         await MainActor.run {
             NotificationCenter.default.post(name: .openChildTimer, object: nil)
         }
@@ -78,4 +80,31 @@ nonisolated final class UserNotificationScheduler: NSObject, NotificationSchedul
 extension Notification.Name {
     /// Posted when the app should present the child timer (notification tap, session running).
     static let openChildTimer = Notification.Name("screentimenext.openChildTimer")
+
+    /// D-019 — the parent saved Settings. Anything showing parent-owned values re-reads them.
+    static let configurationDidChange = Notification.Name("screentimenext.configurationDidChange")
+}
+
+/// D-018 — tapping a reminder must land on the timer, including on a cold launch.
+///
+/// The broadcast alone is not enough: when the app is launched BY the tap, iOS delivers
+/// `didReceive` while SwiftUI is still building the first view, so the notification is posted
+/// before `RootView` is listening and nothing happens. This latch records the request instead, and
+/// `RootView` drains it as soon as it has finished routing. Both paths stay — the broadcast handles
+/// the warm case immediately, the latch catches the cold one.
+nonisolated final class TimerRoutingLatch: @unchecked Sendable {
+    static let shared = TimerRoutingLatch()
+
+    private let lock = NSLock()
+    private var requested = false
+
+    func request() { lock.withLock { requested = true } }
+
+    /// Reads and clears in one step, so a request is honoured exactly once.
+    func consume() -> Bool {
+        lock.withLock {
+            defer { requested = false }
+            return requested
+        }
+    }
 }

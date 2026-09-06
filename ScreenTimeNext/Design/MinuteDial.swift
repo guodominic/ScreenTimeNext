@@ -6,6 +6,7 @@
 //  `zeroMeansOff` is set (warning reminders).
 
 import SwiftUI
+import ScreenTimeNextCore
 
 struct MinuteDial: View {
     @Binding var minutes: Int
@@ -62,6 +63,9 @@ struct MinuteDial: View {
                         let center = CGPoint(x: size / 2, y: size / 2)
                         let dx = value.location.x - center.x
                         let dy = value.location.y - center.y
+                        // The middle of the dial is the READOUT, not a control: a tap on the number
+                        // used to fling the value to whatever angle the finger happened to be at.
+                        guard (dx * dx + dy * dy).squareRoot() > size * 0.30 else { return }
                         var angle = atan2(dy, dx) + .pi / 2          // 0 at 12 o'clock
                         if angle < 0 { angle += 2 * .pi }
                         let raw = Double(range.lowerBound) + (angle / (2 * .pi)) * Double(span)
@@ -83,14 +87,38 @@ struct MinuteDial: View {
                 }
             }
 
-            HStack(spacing: 28) {
-                Button { nudge(-1) } label: { Image(systemName: "minus.circle.fill").font(.title) }
-                    .disabled(minutes <= range.lowerBound)
-                Button { nudge(1) } label: { Image(systemName: "plus.circle.fill").font(.title) }
-                    .disabled(minutes >= range.upperBound)
-            }
-            .tint(color)
+            stepperRow
         }
+    }
+
+    /// D-020 — `.borderless` is load-bearing, not decoration.
+    ///
+    /// Inside a `Form` or `List` row, a `Button` with the default style makes the WHOLE ROW the tap
+    /// target, and two of them in one row collapse into a single ambiguous target — which is why
+    /// these worked during setup (a ScrollView) and did nothing in Settings. `.borderless` keeps
+    /// each button's own bounds. `contentShape` then guarantees the tappable area is the circle the
+    /// parent can see, rather than the glyph's tight outline.
+    private var stepperRow: some View {
+        HStack(spacing: 28) {
+            stepButton(-1, symbol: "minus.circle.fill", enabled: minutes > range.lowerBound)
+            stepButton(1, symbol: "plus.circle.fill", enabled: minutes < range.upperBound)
+        }
+        .tint(color)
+        .accessibilityHidden(true)          // the dial itself is the adjustable element
+    }
+
+    private func stepButton(_ direction: Int, symbol: String, enabled: Bool) -> some View {
+        Button {
+            nudge(direction)
+        } label: {
+            Image(systemName: symbol)
+                .font(.title)
+                .frame(width: 44, height: 44)      // a real 44pt target, not the glyph's outline
+                .contentShape(Circle())
+        }
+        .buttonStyle(.borderless)
+        .disabled(!enabled)
+        .opacity(enabled ? 1 : 0.35)
     }
 
     private var ticks: some View {
@@ -132,6 +160,50 @@ struct MinuteDial: View {
         // naturally rather than jumping.
         let st = step(near: direction < 0 ? minutes - 1 : minutes)
         minutes = min(max(minutes + direction * st, range.lowerBound), range.upperBound)
+    }
+}
+
+// MARK: Shared configurations
+//
+// D-020 — Settings had its own hand-written budget dial (2...120, fixed 2-minute steps) while
+// setup used the values from `ScreenTimeConfiguration`. Same question, two different feels, and
+// Settings could not express a one-minute budget at all. These factories are now the only way a
+// budget or reminder dial gets built, so the two screens cannot drift apart again.
+
+extension MinuteDial {
+
+    /// Minutes of screen time: 1–120, one-minute steps under fifteen and two above (D-017).
+    static func budget(_ minutes: Binding<Int>,
+                       title: String? = nil,
+                       color: Color = Theme.mint,
+                       baseSize: CGFloat = 230) -> MinuteDial {
+        // Built as a local first: a `...` at the start of a continuation line parses as the
+        // PREFIX operator (PartialRangeThrough), not as the range we mean.
+        let lowest = ScreenTimeConfiguration.budgetRangeSeconds.lowerBound / 60
+        let highest = ScreenTimeConfiguration.budgetRangeSeconds.upperBound / 60
+        return MinuteDial(minutes: minutes,
+                   range: lowest...highest,
+                   step: ScreenTimeConfiguration.budgetStepSeconds / 60,
+                   fineBelow: ScreenTimeConfiguration.fineStepThresholdSeconds / 60,
+                   title: title,
+                   color: color,
+                   baseSize: baseSize)
+    }
+
+    /// One reminder, in minutes before the end. 0 renders as "Off". The upper bound comes from the
+    /// budget and from the reminder before it (D-019), so the caller passes it in.
+    static func reminder(_ minutes: Binding<Int>,
+                         upperBound: Int,
+                         title: String,
+                         color: Color,
+                         baseSize: CGFloat = 104) -> MinuteDial {
+        MinuteDial(minutes: minutes,
+                   range: 0...max(0, upperBound),
+                   step: ScreenTimeConfiguration.warningStepSeconds / 60,
+                   title: title,
+                   color: color,
+                   baseSize: baseSize,
+                   zeroMeansOff: true)
     }
 }
 

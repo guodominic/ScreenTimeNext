@@ -82,10 +82,10 @@ final class ParentDashboardViewModel {
 
     /// D-016 — set today's budget from the hero and open a session in one action.
     func startSession() {
+        // Only the budget changes here — everything else the parent has arranged (reminders,
+        // activities, category order, "my usual") is carried across untouched (D-019).
         var config = configuration
-        config = ScreenTimeConfiguration(dailyBudgetSeconds: quickMinutes * 60,
-                                         warningOffsetsSeconds: config.warningOffsetsSeconds,
-                                         selectedActivities: config.selectedActivities)
+        config.dailyBudgetSeconds = quickMinutes * 60
         try? services.storage.save(config)
         _ = try? controller.start()
         reload()

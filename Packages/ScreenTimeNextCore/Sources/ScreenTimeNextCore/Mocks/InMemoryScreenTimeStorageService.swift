@@ -15,6 +15,7 @@ public final class InMemoryScreenTimeStorageService: ScreenTimeStorageService, @
     private var usageByDay: [Date: DailyUsage] = [:]
     private var window: SessionWindow?
     private var protection: ProtectionState = .unshielded
+    private var pickerPreferences: ParentPickerPreferences = .default
     private var _failing = false
 
     public init() {}
@@ -67,10 +68,26 @@ public final class InMemoryScreenTimeStorageService: ScreenTimeStorageService, @
         try lock.withLock { try check(); protection = state }
     }
 
+    /// D-024 — `pickerPreferences` deliberately survives: "Start over" erases the child's setup,
+    /// not the parent's own arrangement of the picker.
     public func eraseAll() throws {
         try lock.withLock {
             try check()
             profile = nil; configuration = nil; usageByDay = [:]; window = nil; protection = .unshielded
+        }
+    }
+
+    public func loadPickerPreferences() throws -> ParentPickerPreferences {
+        try lock.withLock {
+            try check()
+            return pickerPreferences
+        }
+    }
+
+    public func save(_ preferences: ParentPickerPreferences) throws {
+        try lock.withLock {
+            try check()
+            pickerPreferences = preferences
         }
     }
 

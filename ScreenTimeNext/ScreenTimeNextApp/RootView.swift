@@ -37,27 +37,41 @@ struct RootView: View {
         }
         .task {
             route = isSetUp ? .home : .onboarding
-            if pendingTimerRequest && route == .home {
-                pendingTimerRequest = false
-                showChildTimer = true
-            }
+            honourPendingTimerRequest()
             presentTimerIfSessionExists()
         }
         // During a session the device is the child's: however the app is opened, the timer is
         // what they see. The Parents control (D-011) is the way to the dashboard.
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { presentTimerIfSessionExists() }
+            if phase == .active {
+                honourPendingTimerRequest()
+                presentTimerIfSessionExists()
+            }
         }
         // A warning was tapped. If routing hasn't finished yet (cold launch straight from the
         // notification), remember it and honour it as soon as it has.
         .onReceive(NotificationCenter.default.publisher(for: .openChildTimer)) { _ in
-            if route == .home { showChildTimer = true } else { pendingTimerRequest = true }
+            pendingTimerRequest = true
+            honourPendingTimerRequest()
         }
         .fullScreenCover(isPresented: $showChildTimer) {
             NavigationStack {
                 ChildTimerView(services: services)
             }
         }
+    }
+
+    /// A reminder was tapped. Two sources, because one of them can fire before this view exists:
+    /// the in-process broadcast (app already running) and the latch (launched BY the tap).
+    private func honourPendingTimerRequest() {
+        let latched = TimerRoutingLatch.shared.consume()
+        guard pendingTimerRequest || latched else { return }
+        guard route == .home else {
+            pendingTimerRequest = true      // still onboarding — honour it once routing settles
+            return
+        }
+        pendingTimerRequest = false
+        showChildTimer = true
     }
 
     private func presentTimerIfSessionExists() {

@@ -9,10 +9,11 @@ import ScreenTimeNextCore
 @main
 struct ScreenTimeNextApp: App {
 
-    /// Phase 0 (D-007): Screen Time services mocked, persistence real (app container).
-    /// Phase 1 swaps real adapters and the App Group container in here, and nowhere else.
-    private let container: ServiceContainer = .phase0(notifications: UserNotificationScheduler(),
-                                                     presence: LiveActivityPresenter())
+    /// D-023 — Phase 1. Persistence is the App Group container (the only one the extensions can
+    /// read); the Screen Time services are swapped for real adapters here, one task at a time.
+    /// This is the ONLY place any of that is decided.
+    private let container: ServiceContainer = .live(notifications: UserNotificationScheduler(),
+                                                   presence: LiveActivityPresenter())
 
     var body: some Scene {
         WindowGroup {

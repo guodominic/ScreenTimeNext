@@ -13,7 +13,7 @@ in the same commit as the work. If this file and a task's front-matter disagree,
 | 001 | [Project Foundation](001-project-foundation.md) | done | — | — | PASS (ext. target + capabilities blocked by gate) | build OK, 16/16 tests; `./scripts/test.sh` |
 | 002 | [App Architecture](002-app-architecture.md) | done | 001 | — | PASS | 26/26 tests; import check automated |
 | 003 | [Parent Onboarding](003-parent-onboarding.md) | done | 002 | QA-01 | PASS | 32/32; QA-01 verified on device |
-| 004 | [Family Controls Authorization](004-family-controls-authorization.md) | not_started | 002, 003 | QA-02 | — | entitlement risk |
+| 004 | [Family Controls Authorization](004-family-controls-authorization.md) | not_started | 002, 003 | QA-02 | — | **unblocked** — entitlement signing since 2026-09-06 |
 | 005 | [Family Activity Picker](005-family-activity-picker.md) | not_started | 004 | QA-03, QA-04 | — | |
 | 006 | [Screen Time Configuration](006-screen-time-configuration.md) | done | 002 | QA-05 | PASS (App Group at gate) | 40/40; FileStorageService |
 | 007 | [Child Timer UI](007-child-timer-ui.md) | done | 006 | QA-06, QA-07 | PASS / device check pending | 51/51; SessionController |
@@ -56,7 +56,7 @@ in the same commit as the work. If this file and a task's front-matter disagree,
 | Phase | Account | Tasks | Exit condition |
 |---|---|---|---|
 | **0 — experience half** | free Personal Team | 001, 002, 003, 006 (local storage), 007, 008, 009, 014, 015 | Prototype runs on Dominic's device; a few families used it for a week; §21 Q2 ("does choosing the next activity help?") has an answer |
-| **Gate** | — | pay $99, submit entitlement request ×2 | Only if Phase 0 says yes |
+| **Gate** | — | pay $99, submit entitlement request ×2 | **PASSED 2026-09-06** — membership active, Family Controls (Development), App Groups and Time Sensitive Notifications all signing (B-006) |
 | **1 — enforcement half** | paid | 004, 005, 010, 011, 012, 013, 016, 017, 018, 019, 020 | §22 Definition of Done |
 
 ## Batched verification note

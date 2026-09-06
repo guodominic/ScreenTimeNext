@@ -25,11 +25,7 @@ struct TimeStepView: View {
 
             ScrollView {
                 VStack(spacing: 24) {
-                    MinuteDial(minutes: minutes,
-                               range: ScreenTimeConfiguration.budgetRangeSeconds.lowerBound / 60...ScreenTimeConfiguration.budgetRangeSeconds.upperBound / 60,
-                               step: ScreenTimeConfiguration.budgetStepSeconds / 60,
-                               fineBelow: ScreenTimeConfiguration.fineStepThresholdSeconds / 60,
-                               color: Theme.mint)
+                    MinuteDial.budget(minutes, color: Theme.mint)
                         .bounceIn()
 
                     VStack(spacing: 10) {

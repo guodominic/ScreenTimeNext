@@ -479,6 +479,259 @@ a judgement.
   **what counts** on its own, skippable. The budget dial steps by **one minute under fifteen**,
   two above, and the range now starts at one minute — "seven more minutes" is a real answer.
 
+## D-018 — Colour means time, not activity; the picker is the screen; no per-category app counts
+**Date:** 2026-09-06 · **Status:** accepted
+
+**Context.** Four things Dominic hit on the device:
+1. Every reminder interstitial came up a different colour. The card was tinted by the activity the
+   child had chosen (`Theme.color(for: activity)`), so the colour said "you picked LEGO", not "you
+   have two minutes left" — and Pip only ever had two faces across the whole sequence.
+2. The dashboard hero carried labels for things a parent already knows or does not need: an
+   "Open timer" caption on a tappable clock, "In progress"/"Not shielded" chips, a "your child"
+   stand-in where a name was missing, and a "Status" section that mostly reported that everything
+   was fine.
+3. "What counts?" was a coy title on a screen whose real content was one button that opened
+   something else.
+4. Open question: can the app show how many installed apps a chosen category contains?
+
+**Decision.**
+- **`ShieldUrgency` (calm / soon / last / finished / spent) is carried on `ShieldPresentation`** and
+  is the only thing that picks colour and expression: green → orange → red across the reminders,
+  the rainbow reserved for the finish, lavender for "already spent today". A distinct mascot mood
+  per step (playing / thinking / excited / cheering / sleepy). `forWarning(index:count:)` treats a
+  lone reminder as the LAST one — `WarningStateEngine.role(ofWarningAt:count:)` calls index 0
+  `.firstWarning` for state-machine reasons, and colour must not inherit that. The chosen activity
+  still shapes the words and the badge; it no longer shapes the colour.
+- **The dashboard keeps only what a parent acts on.** Hero = name (or "Today"), Pip, the ring, and
+  End / Extend. No caption, no chips, no Status section. The one status line that survives is
+  "Notifications are off", shown only when it is true, because that one means the app is not doing
+  its job. Fixing this also fixed a real bug: End and Extend were `Button`s nested inside the
+  hero's own `Button`, so the outer one swallowed their taps — the hero is now a plain view with
+  `onTapGesture`.
+- **The picker IS the setup screen.** Title: "Pick apps and categories". A scrollable, multi-select
+  list of category tiles with a Websites section for browsers, running counts above it and a Start
+  button pinned to the bottom. `ContentPickerModel` owns the picks so the step, the draft and the
+  counts cannot disagree; the same view serves Settings as `ContentPickerScreen`.
+- **Notification taps route through a latch** (`TimerRoutingLatch`) as well as the in-process
+  broadcast, because on a cold launch `didReceive` runs before `RootView` is listening.
+
+**Consequences.**
+- The Phase 1 `ShieldConfiguration` extension reads `presentation.urgency` for its background
+  colour; nothing else about that extension changes.
+- `ContentCategory` is a **Phase 0 stand-in and can never be the real thing**: an
+  `ActivityCategoryToken` cannot be constructed from a name, so these rows shield nothing. Phase 1
+  replaces the rows inside `ContentPickerView` with `FamilyActivityPicker` inline — it is a SwiftUI
+  view, not only a sheet — and everything around it (counts, Start button, `SelectionSummary`)
+  survives unchanged. See B-005.
+- Settings cannot pre-tick the picker from a saved selection, because the stored summary is counts
+  only (§16). Reopening it starts empty until Phase 1, where Apple's picker holds its own state.
+
+## D-019 — Settings reach the running session; reminders can only descend; the picker is the parent's
+**Date:** 2026-09-06 · **Status:** accepted
+
+**Context.** Five things Dominic found on the device:
+1. Changing the next-activity list, the daily budget or the reminders in Settings did not show up
+   in a session that was already running.
+2. Nothing stopped reminder 1 being *smaller* than reminder 2 — 5 / 10 / 2 was settable, and the
+   configuration silently re-sorted it afterwards, so the dials lied about what was saved.
+3. The category rows were in our order, not the parent's.
+4. "The usual three" were three categories **we** picked.
+5. The Dynamic Island showed an SF Symbol, not the app's mascot.
+
+**Decision.**
+- **`SessionController.applyConfigurationChange()`.** Reminders and activities were already
+  re-read from storage on every tick — those followed on their own, though the child timer read
+  activities through a *computed* property, which touches no observable state, so SwiftUI never
+  redrew the chooser; that is now a stored property refreshed on demand. The budget is the real
+  bug: a window is a wall-clock window (D-006) whose end is fixed at Start. The fix keeps
+  `startedAt` (elapsed time is spent and stays spent) and moves `endsAt` to
+  `now + (newBudget − recorded − elapsed) + granted`. `lastState` is reset so the stage is
+  re-derived: `WarningStateEngine.next` is monotonic, so without that a session at "one minute
+  left" would stay red after the parent granted twenty more.
+- **`SessionWindow.budgetSecondsAtStart`** records what the window was worth at Start, so a parent
+  extension (§15) can be told apart from budget and is never clawed back by a settings save. Absent
+  in windows written earlier, where it decodes as the full length — granted time zero, the honest
+  answer when we cannot know.
+- **Reminders strictly descend.** Two mechanisms, so the illegal state is unreachable rather than
+  corrected behind the parent's back: each dial's range stops one minute short of the dial before
+  it, and moving a dial pushes the later ones down (`clampedDescendingMinutes`). A dial set to 0
+  turns off every later one — "reminder 3" with no reminder 2 is a numbering lie.
+- **The picker is the parent's.** Rows are drag-reorderable and the order persists in the
+  configuration; browsers sit first by default (the one row covering something no app category
+  does, and the easiest to overlook); "My usual" is a set the parent saves from whatever is ticked,
+  not three categories we chose.
+- **Pip in the Dynamic Island**, drawn a second time as a compact `PipMark` in the widget target.
+  Sharing `Mascot.swift` would mean either putting SwiftUI into the deliberately framework-free
+  package or adding the file to two targets; a widget mark also has different needs (16–24pt,
+  inside a black pill, sometimes drawn in a single tint).
+
+**Consequences.**
+- `applyConfigurationChange()` is now the call after any settings save — it subsumes
+  `rescheduleNotifications()`, which could not move the window's end.
+- A saved category order is always completed against the catalogue, so a category added in a later
+  version can never be stranded off the bottom of an old saved list.
+- `PipMark` must be kept in step with `Mascot.swift` by hand. Both are pure SwiftUI shapes, so the
+  cost is a few lines when Pip's face changes.
+
+## D-020 — One dial configuration, and buttons that survive a Form row
+**Date:** 2026-09-06 · **Status:** accepted
+
+**Context.** Two things Dominic hit in Settings:
+1. The budget dial there stepped differently from the one in setup — Settings had its own
+   hand-written `2...120, step: 2`, so it could not express a one-minute budget and jumped two at a
+   time where setup moved one.
+2. The +/− buttons under the dials did nothing in Settings — the budget dial's and the reminder
+   dials' alike — while the identical control worked during setup.
+
+**Decision.**
+- **`MinuteDial.budget(_:)` and `MinuteDial.reminder(_:upperBound:…)`** are now the only way a dial
+  gets built. Both read their range and steps from `ScreenTimeConfiguration`, so setup, Settings
+  and the Extend sheet cannot drift apart again. Extra time gets the fine steps too — "five more
+  minutes" is the common grant.
+- **`.buttonStyle(.borderless)` on the +/− buttons.** This was not cosmetic. Inside a `Form` or
+  `List` row, a `Button` with the default style makes the WHOLE ROW the tap target, and two of them
+  in one row collapse into a single ambiguous target — which is exactly why they worked in setup (a
+  `ScrollView`) and were dead in Settings (a `Form`). Each button also gets a real 44pt circular
+  hit area rather than the glyph's outline.
+- **The middle of the dial is the readout, not a control.** A tap on the number used to fling the
+  value to whatever angle the finger happened to be at; the drag now ignores touches inside the
+  inner 30%.
+
+**Consequences.**
+- Any new dial goes through a factory. A raw `MinuteDial(...)` outside `MinuteDial.swift` is a
+  smell — it means someone is re-deciding the steps locally.
+- The rule generalises: any row in a `Form`/`List` holding more than one button needs an explicit
+  button style. `ContentPickerView`'s "My usual" row already carries `.bordered` for this reason.
+
+## D-021 — The picker remembers; the Live Activity does not outlive its session
+**Date:** 2026-09-06 · **Status:** accepted
+
+**Context.** Two reports from the device:
+1. Categories ticked in the picker were gone on the next launch. D-019 persisted the row ORDER and
+   "my usual" but deliberately not the ticks, on a reading of §16 that turned out to be too broad.
+2. After force-quitting the app, the Live Activity was still on screen and the reminders still
+   fired — "why is it still running?"
+
+**Decision.**
+- **`ScreenTimeConfiguration.selectedCategories`** persists the ticks. §16 forbids storing or
+  surfacing Apple's opaque `FamilyActivitySelection` TOKENS; our own catalogue rows are not tokens,
+  and treating them as such cost the parent their setup on every launch. Stored in row order, so
+  the list reads back the way they arranged it. In Phase 1 the real selection lives in Apple's
+  picker (which persists its own state) and this remains the record of which rows were chosen.
+- **Continuing after a force-quit is correct and stays.** Reminders are handed to iOS as calendar
+  triggers, and the countdown is drawn from absolute dates by `Text(timerInterval:)` with no
+  process (Rule 4). If swiping the app away stopped either, the app would be defeated by the most
+  obvious action a child could take (§17). The budget is wall-clock time (D-006): it keeps being
+  spent whether or not the app is open. None of that changes.
+- **What WAS broken is the ending.** Nothing retired the Live Activity when the window ran out —
+  only `finalizeLocked` ended it, which needs a new Start, a parent ending the session, or day
+  rollover. So a finished session left a card sitting there claiming to be live. Now:
+  · `SessionPresenting.finish(_:)` — distinct from `hide()`, because "time is up" is worth seeing
+    for a few minutes whereas a session the parent ended should just go. It ends the activity with
+    `dismissalPolicy: .after(now + 10 minutes)`.
+  · The controller fires it on the transition INTO `.finished`, exactly once — `finish` restarts
+    the dismissal timer, so calling it on every one-second tick would keep the card alive forever,
+    which is the very bug being fixed.
+  · `restore()` with no window calls `hide()`. This is what clears a card stranded by a force-quit:
+    the app could not end it while it was not running, so the next launch does.
+  · The widget treats `context.isStale` as finished. A force-quit partway through means no update
+    ever arrives, so without this a dead card would keep claiming a session is running.
+
+**Consequences.**
+- A card can still linger if the app is force-quit AND never reopened — iOS gives no way to
+  schedule an end without a process. The stale rendering makes it honest in the meantime, and the
+  system retires it at its own limit.
+- `finish` is one-way: `end(_:dismissalPolicy:)` stops the activity being updatable. That is fine
+  for a session that is over, but it means an extension granted afterwards starts a fresh activity.
+
+## D-022 — "Save as my usual" writes when it is pressed
+**Date:** 2026-09-06 · **Status:** accepted
+
+**Context.** D-021 stored `favouriteCategories` in the configuration, and it still did not survive a
+relaunch. The value was right; the timing was wrong. `saveCurrentAsFavourites()` only changed
+memory — the write happened when the parent went on to press Settings' own Save. "Done" on the
+picker reads as "saved and finished", so pressing Done and leaving lost what had just been saved.
+There was no feedback either: the button disappears the moment it works (the selection now matches
+the set), so nothing distinguished "saved" from "did nothing".
+
+**Decision.**
+- The picker model takes an optional `autosave` storage target. "Save as my usual" and a drag both
+  write **immediately**, independent of any surrounding screen's Save. A button labelled Save must
+  save.
+- Only the arrangement (order + "my usual") autosaves. The ticks stay with the selection the
+  surrounding screen commits — Start in setup, Save in Settings — because that is the thing the
+  parent is deciding on that screen.
+- A short "Saved" replaces the button so the press is visibly acknowledged; it clears on the next
+  change.
+- Saving an empty set is refused: with nothing ticked, "my usual" would be an empty set the button
+  could never usefully apply.
+
+**Consequences.**
+- **Setup passes no autosave target, deliberately.** `loadConfiguration()` returns defaults rather
+  than throwing when nothing is stored, so an autosave during first-run setup would CREATE a
+  configuration — and a stored configuration is what marks the app as set up (D-016). A parent who
+  dragged one row and quit would come back to a skipped onboarding. The arrangement is written with
+  everything else when they press Start.
+- The general lesson for this codebase: a control whose label is a verb ("Save", "Apply") must
+  complete that verb by itself. Deferring it to a parent screen's Save is a correctness bug, not a
+  refactor detail.
+
+## D-023 — Phase 1 storage moves to the App Group, with a migration and a fallback
+**Date:** 2026-09-06 · **Status:** accepted (entitlements staged, see B-006)
+
+**Context.** The paid membership exists, so the enforcement half can begin. Storage has to move from
+the app's own container to the App Group, because that is the only directory the DeviceActivityMonitor
+and Shield extensions can read. Two hazards: a parent already using the Phase 0 build has their
+configuration in the app container, and a build whose provisioning is not ready must not crash.
+
+**Decision.**
+- `FileStorageService.shared()` prefers the App Group and falls back to the app container when the
+  group cannot be resolved. A signing problem therefore degrades to "the extensions see nothing"
+  rather than a launch crash.
+- It migrates on first use: every record is copied into the group container, **only when the group
+  container is empty**, and the originals are never deleted. Without this, switching directories
+  would look exactly like a factory reset to anyone already using the app.
+- `ServiceContainer.live(...)` replaces `.phase0(...)` at the app entry point. The four Screen Time
+  services are still parameters, defaulting to their mocks, so Tasks 004/005/010/011 can swap in one
+  real adapter at a time without the app ever being unbuildable.
+- `ServiceContainer.storageIsShared` reports whether storage is actually in the group — the honest
+  signal for "enforcement can work", which a healthy-looking app does not otherwise give.
+
+**Consequences.**
+- The copy is one-way and one-time. If a parent runs an old build after migrating, it reads the
+  stale app-container copy. Acceptable: the old build is not something they can get back to.
+- `Config/*.entitlements` are written but NOT referenced by the project yet — see B-006.
+
+## D-024 — "Start over" erases the child's setup, not the parent's arrangement
+**Date:** 2026-09-06 · **Status:** accepted
+
+**Context.** D-021/D-022 put `categoryOrder` and `favouriteCategories` in `ScreenTimeConfiguration`.
+That made "Start over" wipe them, so a parent who had dragged thirteen rows into their own order and
+saved a "my usual" set lost both on every reset. Dominic asked for the saved default to survive both
+a reset and a kill.
+
+**Decision.**
+- A separate record, `ParentPickerPreferences` (order + favourites + `favouritesAreCustom`), in its
+  own file, which `eraseAll()` deliberately leaves alone. The configuration is the CHILD's setup —
+  budget, reminders, what is covered — and that is exactly what a reset should take. The row order
+  and "my usual" are the parent's own working arrangement and are not part of what is being reset.
+- The ticks (`selectedCategories`) stay in the configuration and DO reset, because they are part of
+  the setup being redone. What replaces them is better: a fresh picker opens pre-ticked with the
+  parent's own saved "usual", so starting over lands them one tap from where they were.
+- `favouritesAreCustom` gates that pre-tick. Offering back a set the parent saved is helpful;
+  silently ticking three categories WE chose for them is presumptuous, and the flag is the only
+  thing that can tell those two apart.
+- The confirmation copy now names what is kept. A dialog that says "erases all settings" while
+  quietly keeping some is a smaller lie than losing the data, but still a lie.
+
+**Consequences.**
+- `ScreenTimeStorageService` gains `loadPickerPreferences()` / `save(_:)`. Any future preference
+  that belongs to the parent rather than the child's setup belongs in this record, not in the
+  configuration — that is the line to check against when adding one.
+- `eraseAll()` is no longer "erase everything ScreenTimeNext stored". If a full wipe is ever needed
+  (an App Store privacy request, say), it needs its own method rather than a quiet re-widening of
+  this one.
+
 <!-- Template for new entries:
 
 ## D-NNN — <short imperative title>

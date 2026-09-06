@@ -1,8 +1,16 @@
 //  ShieldCardView.swift
 //  ScreenTimeNext
 //
-//  D-012. A faithful mock of how iOS renders a ManagedSettings shield: a blurred backdrop of the
-//  app the child is in, with a centered icon, title, subtitle and buttons on top.
+//  D-012 / D-018. A faithful mock of how iOS renders a ManagedSettings shield: a blurred backdrop
+//  of the app the child is in, with a centered icon, title, subtitle and buttons on top.
+//
+//  D-018 — colour and expression carry ONE message: how close the end is.
+//      calm     green      Pip is playing        first reminder, plenty of room
+//      soon     orange     Pip is thinking       middle reminder, start wrapping up
+//      last     red        Pip is excited        last reminder before the end
+//      finished rainbow    Pip is cheering       the celebration, and the only multi-coloured card
+//      spent    lavender   Pip is sleepy         opened later with the budget already gone
+//  The chosen activity still shapes the WORDS and the little badge; it no longer picks the colour.
 //
 //  This is a PREVIEW. The real shield (Phase 1) is drawn by the system from a `ShieldConfiguration`
 //  built out of the same `ShieldPresentation` values, so what is tuned here is what ships:
@@ -18,24 +26,26 @@ struct ShieldCardView: View {
     let presentation: ShieldPresentation
     var onPrimary: () -> Void = {}
 
-    private var tint: Color {
-        presentation.activity.map(Theme.color(for:)) ?? Theme.sky
+    /// One flat colour for strokes and the mascot, even at the finish where the fill is a gradient.
+    private var tint: Color { Theme.color(for: presentation.urgency) }
+    /// The fill: a gradient at the finish, the urgency colour everywhere else.
+    private var fill: AnyShapeStyle { Theme.style(for: presentation.urgency) }
+
+    /// A different face at every step, so the child reads the moment before reading the words.
+    private var mood: MascotMood {
+        switch presentation.urgency {
+        case .calm:     return .playing
+        case .soon:     return .thinking
+        case .last:     return .excited
+        case .finished: return .cheering
+        case .spent:    return .sleepy
+        }
     }
 
     var body: some View {
         VStack(spacing: 20) {
-            ZStack(alignment: .bottomTrailing) {
-                Mascot(mood: presentation.primaryButtonContinues ? .thinking : .cheering,
-                       size: 104, tint: tint, animated: false)
-                Image(systemName: presentation.symbolName)
-                    .font(.system(size: 22, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 44, height: 44)
-                    .background(Circle().fill(tint))
-                    .overlay(Circle().stroke(.white, lineWidth: 2.5))
-                    .offset(x: 6, y: 2)
-            }
-            .bounceIn()
+            badge
+                .bounceIn()
 
             Text(presentation.title)
                 .font(.system(.title2, design: .rounded).bold())
@@ -54,7 +64,7 @@ struct ShieldCardView: View {
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
-                    .background(Capsule().fill(tint))
+                    .background(Capsule().fill(fill))
             }
             .buttonStyle(.plain)
             .padding(.top, 4)
@@ -63,6 +73,24 @@ struct ShieldCardView: View {
         .padding(.horizontal, 32)
         .frame(maxWidth: 460)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    /// Pip with the moment's symbol pinned to his shoulder.
+    private var badge: some View {
+        ZStack(alignment: .bottomTrailing) {
+            if presentation.urgency == .finished {
+                Sparkles(color: tint, count: 10)
+                    .frame(width: 150, height: 150)
+            }
+            Mascot(mood: mood, size: 104, tint: tint, animated: false)
+            Image(systemName: presentation.symbolName)
+                .font(.system(size: 22, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 44, height: 44)
+                .background(Circle().fill(fill))
+                .overlay(Circle().stroke(.white, lineWidth: 2.5))
+                .offset(x: 6, y: 2)
+        }
     }
 }
 
@@ -87,14 +115,31 @@ struct PretendAppBackdrop: View {
     }
 }
 
-#Preview("Reminder") {
+#Preview("1st reminder — green") {
     ZStack {
         PretendAppBackdrop()
-        ShieldCardView(presentation: .make(for: .reminder(minutesLeft: 5, activity: .lego), childName: "Ivy"))
+        ShieldCardView(presentation: .make(for: .reminder(minutesLeft: 10, activity: .lego),
+                                           childName: "Ivy", urgency: .calm))
     }
 }
 
-#Preview("Finished") {
+#Preview("2nd reminder — orange") {
+    ZStack {
+        PretendAppBackdrop()
+        ShieldCardView(presentation: .make(for: .reminder(minutesLeft: 5, activity: .lego),
+                                           childName: "Ivy", urgency: .soon))
+    }
+}
+
+#Preview("Last reminder — red") {
+    ZStack {
+        PretendAppBackdrop()
+        ShieldCardView(presentation: .make(for: .reminder(minutesLeft: 1, activity: .lego),
+                                           childName: "Ivy", urgency: .last))
+    }
+}
+
+#Preview("Finished — celebration") {
     ZStack {
         PretendAppBackdrop()
         ShieldCardView(presentation: .make(for: .finished(activity: .outside), childName: "Ivy"))

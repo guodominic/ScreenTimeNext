@@ -18,6 +18,8 @@ struct ShieldPreviewView: View {
     @State private var activity: TransitionActivity?
     @State private var minutes = 5
     @State private var immersive = false
+    /// Which reminder in the sequence — this is what drives the colour, not the clock (D-018).
+    @State private var urgency: ShieldUrgency = .calm
 
     private var moment: ShieldMoment {
         switch momentIndex {
@@ -28,7 +30,7 @@ struct ShieldPreviewView: View {
     }
 
     private var presentation: ShieldPresentation {
-        .make(for: moment, childName: childName)
+        .make(for: moment, childName: childName, urgency: momentIndex == 0 ? urgency : nil)
     }
 
     var body: some View {
@@ -80,6 +82,12 @@ struct ShieldPreviewView: View {
                 .pickerStyle(.segmented)
 
                 if momentIndex == 0 {
+                    Picker("Which reminder", selection: $urgency) {
+                        Text("1st · green").tag(ShieldUrgency.calm)
+                        Text("2nd · orange").tag(ShieldUrgency.soon)
+                        Text("Last · red").tag(ShieldUrgency.last)
+                    }
+                    .pickerStyle(.segmented)
                     Stepper("Minutes left: \(minutes)", value: $minutes, in: 1...15)
                 }
 
@@ -92,7 +100,7 @@ struct ShieldPreviewView: View {
                     }
                 }
             } footer: {
-                Text("This is a preview. The real screen appears inside the app your child is using, and needs Screen Time access — see Settings ▸ Status.")
+                Text("This is a preview. The real screen appears inside the app being used, and needs Screen Time access. Colour follows the countdown: green, then orange, then red, and the finish is the only colourful one.")
             }
 
             Section {
@@ -102,7 +110,7 @@ struct ShieldPreviewView: View {
                     Label("Show it full screen", systemImage: "arrow.up.left.and.arrow.down.right")
                 }
             } footer: {
-                Text("Full screen is the honest test: hand the device to your child and watch what they do.")
+                Text("Full screen is the honest test: hand the device over and watch what happens.")
             }
         }
         .scrollContentBackground(.hidden)

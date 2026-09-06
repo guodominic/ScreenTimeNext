@@ -14,6 +14,10 @@ final class ChildTimerViewModel {
     private(set) var snapshot: ChildSessionSnapshot = .idle
     private(set) var childName: String = ""
     private(set) var errorText: String?
+    /// D-019 — stored, not computed. A computed property that reads storage touches no observable
+    /// state, so SwiftUI had no reason to redraw the chooser when the parent changed the activity
+    /// list in Settings.
+    private(set) var availableActivities: [TransitionActivity] = TransitionActivity.allCases
 
     private let controller: SessionController
     private let storage: any ScreenTimeStorageService
@@ -27,9 +31,26 @@ final class ChildTimerViewModel {
     // MARK: Lifecycle
 
     func appeared() {
-        childName = (try? storage.loadChildProfile())?.name ?? ""
+        reloadParentSettings()
         run { try controller.restore() }
         startTicking()
+    }
+
+    /// D-019 — the parent saved Settings while this session was running. Re-read everything that
+    /// came from them, and let the controller re-derive the window from the new daily budget.
+    func configurationChanged() {
+        reloadParentSettings()
+        if let updated = (try? controller.applyConfigurationChange()) ?? nil {
+            snapshot = updated
+            errorText = nil
+        } else {
+            refresh()
+        }
+    }
+
+    private func reloadParentSettings() {
+        childName = (try? storage.loadChildProfile())?.name ?? ""
+        availableActivities = (try? controller.availableActivities()) ?? TransitionActivity.allCases
     }
 
     func disappeared() {
@@ -51,10 +72,6 @@ final class ChildTimerViewModel {
     /// PRD §6.11 — pick what to do next. Task 009.
     func choose(_ activity: TransitionActivity) {
         run { try controller.choose(activity) }
-    }
-
-    var availableActivities: [TransitionActivity] {
-        (try? controller.availableActivities()) ?? TransitionActivity.allCases
     }
 
     // MARK: Internals

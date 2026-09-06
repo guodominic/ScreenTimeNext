@@ -42,7 +42,13 @@ public protocol ScreenTimeStorageService: Sendable {
     func loadProtectionState() throws -> ProtectionState
     func save(_ state: ProtectionState) throws
 
-    /// Forget everything ScreenTimeNext stored. Parent-initiated "start over" (and Task 017).
-    /// Never touches anything outside ScreenTimeNext's own records.
+    /// D-024 — the parent's picker arrangement. Survives `eraseAll`, because it is the parent's
+    /// own working setup rather than the child's configuration.
+    func loadPickerPreferences() throws -> ParentPickerPreferences
+    func save(_ preferences: ParentPickerPreferences) throws
+
+    /// Forget the child's setup: profile, configuration, usage, session, protection state.
+    /// Parent-initiated "start over" (and Task 017). Never touches anything outside
+    /// ScreenTimeNext's own records, and deliberately KEEPS `ParentPickerPreferences` — see D-024.
     func eraseAll() throws
 }

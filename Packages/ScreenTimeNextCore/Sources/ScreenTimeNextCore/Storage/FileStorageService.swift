@@ -63,15 +63,51 @@ public final class FileStorageService: ScreenTimeStorageService, @unchecked Send
         return try? FileStorageService(directory: base.appendingPathComponent("ScreenTimeNext", isDirectory: true))
     }
 
+    /// D-023 — the container the app actually runs on, now that the paid membership exists.
+    ///
+    /// Prefers the App Group, because that is the only directory the DeviceActivityMonitor and
+    /// Shield extensions can read. Falls back to the app's own container when the group cannot be
+    /// resolved — a build without the entitlement, or a device where provisioning has not caught
+    /// up — so a signing problem degrades to "the extensions see nothing" rather than a crash on
+    /// launch.
+    ///
+    /// It also MIGRATES: a parent who has been using the Phase 0 build has their configuration in
+    /// the app container, and switching directories without moving it would look exactly like a
+    /// factory reset. The copy happens once, only into an empty group container, and never deletes
+    /// the originals — if anything goes wrong the old data is still there.
+    public static func shared(fileManager: FileManager = .default) throws -> FileStorageService {
+        let local = try appContainer(fileManager: fileManager)
+        guard let group = appGroup(fileManager: fileManager) else { return local }
+        group.adoptRecords(from: local, fileManager: fileManager)
+        return group
+    }
+
+    /// Copy every record from `other` into this (empty) directory. No-op if anything is already
+    /// here, so a later launch can never overwrite newer shared data with a stale local copy.
+    func adoptRecords(from other: FileStorageService, fileManager: FileManager) {
+        lock.withLock {
+            let alreadyPopulated = File.allCases.contains { file in
+                file != .manifest && fileManager.fileExists(atPath: url(file).path)
+            }
+            guard !alreadyPopulated else { return }
+            for file in File.allCases where file != .manifest {
+                let source = other.directory.appendingPathComponent(file.rawValue)
+                guard fileManager.fileExists(atPath: source.path) else { continue }
+                try? fileManager.copyItem(at: source, to: url(file))
+            }
+        }
+    }
+
     // MARK: Files
 
-    private enum File: String {
+    private enum File: String, CaseIterable {
         case manifest = "manifest.json"
         case childProfile = "childProfile.json"
         case configuration = "configuration.json"
         case dailyUsage = "dailyUsage.json"
         case sessionWindow = "sessionWindow.json"
         case protectionState = "protectionState.json"
+        case pickerPreferences = "pickerPreferences.json"
     }
 
     private struct Manifest: Codable {
@@ -198,12 +234,22 @@ public final class FileStorageService: ScreenTimeStorageService, @unchecked Send
         try lock.withLock { try write(state, to: .protectionState) }
     }
 
+    /// D-024 — `pickerPreferences` is absent from this list on purpose: "Start over" erases the
+    /// child's setup, not the parent's own arrangement of the picker.
     public func eraseAll() throws {
         lock.withLock {
             for file in [File.childProfile, .configuration, .dailyUsage, .sessionWindow, .protectionState] {
                 remove(file)
             }
         }
+    }
+
+    public func loadPickerPreferences() throws -> ParentPickerPreferences {
+        lock.withLock { read(ParentPickerPreferences.self, from: .pickerPreferences) ?? .default }
+    }
+
+    public func save(_ preferences: ParentPickerPreferences) throws {
+        try lock.withLock { try write(preferences, to: .pickerPreferences) }
     }
 
     // MARK: Helpers

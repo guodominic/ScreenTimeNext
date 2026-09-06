@@ -78,6 +78,39 @@ public struct ServiceContainer: Sendable {
         )
     }
 
+    // MARK: Phase 1 (D-023)
+
+    /// What the app runs on now that the paid membership exists.
+    ///
+    /// Storage moves to the App Group, because that is the only directory the DeviceActivityMonitor
+    /// and Shield extensions can read — with a one-time copy of anything already in the app's own
+    /// container, so an existing setup is not silently reset. The four Screen Time services are
+    /// still passed in: they are swapped for the real FamilyControls adapters target by target
+    /// (Tasks 004, 005, 010, 011), and until each one lands its mock keeps the app running.
+    public static func live(authorization: any ScreenTimeAuthorizationService = MockScreenTimeAuthorizationService(),
+                            selection: any ScreenTimeSelectionService = MockScreenTimeSelectionService(),
+                            monitoring: any ScreenTimeMonitoringService = MockScreenTimeMonitoringService(),
+                            shield: any ScreenTimeShieldService = MockScreenTimeShieldService(),
+                            notifications: any NotificationScheduling = MockNotificationScheduler(),
+                            presence: any SessionPresenting = MockSessionPresenter()) -> ServiceContainer {
+        let storage: any ScreenTimeStorageService
+        if let file = try? FileStorageService.shared() {
+            storage = file
+        } else {
+            storage = InMemoryScreenTimeStorageService()
+        }
+        return ServiceContainer(authorization: authorization, selection: selection,
+                                monitoring: monitoring, shield: shield, storage: storage,
+                                notifications: notifications, presence: presence)
+    }
+
+    /// True when the storage lives in the App Group — i.e. when an extension could read it.
+    /// False means the entitlement or provisioning is not in place and enforcement cannot work,
+    /// however healthy the app itself looks.
+    public var storageIsShared: Bool {
+        (storage as? FileStorageService)?.directory.path.contains("Shared/AppGroup") ?? false
+    }
+
     /// True when the container had to fall back to memory (nothing survives a relaunch).
     public var storageIsVolatile: Bool {
         storage is InMemoryScreenTimeStorageService

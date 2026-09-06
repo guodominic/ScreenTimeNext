@@ -38,6 +38,28 @@ nonisolated enum Theme {
         }
     }
 
+    // MARK: Urgency (D-018)
+    //
+    // The transition screen's colour says one thing only: how close the end is. Green while there
+    // is room, orange when it is time to wrap up, red on the last stretch, rainbow only at the
+    // finish. Never the chosen activity's colour — that made every reminder a different, arbitrary
+    // hue and told the child nothing.
+
+    static func color(for urgency: ShieldUrgency) -> Color {
+        switch urgency {
+        case .calm:     return grass
+        case .soon:     return tangerine
+        case .last:     return ruby
+        case .finished: return mint
+        case .spent:    return lavender
+        }
+    }
+
+    /// The fill for the card's button and accents. Only the finish is multi-coloured.
+    static func style(for urgency: ShieldUrgency) -> AnyShapeStyle {
+        urgency == .finished ? AnyShapeStyle(celebration) : AnyShapeStyle(color(for: urgency))
+    }
+
     static var celebrationColors: [Color] { [coral, sun, mint, sky, lavender] }
 
     /// The finish is the happy moment — a full rainbow rather than one hue.
