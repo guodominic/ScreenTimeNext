@@ -118,6 +118,20 @@ device belong to it. It cannot, and this is by design rather than a missing API.
 which is information the picker does give us, updated live as they tick rows (D-018). If Apple ever
 exposes a per-category count, it drops into `SelectionSummary` without touching the UI.
 
+**Re-checked 2026-09-06 (D-038), because a negative API finding is only as good as the breadth of
+the search behind it (the D-033 lesson).** `DeviceActivityReport` genuinely does see per-application
+and per-category activity — and still does not help. It is a SwiftUI view that renders inside its
+own sandboxed extension, and Apple's own documentation says that sandbox "prevents your extension
+from ... moving sensitive content outside the extension's address space". So it could *display*,
+inside its own view, how many apps in a category the child actually **used** — usage, not coverage,
+and never a number this app can read back. Worth building one day as its own feature; it is not an
+answer to "how many apps does this category cover".
+
+**What the UI does instead (D-038).** The pill is labelled "apps picked" rather than "apps", and a
+footer says plainly that each category covers every app in it and that iOS does not tell us which.
+A screen that read "0 apps" with a whole category ticked was the real bug here — not the missing
+count, but the label that made its absence look like an answer.
+
 **Required manual step.** None. Do not spend time looking for a workaround; a bundle-ID map built
 by hand is explicitly ruled out by PRD §13.
 

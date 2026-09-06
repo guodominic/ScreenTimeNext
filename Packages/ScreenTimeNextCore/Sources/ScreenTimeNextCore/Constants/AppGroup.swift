@@ -38,4 +38,18 @@ public enum AppGroup {
 public enum MonitoringName {
     public static let dailyActivity = "screentimenext.daily"
     public static let budgetThreshold = "screentimenext.budgetReached"
+
+    /// D-043 — one event per reminder, so the system wakes us BEFORE the end as well as at it.
+    ///
+    /// The seconds-before value is in the name because the extension gets nothing but a name back,
+    /// and it needs to know a reminder from the end without opening storage first.
+    private static let warningPrefix = "screentimenext.warning."
+
+    public static func warningThreshold(secondsBefore: Int) -> String {
+        warningPrefix + String(secondsBefore)
+    }
+
+    public static func isWarningThreshold(_ rawName: String) -> Bool {
+        rawName.hasPrefix(warningPrefix)
+    }
 }

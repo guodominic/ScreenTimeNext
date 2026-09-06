@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Rule 5 / Task 006 — the SAME App Group as the app. This extension runs in its own process
+	     with its own container. Without this key it cannot read the child's name, the session
+	     window or the chosen activity, and the shield would have nothing to say. -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.io.github.guodominic.screentimenext</string>
+	</array>
+
+	<!-- Task 004 — ManagedSettings only hands a shield to an extension carrying the same
+	     restricted entitlement as the app that raised it. -->
+	<key>com.apple.developer.family-controls</key>
+	<true/>
+</dict>
+</plist>

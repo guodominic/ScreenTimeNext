@@ -1,30 +1,31 @@
 //  WarningStateEngineTests.swift
 //  ScreenTimeNextCoreTests
 //
-//  Task 008 / D-013 — configurable warning offsets. Default offsets 600/300/60.
+//  Task 008 / D-013 — configurable warning offsets. D-044 made the default two: 300/60, so
+//  `.secondWarning` is unreachable from the defaults and only `role(ofWarningAt:count:)` still
+//  produces it (for a stored three-reminder config, and it is tested directly).
 
 import XCTest
 @testable import ScreenTimeNextCore
 
 final class WarningStateEngineTests: XCTestCase {
 
-    private let d = ScreenTimeConfiguration.defaultWarningOffsets   // [600, 300, 60]
+    private let d = ScreenTimeConfiguration.defaultWarningOffsets   // D-044 — [300, 60]
 
     func testStageAboveFirstWarningIsActive() {
-        XCTAssertEqual(WarningStateEngine.stage(remainingSeconds: 601, warningOffsets: d), .active)
+        XCTAssertEqual(WarningStateEngine.stage(remainingSeconds: 301, warningOffsets: d), .active)
         XCTAssertEqual(WarningStateEngine.stage(remainingSeconds: 3600, warningOffsets: d), .active)
     }
 
     func testExactBoundariesAreInclusive() {
-        XCTAssertEqual(WarningStateEngine.stage(remainingSeconds: 600, warningOffsets: d), .firstWarning)
-        XCTAssertEqual(WarningStateEngine.stage(remainingSeconds: 300, warningOffsets: d), .secondWarning)
+        XCTAssertEqual(WarningStateEngine.stage(remainingSeconds: 300, warningOffsets: d), .firstWarning)
         XCTAssertEqual(WarningStateEngine.stage(remainingSeconds: 60, warningOffsets: d), .finalWarning)
         XCTAssertEqual(WarningStateEngine.stage(remainingSeconds: 0, warningOffsets: d), .finished)
     }
 
     func testOneSecondAboveEachBoundaryStaysInPreviousStage() {
-        XCTAssertEqual(WarningStateEngine.stage(remainingSeconds: 301, warningOffsets: d), .firstWarning)
-        XCTAssertEqual(WarningStateEngine.stage(remainingSeconds: 61, warningOffsets: d), .secondWarning)
+        XCTAssertEqual(WarningStateEngine.stage(remainingSeconds: 301, warningOffsets: d), .active)
+        XCTAssertEqual(WarningStateEngine.stage(remainingSeconds: 61, warningOffsets: d), .firstWarning)
         XCTAssertEqual(WarningStateEngine.stage(remainingSeconds: 1, warningOffsets: d), .finalWarning)
     }
 
@@ -51,8 +52,8 @@ final class WarningStateEngineTests: XCTestCase {
     }
 
     func testUnsortedOrDuplicateOffsetsAreNormalized() {
-        let messy = [60, 600, 600, 300, 0, -5, 5000]   // 5000 clamps to 900
-        XCTAssertEqual(ScreenTimeConfiguration.normalizedOffsets(messy), [900, 600, 300])
+        let messy = [60, 600, 600, 300, 0, -5, 5000]   // 5000 clamps to 900; D-044 keeps two
+        XCTAssertEqual(ScreenTimeConfiguration.normalizedOffsets(messy), [900, 600])
         XCTAssertEqual(WarningStateEngine.stage(remainingSeconds: 700, warningOffsets: messy), .firstWarning)
     }
 
@@ -73,13 +74,13 @@ final class WarningStateEngineTests: XCTestCase {
     }
 
     func testStartingLateEntersTheCorrectStage() {
-        XCTAssertEqual(WarningStateEngine.start(remainingSeconds: 100, warningOffsets: d), .secondWarning)
+        XCTAssertEqual(WarningStateEngine.start(remainingSeconds: 100, warningOffsets: d), .firstWarning)
         XCTAssertEqual(WarningStateEngine.start(remainingSeconds: 30, warningOffsets: d), .finalWarning)
     }
 
     func testExtendedResumesIntoNaturalStage() {
         XCTAssertEqual(WarningStateEngine.next(current: .extended, remainingSeconds: 1200, warningOffsets: d), .active)
-        XCTAssertEqual(WarningStateEngine.next(current: .extended, remainingSeconds: 400, warningOffsets: d), .firstWarning)
+        XCTAssertEqual(WarningStateEngine.next(current: .extended, remainingSeconds: 300, warningOffsets: d), .firstWarning)
     }
 
     func testFinishedStaysFinishedWithoutAnExtension() {

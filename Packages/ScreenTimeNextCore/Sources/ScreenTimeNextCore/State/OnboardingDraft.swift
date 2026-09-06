@@ -19,7 +19,8 @@ public struct OnboardingDraft: Equatable, Sendable {
     /// §6.4 — set by the (mocked, then real) picker. Optional: a parent may skip in onboarding.
     public var selection: SelectionSnapshot? = nil
 
-    /// §6.5 — default 60 minutes.
+    /// §6.5 / D-034 — default 15 minutes: the length of the request a parent is usually
+    /// answering when they open this app.
     public var dailyBudgetSeconds: Int = ScreenTimeConfiguration.defaultBudgetSeconds
 
     /// §6.6 / D-013 — up to three reminders, minutes before the end; 0 = off.

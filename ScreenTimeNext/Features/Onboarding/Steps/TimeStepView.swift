@@ -1,7 +1,12 @@
-//  TimeStepView.swift — D-016 / D-017
+//  TimeStepView.swift — D-016 / D-017 / D-034
 //
 //  The decision made in the moment: how long, and when to give a heads-up. No headline — the dial
-//  says what it is. Steps are one minute under fifteen, two above.
+//  says what it is. Every dial moves one minute at a time (D-034).
+//
+//  D-038 briefly added a "what's covered" row here so the picker was reachable before the timer
+//  was settled. It came straight back out: the very next screen IS the picker, so the row was a
+//  second door onto the room you were already walking into — two entries to the same place read as
+//  two different places. Reverted, deliberately, and recorded rather than quietly undone.
 
 import SwiftUI
 import ScreenTimeNextCore

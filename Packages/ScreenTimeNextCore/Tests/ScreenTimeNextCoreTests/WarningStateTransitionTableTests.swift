@@ -9,17 +9,24 @@ import XCTest
 
 final class WarningStateTransitionTableTests: XCTestCase {
 
-    private let d = ScreenTimeConfiguration.defaultWarningOffsets
+    private let d = ScreenTimeConfiguration.defaultWarningOffsets   // D-044 — [300, 60]
 
     func testRows_timeDriven() {
-        XCTAssertEqual(WarningStateEngine.next(current: .active, remainingSeconds: 601, warningOffsets: d), .active)
-        XCTAssertEqual(WarningStateEngine.next(current: .active, remainingSeconds: 600, warningOffsets: d), .firstWarning)
-        XCTAssertEqual(WarningStateEngine.next(current: .firstWarning, remainingSeconds: 301, warningOffsets: d), .firstWarning)
-        XCTAssertEqual(WarningStateEngine.next(current: .firstWarning, remainingSeconds: 300, warningOffsets: d), .secondWarning)
-        XCTAssertEqual(WarningStateEngine.next(current: .secondWarning, remainingSeconds: 61, warningOffsets: d), .secondWarning)
-        XCTAssertEqual(WarningStateEngine.next(current: .secondWarning, remainingSeconds: 60, warningOffsets: d), .finalWarning)
+        XCTAssertEqual(WarningStateEngine.next(current: .active, remainingSeconds: 301, warningOffsets: d), .active)
+        XCTAssertEqual(WarningStateEngine.next(current: .active, remainingSeconds: 300, warningOffsets: d), .firstWarning)
+        XCTAssertEqual(WarningStateEngine.next(current: .firstWarning, remainingSeconds: 61, warningOffsets: d), .firstWarning)
+        XCTAssertEqual(WarningStateEngine.next(current: .firstWarning, remainingSeconds: 60, warningOffsets: d), .finalWarning)
         XCTAssertEqual(WarningStateEngine.next(current: .finalWarning, remainingSeconds: 1, warningOffsets: d), .finalWarning)
         XCTAssertEqual(WarningStateEngine.next(current: .finalWarning, remainingSeconds: 0, warningOffsets: d), .finished)
+    }
+
+    /// D-044 — with two reminders `.secondWarning` cannot be reached from the defaults. The role
+    /// mapping that produces it is still exercised directly below, for configurations stored
+    /// before D-044 that still carry three.
+    func testSecondWarningIsUnreachableFromTheDefaults() {
+        for remaining in stride(from: 0, through: 3600, by: 5) {
+            XCTAssertNotEqual(WarningStateEngine.stage(remainingSeconds: remaining, warningOffsets: d), .secondWarning)
+        }
     }
 
     func testLargeJumpSkipsIntermediateStates() {

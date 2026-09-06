@@ -69,6 +69,25 @@ struct ShieldCardView: View {
             .buttonStyle(.plain)
             .padding(.top, 4)
             .bounceIn(delay: 0.2)
+
+            // D-044 — the real shield puts these in a system submenu behind a second button. A
+            // preview that hid them would let a parent sign off on a screen their child never
+            // sees, so they are drawn here as the plain list the submenu amounts to.
+            if let secondary = presentation.secondaryButtonLabel {
+                VStack(spacing: 8) {
+                    Text(secondary)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    ForEach(presentation.submenuItems, id: \.self) { item in
+                        Text(item)
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(Capsule().fill(.thinMaterial))
+                    }
+                }
+                .bounceIn(delay: 0.26)
+            }
         }
         .padding(.horizontal, 32)
         .frame(maxWidth: 460)

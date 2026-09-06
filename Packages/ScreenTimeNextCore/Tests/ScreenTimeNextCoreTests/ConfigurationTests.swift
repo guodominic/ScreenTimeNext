@@ -2,6 +2,7 @@
 //  ScreenTimeNextCoreTests
 //
 //  D-013 — configurable warnings and the dial ranges; legacy-JSON compatibility.
+//  D-034 — the budget range is now 1–90 minutes in 1-minute steps, default 15.
 
 import XCTest
 @testable import ScreenTimeNextCore
@@ -10,20 +11,22 @@ final class ConfigurationTests: XCTestCase {
 
     func testDefaults() {
         let c = ScreenTimeConfiguration.default
-        XCTAssertEqual(c.dailyBudgetSeconds, 3600)
-        XCTAssertEqual(c.warningOffsetsSeconds, [600, 300, 60])
+        // D-034 — fifteen minutes: the length of the request a parent is usually answering when
+        // they open this app, not a number they then have to dial down from.
+        XCTAssertEqual(c.dailyBudgetSeconds, 900)
+        XCTAssertEqual(c.warningOffsetsSeconds, [300, 60], "D-044 — two reminders, not three")
         XCTAssertTrue(c.selectedActivities.isEmpty)
     }
 
     func testInitNormalizes() {
         let c = ScreenTimeConfiguration(dailyBudgetSeconds: 99_999, warningOffsetsSeconds: [0, 120, 120, 4000, 60])
-        XCTAssertEqual(c.dailyBudgetSeconds, 7200)
-        XCTAssertEqual(c.warningOffsetsSeconds, [900, 120, 60])
+        XCTAssertEqual(c.dailyBudgetSeconds, 5400, "D-034 — 90 minutes is the ceiling")
+        XCTAssertEqual(c.warningOffsetsSeconds, [900, 120], "D-044 — the list is two long")
     }
 
-    func testAtMostThreeWarningsEarliestFirst() {
+    func testAtMostTwoWarningsEarliestFirst() {
         let c = ScreenTimeConfiguration(warningOffsetsSeconds: [60, 120, 180, 240, 300])
-        XCTAssertEqual(c.warningOffsetsSeconds, [300, 240, 180])
+        XCTAssertEqual(c.warningOffsetsSeconds, [300, 240])
     }
 
     func testRoundTrip() throws {
@@ -46,10 +49,12 @@ final class ConfigurationTests: XCTestCase {
     }
 
     func testEffectiveOffsetsAreStrictlyShorterThanTheWindow() {
+        // D-044 — a third offset is dropped on the way in, so the stored list is [600, 300].
         let c = ScreenTimeConfiguration(warningOffsetsSeconds: [600, 300, 60])
-        XCTAssertEqual(c.effectiveWarningOffsets(forWindowSeconds: 480), [300, 60])
-        XCTAssertEqual(c.effectiveWarningOffsets(forWindowSeconds: 300), [60], "equal is not shorter")
-        XCTAssertEqual(c.effectiveWarningOffsets(forWindowSeconds: 3600), [600, 300, 60])
+        XCTAssertEqual(c.warningOffsetsSeconds, [600, 300])
+        XCTAssertEqual(c.effectiveWarningOffsets(forWindowSeconds: 480), [300])
+        XCTAssertEqual(c.effectiveWarningOffsets(forWindowSeconds: 300), [], "equal is not shorter")
+        XCTAssertEqual(c.effectiveWarningOffsets(forWindowSeconds: 3600), [600, 300])
         XCTAssertEqual(c.effectiveWarningOffsets(forWindowSeconds: 30), [])
     }
 
@@ -63,16 +68,16 @@ final class ConfigurationTests: XCTestCase {
     func testDirectAssignmentIsNormalizedToo() {
         var c = ScreenTimeConfiguration.default
         c.warningOffsetsSeconds = [60, 60, 900, 5000, 0, -3, 120]
-        XCTAssertEqual(c.warningOffsetsSeconds, [900, 120, 60])
+        XCTAssertEqual(c.warningOffsetsSeconds, [900, 120])
         c.dailyBudgetSeconds = 99_999
-        XCTAssertEqual(c.dailyBudgetSeconds, 7200)
+        XCTAssertEqual(c.dailyBudgetSeconds, 5400)
         c.dailyBudgetSeconds = 1
         XCTAssertEqual(c.dailyBudgetSeconds, 60)
     }
 
     func testDefaultOffsetsForBudget() {
-        XCTAssertEqual(ScreenTimeConfiguration.defaultWarningOffsets(forBudgetSeconds: 60 * 60), [600, 300, 60])
-        XCTAssertEqual(ScreenTimeConfiguration.defaultWarningOffsets(forBudgetSeconds: 12 * 60), [600, 300, 60])
+        XCTAssertEqual(ScreenTimeConfiguration.defaultWarningOffsets(forBudgetSeconds: 60 * 60), [300, 60])
+        XCTAssertEqual(ScreenTimeConfiguration.defaultWarningOffsets(forBudgetSeconds: 12 * 60), [300, 60])
         XCTAssertEqual(ScreenTimeConfiguration.defaultWarningOffsets(forBudgetSeconds: 11 * 60), [300, 60])
         XCTAssertEqual(ScreenTimeConfiguration.defaultWarningOffsets(forBudgetSeconds: 4 * 60), [120, 60])
         XCTAssertEqual(ScreenTimeConfiguration.defaultWarningOffsets(forBudgetSeconds: 2 * 60), [60])
@@ -85,15 +90,14 @@ final class ConfigurationTests: XCTestCase {
 
     func testDialRangesAreConsistent() {
         XCTAssertEqual(ScreenTimeConfiguration.budgetRangeSeconds.lowerBound, 60)
-        XCTAssertEqual(ScreenTimeConfiguration.budgetRangeSeconds.upperBound, 120 * 60)
+        XCTAssertEqual(ScreenTimeConfiguration.budgetRangeSeconds.upperBound, 90 * 60)
         XCTAssertEqual(ScreenTimeConfiguration.warningOffsetRange.upperBound, 15 * 60)
     }
 
     /// Short budgets are the common case, so the dial gets finer under 15 minutes.
     func testBudgetStepIsFinerBelowFifteenMinutes() {
-        XCTAssertEqual(ScreenTimeConfiguration.budgetStep(near: 60), 60)
-        XCTAssertEqual(ScreenTimeConfiguration.budgetStep(near: 14 * 60), 60)
-        XCTAssertEqual(ScreenTimeConfiguration.budgetStep(near: 15 * 60), 120)
-        XCTAssertEqual(ScreenTimeConfiguration.budgetStep(near: 60 * 60), 120)
+        // D-034 — one step for the whole range, so no screen can round a parent's number.
+        XCTAssertEqual(ScreenTimeConfiguration.budgetStepSeconds, 60)
+        XCTAssertEqual(ScreenTimeConfiguration.defaultBudgetSeconds, 15 * 60)
     }
 }

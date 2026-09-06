@@ -16,6 +16,9 @@ import Foundation
 public enum ShieldMoment: Hashable, Sendable {
     /// A reminder mid-session. The button lifts our shield so the remaining minutes continue.
     case reminder(minutesLeft: Int, activity: TransitionActivity?)
+    /// D-044 — the reminder that asks. Same shield, plus a menu of what to do after; picking one
+    /// IS the "OK", and it lifts the shield for the minutes that remain.
+    case chooseNext(minutesLeft: Int, options: [TransitionActivity])
     /// The session just ended. The button sends the child to the Home Screen; it never lifts.
     case finished(activity: TransitionActivity?)
     /// A protected app opened later in the day with the budget already spent.
@@ -79,6 +82,12 @@ public struct ShieldPresentation: Hashable, Sendable {
     /// True when pressing the primary button should lift ScreenTimeNext's own shield and let the
     /// child continue. False means the button only closes the app — never a bypass (§17).
     public let primaryButtonContinues: Bool
+    /// D-044 — the secondary button, when there is one. `ShieldConfiguration` gives it an optional
+    /// submenu of at most THREE items, which is the only list a system shield can show.
+    public let secondaryButtonLabel: String?
+    /// What the submenu offers, in order. Empty when there is no submenu. Capped at three by
+    /// `ShieldMomentResolver.chooserOptions` — the platform's limit, not ours.
+    public let submenuItems: [String]
     /// Which activity was chosen for after, if any. Used for the copy and the small badge — NOT
     /// for the card's colour any more (D-018); `urgency` owns colour.
     public let activity: TransitionActivity?
@@ -88,7 +97,11 @@ public struct ShieldPresentation: Hashable, Sendable {
     public init(title: String, subtitle: String, symbolName: String,
                 primaryButtonLabel: String, primaryButtonContinues: Bool,
                 activity: TransitionActivity?,
-                urgency: ShieldUrgency) {
+                urgency: ShieldUrgency,
+                secondaryButtonLabel: String? = nil,
+                submenuItems: [String] = []) {
+        self.secondaryButtonLabel = secondaryButtonLabel
+        self.submenuItems = submenuItems
         self.title = title
         self.subtitle = subtitle
         self.symbolName = symbolName
@@ -126,6 +139,25 @@ public struct ShieldPresentation: Hashable, Sendable {
                 primaryButtonContinues: true,
                 activity: activity,
                 urgency: urgency ?? .fromMinutesLeft(minutes)
+            )
+
+        case let .chooseNext(minutes, options):
+            let left = minutes == 1 ? "1 minute left" : "\(minutes) minutes left"
+            return ShieldPresentation(
+                title: "\(left)\(addressed)",
+                subtitle: options.isEmpty
+                    ? "Time to start finishing up what you're doing."
+                    : "What would you like to do after? Pick one and keep going.",
+                symbolName: "hand.tap.fill",
+                // §17 — the primary button never buys more time. Choosing is the way onward, which
+                // is the point: the child decides what comes next while the screen time is still
+                // theirs, not once it has already been taken away.
+                primaryButtonLabel: "Not yet",
+                primaryButtonContinues: false,
+                activity: nil,
+                urgency: urgency ?? .fromMinutesLeft(minutes),
+                secondaryButtonLabel: options.isEmpty ? nil : "Pick what's next",
+                submenuItems: options.map(\.displayName)
             )
 
         case let .finished(activity):

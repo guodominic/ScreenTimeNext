@@ -31,46 +31,37 @@ public struct ScreenTimeConfiguration: Codable, Equatable, Sendable {
     /// The activities the parent approved for the child to choose from. PRD §6.7.
     public var selectedActivities: [TransitionActivity]
 
-    /// D-021 — the categories currently ticked. Kept so the next launch opens on the same choice
-    /// the parent made last time rather than an empty list.
-    ///
-    /// These are OUR catalogue rows, not Apple's tokens: §16 forbids storing or surfacing the
-    /// opaque `FamilyActivitySelection` tokens, and nothing here is one. In Phase 1 the real
-    /// selection lives in Apple's picker, which persists its own state, and this stays as the
-    /// record of which category rows the parent chose.
-    public var selectedCategories: [ContentCategory]
-
     // MARK: Ranges (D-013)
 
-    /// 1–120 minutes. Short budgets are the common case ("you get seven more minutes"), so below
-    /// `fineStepThresholdSeconds` the dial moves a minute at a time; above it, two.
-    public static let budgetRangeSeconds = 60...7200
-    public static let budgetStepSeconds = 120
-    public static let fineBudgetStepSeconds = 60
-    public static let fineStepThresholdSeconds = 900        // 15 minutes
-    public static let defaultBudgetSeconds = 3600
-
-    /// The step to use around a given budget.
-    public static func budgetStep(near seconds: Int) -> Int {
-        seconds < fineStepThresholdSeconds ? fineBudgetStepSeconds : budgetStepSeconds
-    }
+    /// D-034 — 1 to 90 minutes, one minute at a time, everywhere.
+    ///
+    /// The two-minute step above fifteen was a compromise for dragging a dial across a long range,
+    /// and it cost the thing that actually matters: a parent saying "twenty-three minutes, then
+    /// dinner" could not set twenty-three. 120 was a number nobody uses — a session that long is a
+    /// different decision, not a longer version of this one — so the range shrank and the dial
+    /// stays comfortable to drag.
+    public static let budgetRangeSeconds = 60...5400
+    public static let budgetStepSeconds = 60
+    public static let defaultBudgetSeconds = 900
 
     /// Each warning: 1–15 minutes before the end (0 in the UI means "off").
     public static let warningOffsetRange = 60...900
     public static let warningStepSeconds = 60
-    public static let maxWarnings = 3
-    public static let defaultWarningOffsets = [600, 300, 60]
+    /// D-044 — TWO reminders, not three. The shield made the count a product decision rather than
+    /// a preference: a child using a covered app meets three full-screen interruptions in one
+    /// session (heads-up, choose what's next, time's up), and a fourth is nagging. The third
+    /// interruption is the end itself, which is not a dial.
+    public static let maxWarnings = 2
+    public static let defaultWarningOffsets = [300, 60]
 
     public init(
         dailyBudgetSeconds: Int = ScreenTimeConfiguration.defaultBudgetSeconds,
         warningOffsetsSeconds: [Int] = ScreenTimeConfiguration.defaultWarningOffsets,
-        selectedActivities: [TransitionActivity] = [],
-        selectedCategories: [ContentCategory] = []
+        selectedActivities: [TransitionActivity] = []
     ) {
         self.storedBudgetSeconds = Self.clampBudget(dailyBudgetSeconds)
         self.storedWarningOffsets = Self.normalizedOffsets(warningOffsetsSeconds)
         self.selectedActivities = selectedActivities
-        self.selectedCategories = selectedCategories
     }
 
     public static let `default` = ScreenTimeConfiguration()
@@ -85,7 +76,10 @@ public struct ScreenTimeConfiguration: Codable, Equatable, Sendable {
     /// ≥ 12 min → 10 / 5 / 1; 4–11 min → halfway + last minute; 2–3 min → last minute only.
     public static func defaultWarningOffsets(forBudgetSeconds budget: Int) -> [Int] {
         let minutes = budget / 60
-        if minutes >= 12 { return [600, 300, 60] }
+        // D-044 — two, and the last one is always the final minute: that is the one the child acts
+        // on. The first is spaced off the budget so a 15-minute session does not get its heads-up
+        // before it has really started.
+        if minutes >= 12 { return [300, 60] }
         if minutes >= 4 { return [(minutes / 2) * 60, 60] }
         return [60]
     }
@@ -175,7 +169,6 @@ public struct ScreenTimeConfiguration: Codable, Equatable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case dailyBudgetSeconds, warningOffsetsSeconds, selectedActivities
-        case selectedCategories
         case warning10Enabled, warning5Enabled, warning1Enabled
     }
 
@@ -194,9 +187,9 @@ public struct ScreenTimeConfiguration: Codable, Equatable, Sendable {
             if try c.decodeIfPresent(Bool.self, forKey: .warning1Enabled) ?? true { legacy.append(60) }
             offsets = legacy
         }
-        let picked = try c.decodeIfPresent([ContentCategory].self, forKey: .selectedCategories) ?? []
-        self.init(dailyBudgetSeconds: budget, warningOffsetsSeconds: offsets, selectedActivities: activities,
-                  selectedCategories: picked)
+        // D-035 — a record written by an older build may still carry `selectedCategories`. It is
+        // ignored: those were our own catalogue rows, and rows that shield nothing are not setup.
+        self.init(dailyBudgetSeconds: budget, warningOffsetsSeconds: offsets, selectedActivities: activities)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -204,6 +197,5 @@ public struct ScreenTimeConfiguration: Codable, Equatable, Sendable {
         try c.encode(dailyBudgetSeconds, forKey: .dailyBudgetSeconds)
         try c.encode(warningOffsetsSeconds, forKey: .warningOffsetsSeconds)
         try c.encode(selectedActivities, forKey: .selectedActivities)
-        try c.encode(selectedCategories, forKey: .selectedCategories)
     }
 }

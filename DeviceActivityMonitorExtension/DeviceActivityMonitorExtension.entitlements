@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Rule 5 / Task 006 — the SAME App Group as the app. This extension runs in its own process
+	     with its own container, so without this key it cannot see the session window the app
+	     wrote, and a threshold callback would have nothing to act on. -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.io.github.guodominic.screentimenext</string>
+	</array>
+
+	<!-- Task 004 — DeviceActivity callbacks only reach an extension that carries the same
+	     restricted entitlement as the app that scheduled them. -->
+	<key>com.apple.developer.family-controls</key>
+	<true/>
+</dict>
+</plist>

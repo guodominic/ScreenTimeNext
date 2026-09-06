@@ -1015,6 +1015,422 @@ the same thing.
 never-hide-a-row contract as the category order — the parent's arrangement first, anything the
 saved order has not heard of appended.
 
+## D-034 — One minute, everywhere, up to ninety
+**Date:** 2026-09-05 · **Status:** accepted
+
+**Context.** The budget dial moved in 1-minute steps below fifteen and 2-minute steps above it, and
+ran to 120. Both halves of that were wrong. A parent saying "twenty-three minutes, then dinner"
+could not set twenty-three, because the dial skipped it — and the compromise bought nothing anyone
+asked for, since a two-hour session is a different decision, not a longer version of this one. The
+`+`/`−` buttons made it worse: they stepped by the same variable amount, so pressing `+` sometimes
+moved one minute and sometimes two, with nothing on screen to explain why.
+
+**Decision.** One step, one minute, every dial in the app — budget, reminders, extend. Range
+1–90 minutes; default 15. `budgetStep(near:)`, `fineBudgetStepSeconds` and
+`fineStepThresholdSeconds` are gone rather than set to constants, so there is no place left for a second step size to reappear.
+
+**Consequences.**
+- 90 rather than 120 shortens the drag, which is what made the variable step tempting in the first
+  place.
+- The `+`/`−` buttons and the drag now agree by construction, not by matching arithmetic.
+- Every new dial gets this for free through `MinuteDial.budget(_:)` / `.reminder(_:upperBound:)`;
+  a raw `MinuteDial(step:)` with anything but 1 is now the thing to catch in review.
+- **This departs from the PRD.** §6.5 specifies a 60-minute default. Sixty is a number a parent had
+  to dial DOWN from every single time, and "fifteen minutes, then dinner" is the sentence this app
+  exists to answer. `OnboardingDraftTests.testDefaultsMatchThePRDExceptTheBudget` is named for the
+  departure so nobody quietly "fixes" it back to match the document.
+
+## D-035 — Delete the category tiles
+**Date:** 2026-09-06 · **Status:** accepted · supersedes the picker half of D-019 and D-028
+
+**Context.** "Pick apps and categories" had two halves that looked alike and were not. Thirteen
+category tiles we drew ourselves — tap to include, drag to reorder, save three as "my usual" — and
+one row that opened Apple's `FamilyActivityPicker`. Only the second one could shield anything.
+B-005 is permanent: there is no API that turns a category name into a token, so a ticked tile was a
+record of an intention and nothing else. The counts row added them together, which made the screen
+say "3 categories" when the answer to "what will actually be blocked?" was "nothing".
+
+Two ways to fix it: teach the tiles to drive Apple's picker (impossible — B-005), or delete them.
+
+**Decision.** Delete them. The screen is now Apple's picker, a list of websites the parent typed
+(D-033), and the counts, which come from the two things that are real. `ContentCategory` is gone
+from the codebase; `ScreenTimeConfiguration.selectedCategories` and the
+`categoryOrder` / `favourites` / `favouritesAreCustom` fields of `ParentPickerPreferences` went with
+it.
+
+**Consequences.**
+- Both records keep hand-written decoders, so a file written by a build that had those keys still
+  decodes — the keys are ignored, never a throw. A throw here would reset a family's whole setup.
+- "My usual" is gone as a concept; D-030's saved SETS replace it and are strictly better, because a
+  saved set holds real apps, real categories and real websites rather than three of our tile names.
+- The drag-to-reorder work from D-019 survives only on the "what's next" activity list, which is
+  ours to define and therefore can be reordered honestly.
+- To reverse this, Apple would have to publish a way to build an `ActivityCategoryToken` from
+  something other than their own picker. Until then, a control that promises what it cannot deliver
+  is worse than no control.
+
+## D-036 — The PIN is set on the way in, not in Settings
+**Date:** 2026-09-06 · **Status:** accepted · supersedes D-031's press-and-hold fallback
+
+**Context.** D-031 replaced the press-and-hold parent gate with a PIN, but left the PIN optional:
+no PIN meant the gate fell back to a long press, so a family that never opened Settings had the old
+non-gate. That is exactly backwards — the families least likely to go looking for a security
+setting are the ones whose child will find the Parents button first.
+
+Separately, the welcome screen ended in a "Let's go" button that agreed with a screen nobody
+disagrees with, and ending a session asked "are you sure?" behind a gate that had already asked.
+
+**Decision.** Three changes, all removing a step:
+- The first time the timer screen appears with no PIN stored, the create pad opens immediately,
+  with no Cancel and no swipe-to-dismiss. Setting it returns straight to the dashboard. Every later
+  trip back to the dashboard needs that PIN; Settings still changes it.
+- The welcome screen animates itself into the time dial after ~2.4s. A tap anywhere skips ahead.
+- "End" ends. The confirmation is gone; the PIN was the confirmation. "Start over" keeps its
+  dialog, because that one erases the child's setup.
+
+**Consequences.**
+- `ParentGateButton` no longer takes `hasPIN` and has no long-press path: there is no longer a
+  state in which no PIN exists after the first visit.
+- The forced pad is the one moment the app insists on something. It insists exactly once, and only
+  after the parent has already chosen a length — never before they have seen what the app does.
+- A parent who forgets the PIN still has "Start over" on the dashboard, which clears it (D-031).
+
+## D-037 — One daily schedule, midnight to midnight, restarted only when it would differ
+**Date:** 2026-09-06 · **Status:** accepted
+
+**Context.** Task 010 had four open questions: what the schedule's window is, how it relates to
+midnight, what the platform limits are, and when a restart is warranted. All four were left open
+deliberately, because getting one wrong is the kind of bug that only shows up on a real device on a
+real evening.
+
+**Platform limits, verified against Apple's own error documentation (2026-09-06):**
+- **20** activities at a time per app *and its extensions* — `MonitoringError.excessiveActivities`.
+- A schedule interval must be at least **15 minutes** (`.intervalTooShort`) and at most
+  **one week** (`.intervalTooLong`).
+
+We register exactly one activity with exactly one event, so none of these constrain the design. The
+limit worth remembering is the first one: it counts the extension's registrations too, so anything
+that registers per-session rather than per-app would climb toward twenty over a day.
+
+**Decision — the schedule.** One `DeviceActivityName` (`screentimenext.daily`), one event
+(`screentimenext.budgetReached`), interval **00:00 → 23:59, repeating**. Midnight, because the
+app's own idea of "today" is `Calendar.startOfDay` (Rule 4) and two different day boundaries would
+hand a child a second budget at whatever other hour we picked. 23:59 rather than 24:00 because
+`intervalEnd` is a time of day and 24:00 is not one. Task 017 tests rollover against this.
+
+**Decision — `includesPastActivity: true`.** The event counts usage from the start of the interval,
+not from the moment we registered. Without it, a parent who edits the budget at 4pm silently hands
+back a full budget, and so does every app launch that re-registers.
+
+**Decision — when to restart.** `restartMonitoring` compares the registration it would write
+against the one `DeviceActivityCenter` already holds — same applications, categories, web domains
+and threshold — and does nothing when they match. Re-registering is not free: it discards the
+system's own accounting for the event, and `includesPastActivity` is what keeps that from costing
+the child their spent minutes. Cheap to check, so it is checked every time.
+
+**Decision — a threshold over an empty selection is refused.** `startMonitoring` throws rather than
+registering an event with no tokens. Such an event can never fire, so registering one would leave
+the app looking armed while nothing could ever trigger — the failure mode this whole task exists to
+rule out.
+
+**Consequences.**
+- `MonitorJournal` (App Group `UserDefaults`, 20 entries, self-trimming) is the extension's ONLY
+  channel to the app: a callback name, our own activity name and a timestamp. §16 — the extension
+  knows which apps tripped the threshold and must never write that down.
+- The dashboard shows whether iOS currently holds the registration, and the last check-in. A parent
+  cannot discover this any other way, because the extension does its work while the app is closed.
+- **Still unproven:** that `eventDidReachThreshold` actually arrives. The simulator accrues no real
+  usage, so this is a device test, and it is the reason Task 010 ends as
+  NEEDS MANUAL DEVICE TEST rather than PASS.
+
+## D-038 — Either order, and an honest label on the app count
+**Date:** 2026-09-06 · **Status:** accepted
+
+**Context.** Two complaints, one screen apart.
+
+First: "what's covered" was reachable only *after* the time dial. The two decisions have nothing to
+do with each other — a parent who already knows which apps they want covered was being made to
+answer "how long?" first to get at it.
+
+Second, and more interesting: with a whole category ticked, the counts row read **"0 apps"**. That
+is technically accurate (`applicationTokens` holds only apps ticked one by one) and completely
+misleading, since the category covers every app inside it. Dominic asked the obvious next question
+— can we just count the apps in the category and show that?
+
+**We cannot, and this is B-005, confirmed again rather than assumed.** Two independent walls:
+- A category token is opaque. An Apple Frameworks Engineer states it directly: "There is no way to
+  extract application tokens from a category token."
+- There is no API to list installed applications at all, so even the denominator does not exist.
+
+`DeviceActivityReport` was worth checking, because it *does* see per-application and per-category
+activity. It does not help: it is a SwiftUI view that renders inside its own sandboxed extension,
+which Apple's documentation says "prevents your extension from ... moving sensitive content outside
+the extension's address space". It could show, inside its own view, how many apps in a category the
+child actually *used* — usage, not coverage, and never a number the app itself can read. Filed as a
+possible future feature, not as an answer to this question.
+
+**Decision.**
+- ~~The picker opens from the time step as well as being the step after it.~~ **Reverted the same
+  day.** The screen immediately after the time step *is* the picker, so the row was a second door
+  onto the room you were already walking into — and two entries to one place read as two places.
+  The original complaint was real but I answered it in the wrong place: the fix that mattered is
+  that the picker is one "Next" away and always reachable from Settings, not that it has two doors.
+  Recorded rather than quietly undone, so nobody re-adds it in three months.
+- The pill is labelled **"apps picked"**, not "apps", and a footer under the counts says plainly
+  that each category covers every app in it and that iOS does not tell us which or how many.
+
+**Consequences.** The app never displays a fabricated coverage number. The one place a parent can
+see what a category actually covers stays Apple's own picker, which is where the tokens live. If
+Apple ever exposes a per-category count it drops into `SelectionSummary` and the footer comes out.
+
+## D-039 — Every "what's next" activity belongs to the family, ours included
+**Date:** 2026-09-06 · **Status:** accepted · extends D-029
+
+**Context.** D-029 let a parent add their own activities and edit or delete *those*. The built-in
+eight stayed fixed, on the reasoning that they are ours. That reasoning does not survive contact
+with a real family: "Bath" is a suggestion about someone's evening, not a fact about it, and a
+household where nobody does homework has a row that will never be tapped taking up a tile.
+
+**Decision.** Swipe any row — built-in or not — to rename or remove it.
+
+- **Remove a custom one** deletes it.
+- **Remove a built-in** adds its id to `hiddenActivityIDs`. Hidden, not deleted: a built-in is a
+  `static let` in code, and a family that drops "Bath" and later wants it back should get it back
+  rather than retype it. "Bring back the ones I removed" appears in Settings once anything is
+  hidden, and only then.
+- **Rename a built-in** creates a real custom activity with a fresh id, hides ours, and drops the
+  new one into the slot the old one occupied. It does NOT edit the built-in in place, because
+  `TransitionActivity.init(from:)` deliberately re-resolves a built-in from its id on every decode
+  (so improving our wording reaches families who already have it saved) — which would silently
+  undo the rename on the next launch. An id nothing else owns is what makes the new name theirs.
+- **Removal stops one short of empty.** `canRemoveActivity(_:)` refuses the last row. A chooser
+  with nothing in it is not a configuration, it is a broken §6.11.
+
+**Consequences.**
+- A child mid-session who already chose an activity that has since been renamed keeps seeing the
+  old name, because the choice stored on the window is the old id. That is correct: they chose that
+  thing, and the window is a record of what happened, not of what the list looks like now.
+- `hiddenActivityIDs` lives in `ParentPickerPreferences`, so it survives "Start over" along with
+  everything else the parent made (D-024).
+
+## D-040 — The shield is real: one named store, and two rules the audit now enforces
+**Date:** 2026-09-06 · **Status:** accepted · implements D-012
+
+**Context.** Task 011 turns the interstitial from a preview into the thing a child actually meets.
+Three decisions were load-bearing enough to write down.
+
+**Decision 1 — one named store, and no wholesale clear, ever.** `ManagedSettingsStore` is a SHARED
+system surface: Apple's own Screen Time writes to it, and so does every other parental-control app
+on the device. `clearAllSettings()` on the default store would erase all of it. A family could lose
+months of Screen Time rules because our fifteen-minute timer ended. So ScreenTimeNext owns exactly
+one named store (`screentimenext`), never touches the default one, and removal sets our own four
+keys to nil by name. We never shield `.all(except:)` either — a phone call, Messages and the camera
+are never covered by us (§15).
+
+Both of those are now **enforced by `scripts/privacy-audit.sh`** (rules 7 and 8), which runs on
+every test run, rather than being a promise in a comment. Each was verified by planting a violation
+and watching the audit fail. A rule nothing checks is a rule that survives exactly as long as the
+person who remembers it.
+
+**Decision 2 — the copy stays in the core package.** `ShieldConfigurationExtension` computes
+nothing and writes nothing: it reads the App Group, works out which `ShieldMoment` applies, and
+hands it to `ShieldPresentation.make(for:childName:)` — the same call the in-app preview makes. The
+screen a parent demonstrates to their child and the screen the child later meets cannot drift,
+because there is one copy of the words.
+
+**Decision 3 — the button continues mid-session and closes at the end, and there is no second
+button.** `primaryButtonContinues` already encoded this for the preview; the action extension now
+reads the same flag from the clock. §17 — a child can never grant themselves more time. The
+template's `fatalError()` on an unknown action was replaced with `.close`: an unrecognised control
+must never become a way through, and crashing in a child's face is not error handling.
+
+**Also settled here.** Renaming a built-in shield string is safe; the typed-website filter (D-033)
+is deliberately NOT lifted when the reminder button is pressed, because those are sites a parent
+blocked outright rather than part of the budget — a heads-up is not permission to visit them.
+
+**Consequences.** Both extension targets carry the App Group and `family-controls` entitlements and
+link `ScreenTimeNextCore`. Xcode created them at iOS 27.0, which would have silently restricted the
+whole app to iOS 27 devices — corrected to 18.0, the same trap as the monitor extension, and now
+worth checking on every new target.
+
+**Still unproven:** that the shield renders and that its button behaves, on a device. Everything
+here compiles and is reasoned from the installed SDK; none of it has met a child yet.
+
+## D-041 — The notification delegate is `@MainActor`, and that is load-bearing
+**Date:** 2026-09-06 · **Status:** accepted · fixes a crash introduced by D-018's notification tap
+
+**Context.** The first real device test of the shield never got as far as the shield. A reminder
+fired, Dominic tapped it, and the app died:
+
+```
+*** Terminating app due to uncaught exception 'NSInternalInconsistencyException',
+    reason: 'Call must be made on main thread'
+    -[UIApplication _performBlockAfterCATransactionCommitSynchronizes:], UIApplication.m:3470
+    ...
+    @objc closure #1 in UserNotificationScheduler.userNotificationCenter(_:didReceive:)
+```
+
+**What was actually wrong.** The `async` form of `UNUserNotificationCenterDelegate`'s methods is
+Swift's bridge over an ObjC method with a completion handler, and UIKit invokes that completion
+handler on **whatever thread the async function finishes on**. Ours was declared `nonisolated`, so
+it always resumed off the main actor. The `await MainActor.run { post }` at the end made this worse
+rather than better: it hopped to main, posted, and hopped straight back OFF main before returning —
+so the completion handler ran on a cooperative-pool thread, UIKit did its state-restoration work
+there, and asserted.
+
+`nonisolated` was put there for a real reason — the app module defaults to main-actor isolation and
+this type has to satisfy nonisolated `NotificationScheduling` requirements — but it was applied to
+the whole type's members by habit, including the two where it is exactly wrong.
+
+**Decision.** Both delegate methods are `@MainActor`. The class stays `nonisolated` for the
+scheduling half. The inner `MainActor.run` is deleted, because the method now already runs there.
+(Apple DTS gives this same fix: developer.apple.com/forums/thread/709563.)
+
+**Consequences.**
+- The crash was in the one path a CHILD triggers — tapping a reminder we sent them — so it was
+  invisible to every test that launches the app and drives the UI, which is every test we have. It
+  took a real reminder on a real device, which is exactly what the Task 010/011 device tests are
+  for and exactly why they are worth the interruption.
+- `ShieldActionExtension` uses the completion-handler form and calls back synchronously on the
+  system's own thread, which is correct for that API and has no equivalent trap. Checked, not
+  assumed.
+- **The general lesson:** an `async` method bridged from an ObjC completion-handler API finishes
+  wherever its isolation says, and the caller may have thread requirements the compiler cannot see.
+  `nonisolated` is not a neutral default there — it is a decision about which thread the framework's
+  completion handler runs on.
+
+## D-042 — One sentence decides when the shield is up
+**Date:** 2026-09-06 · **Status:** accepted · Task 012
+
+**Context.** Task 010 proved the system wakes us when the budget is spent. Task 011 built what the
+child then sees. Dominic tested, the timer hit zero, and nothing happened — correctly, because
+nothing in the codebase yet connected the two. That gap is this task.
+
+The temptation was to sprinkle `applyShield` / `removeShield` at each of the eight or so moments
+that could matter: session start, session end, expiry, extend, midnight, config change, launch,
+threshold callback. That is how you get a device that is shielded when it should not be, in a way
+nobody can reproduce, because the answer depends on which of eight call sites ran last.
+
+**Decision.** One function, `Enforcement.reconcile`, and one sentence:
+
+> **Covered apps are shielded exactly when today's budget is gone.**
+
+Every caller does the same thing: recompute from stored state and make the device match. It is
+idempotent, so a repeated call changes nothing; it derives everything from absolute timestamps, so a
+missed call costs nothing and the next one repairs it. Callers: app launch and configuration change
+(`MonitoringCoordinator`), every child-timer state change, the parent's start / end / extend, and —
+the one that actually matters — the DeviceActivity extension's threshold callback, which is usually
+the only process of ours running at that moment.
+
+**What this rule deliberately leaves open.** A parent who presses "End" with budget still on the
+clock stops the session but does **not** block the device. They ended a round, not the day. Making
+"End" shield would need a second concept — "the day is over" as distinct from "the budget is
+gone" — and that concept does not exist yet. Worth revisiting if a family wants a hard stop; noted
+here so it is a choice rather than an oversight.
+
+**Consequences.**
+- `Enforcement`, `ManagedSettingsShieldService`, `FamilyActivitySelectionCoding` and
+  `AppGroupSelectionService` are now compiled into the DeviceActivity extension as well as the app.
+  Shared rather than duplicated on purpose: rules 6 and 7 are security-critical, and code that must
+  never call `clearAllSettings()` should exist once, not once per process.
+- `ShieldActionExtension.liftShield()` stays its own small implementation. It is NOT a duplicate of
+  `removeShield()`: it deliberately leaves the typed-website filter (D-033) in place, because those
+  are sites a parent blocked outright rather than part of the budget, and a reminder is not
+  permission to visit them.
+- **Not yet built:** D-012's other half — the shield as the mid-session REMINDER. That needs extra
+  `DeviceActivityEvent` thresholds at (budget − reminder) so the system wakes us early too. Today's
+  reminders are notifications only.
+
+## D-043 — A threshold per reminder, so the system wakes us inside the app
+**Date:** 2026-09-06 · **Status:** accepted · completes D-012 · extends D-037
+
+**Context.** The budget-spent shield works on device. But Dominic reported the thing that actually
+matters: when the timer ran out **while he was using a covered app**, nothing happened. The shield
+only appeared when he left that app and went back into it.
+
+Two explanations, and they call for different fixes, so it is worth being precise about which:
+
+- **A — the callback arrived on time, and iOS did not re-evaluate the app already in the
+  foreground.** Then this is a platform behaviour and no amount of our code changes it.
+- **B — the callback arrived LATE**, at the moment he re-entered the app. `DeviceActivityEvent`
+  thresholds are usage-accounted, not clock-accounted, and the system decides when to reconcile
+  that accounting. Then the shield went up exactly when we asked; we just asked late.
+
+`MonitorJournal` already timestamps every callback and the dashboard shows the last one, so the two
+are told apart by comparing that time against when the timer hit zero. Recorded here because the
+temptation was to guess, and the guesses lead to opposite fixes.
+
+**Decision (useful under either explanation).** Register a `DeviceActivityEvent` for **each
+reminder** as well as for the budget, at `budget − offset`. Still one `DeviceActivityName`, so the
+20-activity limit (D-037) is nowhere near.
+
+Why this is the right thing regardless of A or B:
+- It is what D-012 promised and Task 011 was built for. A reminder that only posts a notification is
+  a reminder a child can swipe away without looking up; the shield is the version they cannot.
+- The threshold fires *because usage accrued*, which means the child is very likely inside a covered
+  app at that moment — exactly where the heads-up is worth something.
+- It gives the system three or four chances to wake us during a session instead of one at the very
+  end, so under explanation B the child is interrupted before the end even if the final callback
+  drifts.
+
+**How the two kinds are told apart.** By event name (`MonitoringName.isWarningThreshold`), because a
+name is all the system hands the extension and opening storage to ask "which one was that" is work
+in a process that may be killed the moment it returns.
+
+**A reminder shield must NOT go through `Enforcement.reconcile`.** There is time left, so the rule
+would correctly say "unshielded" and take the reminder straight back down. `raiseReminderShield`
+exists for that one case. The child gets their remaining minutes back by pressing the button, which
+is what makes it a pause rather than a punishment.
+
+**Consequences.** `ScreenTimeMonitoringService` now takes `warningOffsetsSeconds`, and
+`sameRegistration` compares the whole event map rather than a single event — otherwise changing a
+reminder would not trigger a re-registration and the parent's change would silently not take.
+
+## D-044 — Three shields, two dials, and the last one asks
+**Date:** 2026-09-06 · **Status:** accepted · supersedes D-016's chooser placement
+
+**Context.** Once the reminder became a full-screen shield (D-043) rather than a notification,
+"how many reminders" stopped being a preference and became the shape of the experience. Dominic
+described what a child should actually meet, in order:
+
+1. **Heads-up** — "5 minutes left". OK, carry on.
+2. **Decide** — "1 minute left". Pick what's next, then carry on.
+3. **The end** — time's up; this one does not let you carry on.
+
+Three interruptions in one session. A fourth is nagging.
+
+**Decision.**
+- `maxWarnings` 3 → **2**. Two dials in Settings and in setup; the third shield is the end itself,
+  which is not a dial and never was.
+- The chooser moves to the **last** reminder. D-016 put it second-to-last so a child would not be
+  choosing under pressure in the final minute — but that reasoning was about a notification, and
+  with two reminders "second-to-last" IS the first one, the earliest possible moment. Asking before
+  they have felt the time running out gets an answer that means nothing by the end.
+- `ShieldMomentResolver` (framework-free, in the package) decides which of the three a child is
+  looking at. Both extensions call it: the configuration extension draws the screen, the action
+  extension acts on the buttons, and if they computed this separately a child could tap "LEGO" and
+  get "Bath".
+
+**What made this possible — and what it cost.** `ShieldConfiguration` has a secondary button with
+`secondaryButtonSubmenuItems`, and `ShieldAction` has `first`/`second`/`thirdSecondarySubmenuItemPressed`
+to report which was tapped. That is the only list a system shield can show, so:
+- **Three options, maximum.** The child is offered the first three in the PARENT's order, which is
+  what the drag-to-reorder in Settings is for (D-039). The order they chose decides what their
+  child sees.
+- **iOS 26.4+.** The submenu and those action cases are brand new. The app supports iOS 18, so on
+  anything older `supportsChooserMenu` is false, the second reminder is an ordinary heads-up, and
+  the child picks inside ScreenTimeNext as before. Less good, still whole — and the guard and the
+  `#available` branch that renders it agree by construction rather than by comment.
+
+**Consequences.**
+- The preview a parent can show their child now has all three shields, including the one that asks,
+  and draws the submenu as the plain list it amounts to. A preview that omitted it would let a
+  parent sign off on a screen their child never sees.
+- On the chooser shield the primary button is "Not yet" and does NOT take the child's remaining
+  minutes away. Declining a menu is a UI decision, not a reason to end screen time early.
+- A child who has already chosen gets the plain reminder instead: re-asking reads as "that wasn't
+  good enough", and costs a tap for nothing.
+
 <!-- Template for new entries:
 
 ## D-NNN — <short imperative title>

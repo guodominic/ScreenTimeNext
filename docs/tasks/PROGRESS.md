@@ -14,14 +14,14 @@ in the same commit as the work. If this file and a task's front-matter disagree,
 | 002 | [App Architecture](002-app-architecture.md) | done | 001 | — | PASS | 26/26 tests; import check automated |
 | 003 | [Parent Onboarding](003-parent-onboarding.md) | done | 002 | QA-01 | PASS | 32/32; QA-01 verified on device |
 | 004 | [Family Controls Authorization](004-family-controls-authorization.md) | done | 002, 003 | QA-02 | PASS (build) / NEEDS MANUAL DEVICE TEST | real AuthorizationCenter, `.individual` (D-025); four states rendered |
-| 005 | [Family Activity Picker](005-family-activity-picker.md) | in_progress | 004 | QA-03, QA-04 | — | picker + coding + App Group store wired (D-026); "my usual" still stores tiles |
+| 005 | [Family Activity Picker](005-family-activity-picker.md) | done | 004 | QA-03, QA-04 | PASS (build) / NEEDS MANUAL DEVICE TEST | picker + coding + App Group store (D-026); tiles deleted, Apple's picker is the only entry (D-035) |
 | 006 | [Screen Time Configuration](006-screen-time-configuration.md) | done | 002 | QA-05 | PASS (App Group at gate) | 40/40; FileStorageService |
 | 007 | [Child Timer UI](007-child-timer-ui.md) | done | 006 | QA-06, QA-07 | PASS / device check pending | 51/51; SessionController |
 | 008 | [Warning State Engine](008-warning-state-engine.md) | done | 006 | QA-07 | PASS | transition-table tests; batched run |
 | 009 | [What's Next](009-whats-next.md) | done | 003, 006 | QA-08 | PASS | choice on SessionWindow; D-009; batched run |
-| 010 | [Device Activity Monitor](010-device-activity-monitor.md) | not_started | 005, 006 | — | — | likely device-test only |
-| 011 | [Managed Settings Shield](011-managed-settings-shield.md) | not_started | 005 | QA-10 | — | |
-| 012 | [Enforcement Integration](012-enforcement-integration.md) | not_started | 010, 011 | QA-09 | — | **the V1 make-or-break task** |
+| 010 | [Device Activity Monitor](010-device-activity-monitor.md) | done | 005, 006 | — | **PASS (device 2026-09-06)** | threshold callback fired with the app force-quit; D-037 |
+| 011 | [Managed Settings Shield](011-managed-settings-shield.md) | done | 005 | QA-10 | NEEDS MANUAL DEVICE TEST | real shield + both extension targets (D-040); rules 6 & 7 now enforced by the audit |
+| 012 | [Enforcement Integration](012-enforcement-integration.md) | in_progress | 010, 011 | QA-09 | NEEDS MANUAL DEVICE TEST | one rule, `Enforcement.reconcile` (D-042); budget-spent shielding wired, reminder-shield still to do |
 | 013 | [Parent Extension](013-parent-extension.md) | in_progress | 012 | QA-11 | PASS (session half) / BLOCKED by gate (shield half) | +10/+20 in Phase 0; Allow Once deferred (D-010) |
 | 014 | [Parent Dashboard](014-parent-dashboard.md) | done | 006, 011 | — | PASS | + SettingsView; Extend row disabled until 013; batched run |
 | 015 | [Time's Up Experience](015-times-up-experience.md) | done | 009 | — | PASS | TimesUpView; batched run |

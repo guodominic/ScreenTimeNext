@@ -1,7 +1,7 @@
 ---
 task: "010"
 title: Device Activity Monitor Extension
-status: not_started        # not_started | in_progress | blocked | done
+status: done               # not_started | in_progress | blocked | done
 depends_on: ["005", "006"]
 qa_criteria: []
 prd_refs: ["§14", "§8"]
@@ -42,22 +42,53 @@ Implement the DeviceActivity schedule and the daily-budget threshold, and the ex
 - Rule 5 — the extension communicates through the App Group, not through the app.
 
 ## Definition of Done
-- [ ] Monitoring starts with a schedule and a threshold derived from the configured budget.
-- [ ] The extension receives and records the threshold callback with the app closed.
-- [ ] Monitoring restarts correctly after a configuration or selection change.
-- [ ] No code path assumes the extension runs continuously or that the app is alive.
-- [ ] Platform limits and the schedule/midnight decision are recorded in `docs/DECISIONS.md`.
-- [ ] Verdict states clearly whether device testing is still required.
+- [x] Monitoring starts with a schedule and a threshold derived from the configured budget.
+- [x] The extension receives and records the threshold callback with the app closed. — **proven
+      on device 2026-09-06 18:03.**
+- [x] Monitoring restarts correctly after a configuration or selection change.
+- [x] No code path assumes the extension runs continuously or that the app is alive.
+- [x] Platform limits and the schedule/midnight decision are recorded in `docs/DECISIONS.md` (D-037).
+- [x] Verdict states clearly whether device testing is still required.
 
 ## Completion report
-Append the result here when the task finishes. Do not edit earlier tasks' reports.
 
 - **Files changed:**
-- **Build result:**
-- **Tests run:**
-- **Verdict:** PASS / FAIL / BLOCKED / NEEDS MANUAL DEVICE TEST
-- **Platform limitations or manual steps:**
-- **Follow-up work:**
+  - `DeviceActivityMonitorExtension/` — new target (created in Xcode). Entitlements now carry the
+    App Group *and* `family-controls`; `ScreenTimeNextCore` linked so both targets share the
+    identifier and the journal (Rule 5). Deployment target corrected 27.0 → 18.0 so the embedded
+    extension does not silently restrict the app to iOS 27 devices.
+  - `DeviceActivityMonitorExtension/DeviceActivityMonitorExtension.swift` — five callbacks, each
+    recording one journal entry. No async work, no UI, no notifications (Rule 3).
+  - `ScreenTimeNext/ScreenTime/Monitoring/DeviceActivityMonitoringService.swift` — the real
+    `ScreenTimeMonitoringService`: one daily schedule, one threshold, restart-only-if-different.
+  - `ScreenTimeNext/ScreenTime/Monitoring/MonitoringCoordinator.swift` — decides *when* to
+    register: launch and `.configurationDidChange`. Never polls.
+  - `Packages/.../Models/MonitorReport.swift`, `Packages/.../Services/MonitorJournal.swift` — the
+    extension's one-way channel to the app.
+  - `ScreenTimeNextApp.swift` — real monitoring service wired in; coordinator started once.
+  - `ParentDashboardView/ViewModel` — an "Enforcement" section: is iOS holding the registration,
+    and what was the last check-in.
+- **Build result:** Build Succeeded. Two warnings, both "Family Controls (Development)" — the
+  distribution entitlement is still with Apple (B-006 / `docs/entitlement-request.md`).
+- **Tests run:** `MonitorJournalTests` — trimming, suite round-trip, `latest`, today-vs-yesterday,
+  and a §16 shape test asserting an entry carries only `event` / `activity` / `at`.
+- **Verdict:** **PASS** (device-verified 2026-09-06)
+- **Platform limitations or manual steps:** 20 activities max (counting the extension's), interval
+  15 minutes to one week — all recorded in D-037. The threshold callback cannot be proven in the
+  simulator: it needs real accrued usage on a real device.
+- **Device test — RUN AND PASSED, 2026-09-06.** Budget set to 1 minute, 3 categories and 2 apps
+  selected, ScreenTimeNext force-quit, a covered app used, dashboard reopened: the Enforcement
+  section showed a `thresholdReached` check-in timestamped 18:03. So the whole chain works with the
+  app not running — `DeviceActivityCenter` registration → system accounting → extension wake →
+  App Group write → app read. **Tasks 011 and 012 are unblocked.**
+
+  One thing the test caught that the code did not: the check-in line read
+  "Last check-in the budget ran out · Sep 6, 2026 at 18:03" — every word true, and unreadable,
+  because the label ran straight into the event. Dominic looked at a working check-in and could not
+  tell it had worked, which for a status row is the same as it not working. Now two lines: the
+  event as a heading, the timestamp beneath it.
+- **Follow-up work:** Task 011 raises the shield inside `eventDidReachThreshold`; Task 012 connects
+  it to the session and to `ProtectionState`.
 
 > After finishing: update `status:` in this file's front-matter, update
 > `docs/tasks/PROGRESS.md`, and log any new decision in `docs/DECISIONS.md`

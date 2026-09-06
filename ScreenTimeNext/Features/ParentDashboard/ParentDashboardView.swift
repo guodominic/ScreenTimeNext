@@ -15,7 +15,6 @@ struct ParentDashboardView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.openURL) private var openURL
     @State private var viewModel: ParentDashboardViewModel
-    @State private var confirmEndSession = false
     @State private var confirmReset = false
     @State private var showExtend = false
     @State private var showShieldPreview = false
@@ -40,6 +39,7 @@ struct ParentDashboardView: View {
                 if viewModel.authorization != .approved { screenTimeAccessSection }
                 if viewModel.notificationsDenied { notificationAlertSection }
                 contentSection
+                enforcementSection
                 whatsNextSection
                 dangerSection
             }
@@ -138,16 +138,13 @@ struct ParentDashboardView: View {
 
             HStack(spacing: 12) {
                 if viewModel.sessionIsRunning {
-                    Button(role: .destructive) { confirmEndSession = true } label: {
+                    // D-036 — no "are you sure?". This button is already behind the parent PIN,
+                    // and the parent pressing it is usually standing next to a child who has just
+                    // been told the timer is stopping. A second tap turns a decision into a delay.
+                    Button(role: .destructive) { viewModel.endSession() } label: {
                         heroChip("End", "stop.fill")
                     }
                     .buttonStyle(.plain)
-                    .confirmationDialog("End today's session now?", isPresented: $confirmEndSession, titleVisibility: .visible) {
-                        Button("End session", role: .destructive) { viewModel.endSession() }
-                        Button("Keep going", role: .cancel) {}
-                    } message: {
-                        Text("The time used so far counts toward today's budget.")
-                    }
                 }
                 if viewModel.canExtend {
                     Button { showExtend = true } label: {
@@ -246,6 +243,73 @@ struct ParentDashboardView: View {
         }
     }
 
+    /// Task 010 — the one thing a parent cannot find out any other way: whether iOS is actually
+    /// watching. The monitor extension runs while the app is closed, so "it looked fine when I
+    /// last opened it" is not evidence, and a dashboard that stayed quiet about this would let a
+    /// family believe a budget was being enforced when nothing was registered at all.
+    ///
+    /// §16 — a check-in is a callback name and a time. Never which app tripped it.
+    @ViewBuilder
+    private var enforcementSection: some View {
+        Section {
+            HStack(spacing: 12) {
+                IconChip(symbol: viewModel.monitoringIsRegistered ? "eye.fill" : "eye.slash",
+                         color: viewModel.monitoringIsRegistered ? Theme.grass : Theme.peach)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(viewModel.monitoringIsRegistered ? "Watching today's budget" : "Not watching yet")
+                        .fontWeight(.semibold)
+                    Text(viewModel.monitoringIsRegistered
+                         ? "iOS keeps count even when this app is closed."
+                         : "Pick what's covered above, and this switches on.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+            }
+            if let report = viewModel.lastMonitorReport {
+                // Two lines, not one sentence. The first version read "Last check-in the budget ran
+                // out · Sep 6 at 18:03" — every word true, and unreadable, because the label ran
+                // straight into the event with nothing between them. Dominic looked at a working
+                // check-in and could not tell it had worked, which is the same as it not working.
+                HStack(spacing: 12) {
+                    IconChip(symbol: Self.symbol(for: report.event), color: Theme.sky, size: 30)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(Self.describe(report.event))
+                            .font(.subheadline.weight(.semibold))
+                        Text("Last check-in · \(report.at.formatted(date: .abbreviated, time: .shortened))")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 0)
+                }
+            }
+        } header: {
+            Text("Enforcement")
+        }
+    }
+
+    /// Apple's callback names, in words a parent can read. Written as standalone headings rather
+    /// than sentence fragments, because that is what they have to work as on their own line.
+    private static func describe(_ event: MonitorReport.Event) -> String {
+        switch event {
+        case .intervalDidStart:           return "A new day started"
+        case .intervalDidEnd:             return "The day ended"
+        case .thresholdReached:           return "Today's budget ran out"
+        case .warningBeforeIntervalEnds:  return "The day is nearly over"
+        case .warningBeforeThreshold:     return "The budget is nearly spent"
+        }
+    }
+
+    private static func symbol(for event: MonitorReport.Event) -> String {
+        switch event {
+        case .thresholdReached:           return "hourglass.bottomhalf.filled"
+        case .warningBeforeThreshold:     return "exclamationmark.triangle.fill"
+        case .intervalDidStart:           return "sunrise.fill"
+        case .intervalDidEnd:             return "moon.fill"
+        case .warningBeforeIntervalEnds:  return "clock.badge.exclamationmark"
+        }
+    }
+
     private var whatsNextSection: some View {
         Section("What's next") {
             if viewModel.configuration.selectedActivities.isEmpty {
@@ -308,15 +372,16 @@ struct ParentDashboardView: View {
                 Button("Erase and start over", role: .destructive) { onReset() }
                 Button("Cancel", role: .cancel) {}
             } message: {
-                Text("Erases the profile, the budget and the reminders on this device. Your category order and “my usual” are kept. This cannot be undone.")
+                Text("Erases the profile, the budget and the reminders on this device. The websites you typed, your saved sets and your own activities are kept. This cannot be undone.")
             }
         } footer: {
-            Text("Erases the child profile, the budget and the reminders. Your picker arrangement is kept.")
+            Text("Erases the child profile, the budget and the reminders. What you made — saved sets, websites, your own activities — is kept.")
         }
     }
 }
 
-/// D-013: extension minutes on a dial, 2–120 in 2-minute steps.
+/// D-013 / D-034: extension minutes on the same dial as everywhere else — 1 to 90, one minute
+/// at a time.
 struct ExtendTimeSheet: View {
     @Environment(\.dismiss) private var dismiss
     let childName: String
@@ -329,8 +394,7 @@ struct ExtendTimeSheet: View {
                 Mascot(mood: .cheering, size: 84, tint: Theme.lavender)
                 Text(childName.isEmpty ? "More time" : "Give \(childName) more time")
                     .font(.system(.title2, design: .rounded).bold())
-                // D-020 — "give five more minutes" is the common case, so extra time gets the
-                // same fine steps as the budget rather than jumping two at a time.
+                // D-020/D-034 — the same dial as everywhere else: 1–90, one minute at a time.
                 MinuteDial.budget($minutes, color: Theme.lavender)
                 Text("Extra minutes are beyond today's budget.")
                     .font(.footnote).foregroundStyle(.secondary)

@@ -11,11 +11,9 @@ import ScreenTimeNextCore
 struct MinuteDial: View {
     @Binding var minutes: Int
     let range: ClosedRange<Int>
-    /// Constant step, or — when `fineBelow` is set — 1 minute under that threshold.
+    /// D-034 — one step for the whole range. The fine/coarse split is gone: every dial in the app
+    /// now moves a minute at a time, so no screen can round a parent's number to something else.
     let step: Int
-    /// Below this many minutes the dial moves one minute at a time (D-017): short budgets are the
-    /// common case and two-minute jumps are too coarse to say "seven more minutes".
-    var fineBelow: Int? = nil
     var title: String? = nil
     var color: Color = Theme.sky
     /// Base size; on iPad every dial is scaled up (see `size`), because the whole control is dragged.
@@ -143,11 +141,7 @@ struct MinuteDial: View {
             .rotationEffect(.degrees(fraction * 360))
     }
 
-    /// The step in force around a given value.
-    private func step(near value: Int) -> Int {
-        if let fineBelow, value < fineBelow { return 1 }
-        return step
-    }
+    private func step(near value: Int) -> Int { step }
 
     private func set(_ raw: Double) {
         let st = step(near: Int(raw))
@@ -172,7 +166,7 @@ struct MinuteDial: View {
 
 extension MinuteDial {
 
-    /// Minutes of screen time: 1–120, one-minute steps under fifteen and two above (D-017).
+    /// Minutes of screen time: 1–90, one minute at a time (D-034).
     static func budget(_ minutes: Binding<Int>,
                        title: String? = nil,
                        color: Color = Theme.mint,
@@ -184,7 +178,6 @@ extension MinuteDial {
         return MinuteDial(minutes: minutes,
                    range: lowest...highest,
                    step: ScreenTimeConfiguration.budgetStepSeconds / 60,
-                   fineBelow: ScreenTimeConfiguration.fineStepThresholdSeconds / 60,
                    title: title,
                    color: color,
                    baseSize: baseSize)
@@ -210,7 +203,7 @@ extension MinuteDial {
 #Preview("Budget") {
     struct Host: View {
         @State var m = 60
-        var body: some View { MinuteDial(minutes: $m, range: 2...120, step: 2, title: "Daily budget", color: Theme.sky) }
+        var body: some View { MinuteDial.budget($m, title: "Daily budget", color: Theme.sky) }
     }
     return Host()
 }

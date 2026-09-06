@@ -15,7 +15,18 @@ struct ChildTimerView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var viewModel: ChildTimerViewModel
-    @State private var showPINPad = false
+    /// D-036 — which pad is up, if any. `.create` is the forced first-run one; `.unlock` is the
+    /// everyday way back to the dashboard.
+    @State private var pinSheet: PINSheet?
+    /// D-036 — the forced setup happens at most once per visit to this screen, and only when there
+    /// is genuinely no stored PIN. Without this latch anything that re-runs `onAppear` (returning
+    /// from a sheet, a foreground) would put the pad back up in a parent's face.
+    @State private var didOfferPINSetup = false
+
+    private enum PINSheet: String, Identifiable {
+        case create, unlock
+        var id: String { rawValue }
+    }
 
     init(services: ServiceContainer) {
         _viewModel = State(initialValue: ChildTimerViewModel(services: services))
@@ -51,7 +62,17 @@ struct ChildTimerView: View {
             }
         }
         .animation(.spring(response: 0.5, dampingFraction: 0.8), value: snapshot.state)
-        .onAppear { viewModel.appeared() }
+        .onAppear {
+            viewModel.appeared()
+            // D-036 — first run ONLY. The child is about to be handed a device whose only way
+            // back is this screen's Parents button, so the PIN gets set before that happens, not
+            // later in a Settings screen the parent may never open. Once one is stored this never
+            // fires again — the latch guards the re-runs, the nil check guards the rest.
+            if viewModel.parentPIN == nil && !didOfferPINSetup {
+                didOfferPINSetup = true
+                pinSheet = .create
+            }
+        }
         .onDisappear { viewModel.disappeared() }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { viewModel.refresh() }
@@ -59,17 +80,29 @@ struct ChildTimerView: View {
         .onReceive(NotificationCenter.default.publisher(for: .configurationDidChange)) { _ in
             viewModel.configurationChanged()
         }
-        .sheet(isPresented: $showPINPad) {
-            ParentPINView(mode: .unlock, storedPIN: viewModel.parentPIN) { _ in
-                dismiss()
+        .sheet(item: $pinSheet) { sheet in
+            switch sheet {
+            case .create:
+                // No Cancel, and no swipe away: this is the one moment the app insists on
+                // something, and it insists exactly once.
+                ParentPINView(mode: .create, canCancel: false) { newPIN in
+                    guard let newPIN, viewModel.setParentPIN(newPIN) else { return }
+                    dismiss()          // straight back to the dashboard, as promised
+                }
+                .presentationDetents([.large])
+                .interactiveDismissDisabled(true)
+            case .unlock:
+                ParentPINView(mode: .unlock, storedPIN: viewModel.parentPIN) { _ in
+                    dismiss()
+                }
+                .presentationDetents([.large])
             }
-            .presentationDetents([.large])
         }
         .navigationBarBackButtonHidden(true)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                ParentGateButton(hasPIN: viewModel.parentPIN != nil) {
-                    if viewModel.parentPIN != nil { showPINPad = true } else { dismiss() }
+                ParentGateButton {
+                    pinSheet = viewModel.parentPIN == nil ? .create : .unlock
                 }
             }
         }
@@ -219,39 +252,21 @@ struct ChildTimerView: View {
 /// repeat it, and the thing behind it grants more screen time. A PIN is something the child has to
 /// be told rather than something they can copy.
 ///
-/// With no PIN set the button still works on a press-and-hold, because a parent must never be shut
-/// out of their own device by a security feature they have not set up yet.
+/// D-036 — there is no press-and-hold fallback any more, because there is no longer a state where
+/// no PIN exists: arriving on this screen without one opens the create pad instead of the unlock
+/// pad, so the button always leads somewhere and never leads straight to the dashboard.
 struct ParentGateButton: View {
-    let hasPIN: Bool
     let onUnlock: () -> Void
-    @State private var showHint = false
 
     var body: some View {
-        Label(label, systemImage: "lock.fill")
+        Label("Parents", systemImage: "lock.fill")
             .font(.subheadline)
             .foregroundStyle(.secondary)
             .padding(.horizontal, 10).padding(.vertical, 6)
             .background(Capsule().fill(.thinMaterial))
             .contentShape(Capsule())
-            .onTapGesture {
-                if hasPIN {
-                    onUnlock()
-                } else {
-                    showHint = true
-                    Task {
-                        try? await Task.sleep(for: .seconds(2))
-                        showHint = false
-                    }
-                }
-            }
-            .onLongPressGesture(minimumDuration: 1.0) { if !hasPIN { onUnlock() } }
-            .accessibilityLabel(hasPIN ? "Parents. Enter your PIN to go back."
-                                       : "Parents. Press and hold to go back.")
-    }
-
-    private var label: String {
-        if hasPIN { return "Parents" }
-        return showHint ? "Hold to go back" : "Parents"
+            .onTapGesture { onUnlock() }
+            .accessibilityLabel("Parents. Enter your PIN to go back.")
     }
 }
 

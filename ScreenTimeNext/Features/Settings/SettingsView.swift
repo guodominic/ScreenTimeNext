@@ -21,6 +21,9 @@ struct SettingsView: View {
     @State private var pickerLoaded = false
     @State private var screenTimeApproved = false
     @State private var customActivities: [TransitionActivity] = []
+    /// D-039 — built-ins the parent removed. Hidden, not deleted: they are `static let`s in code,
+    /// and a family that drops "Bath" and wants it back should not have to retype it.
+    @State private var hiddenActivityIDs: [String] = []
     @State private var showActivityEditor = false
     @State private var editingActivity: TransitionActivity?
     @State private var parentPIN: ParentPIN?
@@ -31,10 +34,13 @@ struct SettingsView: View {
     /// D-033 — the parent's own order, built by the same rule as the category list: their
     /// arrangement first, anything it has never heard of appended, so a stale order cannot hide a
     /// row.
-    private var orderedActivities: [TransitionActivity] {
+    private var activityPreferences: ParentPickerPreferences {
         ParentPickerPreferences(customActivities: customActivities,
-                                activityOrder: activityOrder).allActivities
+                                activityOrder: activityOrder,
+                                hiddenActivityIDs: hiddenActivityIDs)
     }
+
+    private var orderedActivities: [TransitionActivity] { activityPreferences.allActivities }
     private var allActivities: [TransitionActivity] { orderedActivities }
     @State private var existingProfileID: UUID?
     @State private var errorText: String?
@@ -94,7 +100,7 @@ struct SettingsView: View {
             } header: {
                 Text("Reminders (minutes before the end)")
             } footer: {
-                Text("Your child is asked what to do next at the second-to-last reminder. Up to three, each shorter than the budget (up to \(ScreenTimeConfiguration.maxWarningOffset(forBudgetSeconds: budgetMinutes * 60) / 60) min). Off skips that reminder. A finish notification is always sent.")
+                Text("Two reminders, each a full-screen message inside whatever app your child is using. The first is a heads-up; the second asks them to pick what's next. Each must be shorter than the budget (up to \(ScreenTimeConfiguration.maxWarningOffset(forBudgetSeconds: budgetMinutes * 60) / 60) min); Off skips it. The end always interrupts, and is not a dial.")
             }
 
             Section {
@@ -108,6 +114,15 @@ struct SettingsView: View {
                         .foregroundStyle(Theme.mint)
                 }
                 .moveDisabled(true)
+                // D-039 — only offered once something is missing, and it is the whole reason a
+                // removed built-in is hidden rather than gone.
+                if activityPreferences.hasHiddenBuiltIns {
+                    Button { restoreBuiltIns() } label: {
+                        Label("Bring back the ones I removed", systemImage: "arrow.uturn.backward")
+                            .foregroundStyle(Theme.sky)
+                    }
+                    .moveDisabled(true)
+                }
             } header: {
                 HStack {
                     Text("What's next")
@@ -119,8 +134,8 @@ struct SettingsView: View {
             } footer: {
                 // D-029 — "all eight" stopped being true the moment a parent could add a ninth.
                 Text(activities.isEmpty
-                     ? "None picked — everything here will be offered."
-                     : "\(activities.count) picked. Swipe a custom one to edit or delete it; Reorder to arrange them.")
+                     ? "None picked — everything here will be offered. Swipe any row to rename or remove it; Reorder to arrange them."
+                     : "\(activities.count) picked. Swipe any row to rename or remove it; Reorder to arrange them.")
             }
 
             Section {
@@ -140,8 +155,7 @@ struct SettingsView: View {
                 if selection != nil {
                     Button("Clear selection", role: .destructive) {
                         selection = nil
-                        picker.clear()
-                        picker.applyRealSelection(nil)      // D-027 — clears the stored one too
+                        picker.clearAll()                   // D-027 — clears the stored one too
                     }
                 }
             } header: {
@@ -168,7 +182,9 @@ struct SettingsView: View {
         }
         .sheet(isPresented: $showActivityEditor) {
             ActivityEditorSheet(existing: editingActivity) { saved in
-                if let index = customActivities.firstIndex(of: saved) {
+                if let original = editingActivity, !original.isCustom {
+                    replaceBuiltIn(original, with: saved)    // D-039 — see the note on that method
+                } else if let index = customActivities.firstIndex(of: saved) {
                     customActivities[index] = saved          // same id — a rename, not a new one
                 } else {
                     customActivities.append(saved)
@@ -202,15 +218,18 @@ struct SettingsView: View {
                 }
             }
         }
-        // Only the family's own activities can be changed or removed; the built-in eight are ours.
+        // D-039 — every row, ours included. "What my child does after screen time" is the one
+        // list in this app that belongs to the family; a built-in called "Bath" is a suggestion,
+        // not a fact about their evening. Removal stops one short of empty: a chooser with nothing
+        // in it is not a configuration, it is a broken §6.11.
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-            if activity.isCustom {
-                Button(role: .destructive) { remove(activity) } label: { Label("Delete", systemImage: "trash") }
-                Button { editingActivity = activity; showActivityEditor = true } label: {
-                    Label("Edit", systemImage: "pencil")
-                }
-                .tint(Theme.sky)
+            if activityPreferences.canRemoveActivity(activity.id) {
+                Button(role: .destructive) { remove(activity) } label: { Label("Remove", systemImage: "trash") }
             }
+            Button { editingActivity = activity; showActivityEditor = true } label: {
+                Label("Rename", systemImage: "pencil")
+            }
+            .tint(Theme.sky)
         }
     }
 
@@ -228,9 +247,45 @@ struct SettingsView: View {
         persistCustomActivities()
     }
 
+    /// D-039 — a custom activity is deleted; a built-in is hidden, so "Bring back the ones I
+    /// removed" can undo it.
     private func remove(_ activity: TransitionActivity) {
-        customActivities.removeAll { $0 == activity }
+        guard activityPreferences.canRemoveActivity(activity.id) else { return }
+        if activity.isCustom {
+            customActivities.removeAll { $0 == activity }
+        } else {
+            hiddenActivityIDs.append(activity.id)
+        }
         activities.remove(activity)
+        activityOrder.removeAll { $0 == activity.id }
+        persistCustomActivities()
+    }
+
+    private func restoreBuiltIns() {
+        let builtInIDs = Set(TransitionActivity.allCases.map(\.id))
+        hiddenActivityIDs.removeAll { builtInIDs.contains($0) }
+        persistCustomActivities()
+    }
+
+    /// D-039 — renaming a BUILT-IN makes a new activity of the family's own and hides ours, rather
+    /// than editing ours in place. A built-in is re-resolved from its id on every decode (so that
+    /// improving its wording reaches families who already have it), which would quietly undo the
+    /// rename on the next launch. A real custom activity has an id nothing else owns, so the new
+    /// name is the family's for good — and it lands where the old row was, not at the bottom.
+    private func replaceBuiltIn(_ builtIn: TransitionActivity, with renamed: TransitionActivity) {
+        let replacement = TransitionActivity.custom(displayName: renamed.displayName,
+                                                    symbolName: renamed.symbolName)
+        customActivities.append(replacement)
+        if let slot = orderedActivities.firstIndex(of: builtIn) {
+            var ids = orderedActivities.map(\.id)
+            ids[slot] = replacement.id
+            activityOrder = ids
+        }
+        if activities.contains(builtIn) {
+            activities.remove(builtIn)
+            activities.insert(replacement)
+        }
+        hiddenActivityIDs.append(builtIn.id)
         persistCustomActivities()
     }
 
@@ -240,6 +295,7 @@ struct SettingsView: View {
         guard var preferences = try? services.storage.loadPickerPreferences() else { return }
         preferences.customActivities = customActivities
         preferences.activityOrder = activityOrder
+        preferences.hiddenActivityIDs = hiddenActivityIDs
         try? services.storage.save(preferences)
     }
 
@@ -259,12 +315,13 @@ struct SettingsView: View {
         activities = Set(config.selectedActivities)
         let preferences = (try? services.storage.loadPickerPreferences()) ?? .default
         customActivities = preferences.customActivities
+        hiddenActivityIDs = preferences.hiddenActivityIDs
         activityOrder = preferences.activityOrder
         parentPIN = try? services.storage.loadParentPIN()
         selection = try? services.selection.loadSelection()
         // Only on first appear: coming back from the picker must not undo what was just arranged.
         if !pickerLoaded {
-            // D-022 — autosaving: "Save as my usual" and a drag write themselves immediately here,
+            // D-022 — autosaving: a typed website and a saved set write themselves immediately here,
             // rather than waiting for this screen's own Save button.
             picker = ContentPickerModel.loaded(from: services.storage,
                                                selection: services.selection,
@@ -279,8 +336,7 @@ struct SettingsView: View {
         let config = ScreenTimeConfiguration(
             dailyBudgetSeconds: budgetMinutes * 60,
             warningOffsetsSeconds: warningMinutes.map { min($0 * 60, ScreenTimeConfiguration.maxWarningOffset(forBudgetSeconds: budgetMinutes * 60)) },
-            selectedActivities: allActivities.filter { activities.contains($0) },
-            selectedCategories: picker.order.filter { picker.categories.contains($0) }
+            selectedActivities: allActivities.filter { activities.contains($0) }
         )
         do {
             try services.storage.save(profile)

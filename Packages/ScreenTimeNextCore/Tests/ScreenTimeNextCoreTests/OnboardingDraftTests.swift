@@ -8,11 +8,14 @@ import XCTest
 
 final class OnboardingDraftTests: XCTestCase {
 
-    /// PRD §6.5 / §6.6 defaults.
-    func testDefaultsMatchThePRD() {
+    /// PRD §6.6 defaults, and the one place the app deliberately departs from §6.5: D-034 made
+    /// the starting budget 15 minutes rather than 60. The PRD's 60 was a number a parent had to
+    /// dial DOWN from every single time, and "fifteen minutes, then dinner" is the sentence this
+    /// app exists to answer.
+    func testDefaultsMatchThePRDExceptTheBudget() {
         let draft = OnboardingDraft()
-        XCTAssertEqual(draft.dailyBudgetSeconds, 3600)
-        XCTAssertEqual(draft.warningMinutes, [10, 5, 1])
+        XCTAssertEqual(draft.dailyBudgetSeconds, 900)
+        XCTAssertEqual(draft.warningMinutes, [5, 1], "D-044 — two reminders")
         XCTAssertTrue(draft.selectedActivities.isEmpty)
         XCTAssertNil(draft.selection)
         XCTAssertFalse(draft.hasChildName)
@@ -31,30 +34,31 @@ final class OnboardingDraftTests: XCTestCase {
 
     /// Defaults follow the budget until the parent touches the dials.
     func testReminderDefaultsFollowTheBudget() {
+        // D-044 — two dials, so every expected list here is two long.
         var draft = OnboardingDraft()
-        XCTAssertEqual(draft.warningMinutes, [10, 5, 1])
+        XCTAssertEqual(draft.warningMinutes, [5, 1])
         draft.dailyBudgetSeconds = 4 * 60
-        XCTAssertEqual(draft.warningMinutes, [2, 1, 0])
+        XCTAssertEqual(draft.warningMinutes, [2, 1])
         draft.dailyBudgetSeconds = 8 * 60
-        XCTAssertEqual(draft.warningMinutes, [4, 1, 0])
+        XCTAssertEqual(draft.warningMinutes, [4, 1])
         draft.dailyBudgetSeconds = 3 * 60
-        XCTAssertEqual(draft.warningMinutes, [1, 0, 0])
+        XCTAssertEqual(draft.warningMinutes, [1, 0])
         draft.dailyBudgetSeconds = 12 * 60
-        XCTAssertEqual(draft.warningMinutes, [10, 5, 1])
+        XCTAssertEqual(draft.warningMinutes, [5, 1])
         XCTAssertFalse(draft.hasCustomizedWarnings)
         // Once customized, they stick.
-        draft.warningMinutes = [6, 0, 0]
+        draft.warningMinutes = [6, 0]
         draft.dailyBudgetSeconds = 60 * 60
-        XCTAssertEqual(draft.warningMinutes, [6, 0, 0])
+        XCTAssertEqual(draft.warningMinutes, [6, 0])
         XCTAssertTrue(draft.hasCustomizedWarnings)
     }
 
     /// Budget lowered after reminders were set: reminders are clamped to budget − 1 minute.
     func testRemindersAreClampedToTheBudget() {
         var draft = OnboardingDraft()
-        draft.warningMinutes = [10, 5, 1]
+        draft.warningMinutes = [10, 5]
         draft.dailyBudgetSeconds = 8 * 60
-        XCTAssertEqual(draft.configuration.warningOffsetsSeconds, [420, 300, 60], "10 → 7")
+        XCTAssertEqual(draft.configuration.warningOffsetsSeconds, [420, 300], "10 → 7")
     }
 
     func testActivitiesAreStoredInCanonicalOrder() {

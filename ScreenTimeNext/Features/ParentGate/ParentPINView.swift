@@ -22,6 +22,10 @@ struct ParentPINView: View {
     let mode: Mode
     /// `.unlock` is the only mode that checks a stored PIN; the others are handed theirs by `mode`.
     var storedPIN: ParentPIN?
+    /// D-036 — false for the forced first-run setup, where there is nothing to go back to and a
+    /// Cancel button would just be a way for a child to skip the gate. Declared BEFORE the two
+    /// closures so the memberwise initialiser still takes `onSuccess` as a trailing closure.
+    var canCancel: Bool = true
     /// `.unlock` passes nil; `.create` and `.change` pass the new PIN to store.
     let onSuccess: (ParentPIN?) -> Void
     var onCancel: () -> Void = {}
@@ -67,9 +71,11 @@ struct ParentPINView: View {
                 .disabled(isWaiting)
                 .opacity(isWaiting ? 0.4 : 1)
 
-            Button("Cancel") { onCancel(); dismiss() }
-                .font(.footnote)
-                .padding(.top, 2)
+            if canCancel {
+                Button("Cancel") { onCancel(); dismiss() }
+                    .font(.footnote)
+                    .padding(.top, 2)
+            }
         }
         .padding(.vertical, 24)
         .readableWidth(420)

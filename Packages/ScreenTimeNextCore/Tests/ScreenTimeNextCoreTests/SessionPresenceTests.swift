@@ -19,7 +19,11 @@ final class SessionPresenceTests: XCTestCase {
         XCTAssertEqual(presence.shown.last?.chosenActivity, .lego)
 
         try controller.extend(bySeconds: 600)
-        XCTAssertEqual(presence.shown.last?.endsAt, start.addingTimeInterval(3600 + 600))
+        // The default budget (D-034: 900s) plus the extension, read from the constant rather than
+        // written out — this test is about the Live Activity following the session, not about
+        // what the budget happens to be this month.
+        XCTAssertEqual(presence.shown.last?.endsAt,
+                       start.addingTimeInterval(Double(ScreenTimeConfiguration.defaultBudgetSeconds + 600)))
 
         try controller.endEarly()
         XCTAssertEqual(presence.hideCount, 1)

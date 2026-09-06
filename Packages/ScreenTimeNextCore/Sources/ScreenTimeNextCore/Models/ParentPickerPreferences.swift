@@ -12,23 +12,17 @@
 //  alone, and which is therefore also what makes a reset feel like a reset rather than a
 //  punishment.
 //
-//  §16: these are our own catalogue rows, never Apple's opaque selection tokens.
+//  D-035 removed `categoryOrder` / `favourites` / `favouritesAreCustom`. They arranged and saved
+//  category TILES, and the tiles are gone: only a token from Apple's picker can shield anything, so
+//  a saved set of our own category names promised something it could never deliver. Records written
+//  by an older build still decode — the keys are simply ignored (`decodeIfPresent` never saw them
+//  as required), which is the whole reason this record has a hand-written decoder.
+//
+//  §16: nothing here is one of Apple's opaque selection tokens.
 
 import Foundation
 
 public struct ParentPickerPreferences: Codable, Equatable, Sendable {
-
-    /// The row order as the parent arranged it. Always completed against the catalogue on read,
-    /// so a category added in a later version can never be stranded off the bottom of a saved list.
-    public var categoryOrder: [ContentCategory]
-
-    /// The set applied by "My usual".
-    public var favourites: [ContentCategory]
-
-    /// False while `favourites` is still the value WE chose. It gates pre-ticking: offering the
-    /// parent their own saved set on a fresh picker is helpful, silently ticking three categories
-    /// they never chose is presumptuous.
-    public var favouritesAreCustom: Bool
 
     /// D-029 — activities the parent invented. Kept here rather than in the configuration for the
     /// same reason as everything else in this record: a reset should take the child's setup, not
@@ -45,8 +39,15 @@ public struct ParentPickerPreferences: Codable, Equatable, Sendable {
 
     /// D-033 — the order the parent dragged their "what's next" activities into, by id. Ids that
     /// no longer exist are ignored, and anything missing is appended, so the list can never lose a
-    /// row (same contract as `categoryOrder`).
+    /// row.
     public var activityOrder: [String]
+
+    /// D-039 — built-ins the parent removed, by id.
+    ///
+    /// Hidden rather than deleted, for two reasons. A built-in is a `static let` in code, so there
+    /// is nothing to delete; and a family that removes "Bath" and later wants it back should get it
+    /// back, not have to retype it. `restoreBuiltIns()` is one tap away in Settings.
+    public var hiddenActivityIDs: [String]
 
     /// D-030 — whole selections the parent saved and named, so a set of apps, categories and
     /// WEBSITES can be re-applied with one tap instead of retyped. A website can only be created
@@ -54,25 +55,23 @@ public struct ParentPickerPreferences: Codable, Equatable, Sendable {
     /// remembering the selection that contains it is the only way to stop a parent typing it again.
     public var savedSelections: [SavedSelection]
 
-    public init(categoryOrder: [ContentCategory] = ContentCategory.defaultOrder,
-                favourites: [ContentCategory] = ContentCategory.defaultFavourites,
-                favouritesAreCustom: Bool = false,
-                customActivities: [TransitionActivity] = [],
+    public init(customActivities: [TransitionActivity] = [],
                 savedSelections: [SavedSelection] = [],
                 blockedWebsites: [String] = [],
-                activityOrder: [String] = []) {
-        self.categoryOrder = ContentCategory.completeOrder(categoryOrder)
-        self.favourites = favourites
-        self.favouritesAreCustom = favouritesAreCustom
+                activityOrder: [String] = [],
+                hiddenActivityIDs: [String] = []) {
         self.customActivities = customActivities
         self.savedSelections = savedSelections
         self.blockedWebsites = Self.tidied(blockedWebsites)
         self.activityOrder = activityOrder
+        self.hiddenActivityIDs = hiddenActivityIDs
     }
 
-    /// The built-in eight plus whatever the parent added, in the order they arranged.
+    /// What the child is actually offered: the built-ins the parent kept, plus whatever they
+    /// added, in the order they arranged.
     public var allActivities: [TransitionActivity] {
-        let everything = TransitionActivity.allCases + customActivities
+        let hidden = Set(hiddenActivityIDs)
+        let everything = (TransitionActivity.allCases + customActivities).filter { !hidden.contains($0.id) }
         guard !activityOrder.isEmpty else { return everything }
         var byID = Dictionary(uniqueKeysWithValues: everything.map { ($0.id, $0) })
         var ordered: [TransitionActivity] = []
@@ -124,28 +123,34 @@ public struct ParentPickerPreferences: Codable, Equatable, Sendable {
         return true
     }
 
-    public static let `default` = ParentPickerPreferences()
-
-    /// What a fresh picker should open with ticked: the parent's own usual set, or nothing.
-    public var initialSelection: Set<ContentCategory> {
-        favouritesAreCustom ? Set(favourites) : []
+    /// D-039 — true when the parent has removed at least one built-in, which is the only reason
+    /// to offer them a way back.
+    public var hasHiddenBuiltIns: Bool {
+        let builtInIDs = Set(TransitionActivity.allCases.map(\.id))
+        return hiddenActivityIDs.contains { builtInIDs.contains($0) }
     }
 
+    /// D-039 — the child must always have something to choose. A parent who removes the last row
+    /// has not configured anything, they have broken §6.11, so removal stops one short.
+    public func canRemoveActivity(_ id: String) -> Bool {
+        allActivities.contains { $0.id != id }
+    }
+
+    public static let `default` = ParentPickerPreferences()
+
     private enum CodingKeys: String, CodingKey {
-        case categoryOrder, favourites, favouritesAreCustom, customActivities, savedSelections
-        case blockedWebsites, activityOrder
+        case customActivities, savedSelections
+        case blockedWebsites, activityOrder, hiddenActivityIDs
     }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         self.init(
-            categoryOrder: try c.decodeIfPresent([ContentCategory].self, forKey: .categoryOrder) ?? ContentCategory.defaultOrder,
-            favourites: try c.decodeIfPresent([ContentCategory].self, forKey: .favourites) ?? ContentCategory.defaultFavourites,
-            favouritesAreCustom: try c.decodeIfPresent(Bool.self, forKey: .favouritesAreCustom) ?? false,
             customActivities: try c.decodeIfPresent([TransitionActivity].self, forKey: .customActivities) ?? [],
             savedSelections: try c.decodeIfPresent([SavedSelection].self, forKey: .savedSelections) ?? [],
             blockedWebsites: try c.decodeIfPresent([String].self, forKey: .blockedWebsites) ?? [],
-            activityOrder: try c.decodeIfPresent([String].self, forKey: .activityOrder) ?? []
+            activityOrder: try c.decodeIfPresent([String].self, forKey: .activityOrder) ?? [],
+            hiddenActivityIDs: try c.decodeIfPresent([String].self, forKey: .hiddenActivityIDs) ?? []
         )
     }
 }

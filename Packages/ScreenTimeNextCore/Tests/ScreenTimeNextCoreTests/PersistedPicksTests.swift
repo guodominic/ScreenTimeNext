@@ -1,8 +1,9 @@
 //  PersistedPicksTests.swift
 //  ScreenTimeNextCoreTests
 //
-//  D-021 — what the parent picked, arranged and saved as "my usual" must all survive a relaunch,
-//  and the Live Activity must not outlive the session that owns it.
+//  D-021 / D-035 — what the parent made must survive a relaunch and a "Start over", a record
+//  written by an older build must never fail to decode, and the Live Activity must not outlive the
+//  session that owns it.
 
 import XCTest
 @testable import ScreenTimeNextCore
@@ -15,79 +16,79 @@ final class PersistedPicksTests: XCTestCase {
         func advance(_ seconds: TimeInterval) { now = now.addingTimeInterval(seconds) }
     }
 
-    // MARK: Picks survive a relaunch
-
-    func testSelectedCategoriesRoundTrip() throws {
-        var config = ScreenTimeConfiguration.default
-        config.selectedCategories = [.browsers, .games, .social]
-        let decoded = try JSONDecoder().decode(ScreenTimeConfiguration.self,
-                                               from: try JSONEncoder().encode(config))
-        XCTAssertEqual(decoded.selectedCategories, [.browsers, .games, .social])
+    private func snapshot(categories: Int = 0, apps: Int = 0, websites: Int = 0) -> SelectionSnapshot {
+        .phase0Placeholder(summary: SelectionSummary(applicationCount: apps,
+                                                     categoryCount: categories,
+                                                     webDomainCount: websites))
     }
 
-    func testTicksAndArrangementSurviveTogetherInTheirOwnRecords() throws {
-        let storage = InMemoryScreenTimeStorageService()
-        var config = ScreenTimeConfiguration.default
-        config.selectedCategories = [.education, .games]
-        try storage.save(config)
-        try storage.save(ParentPickerPreferences(categoryOrder: [.education, .browsers, .games],
-                                                 favourites: [.education],
-                                                 favouritesAreCustom: true))
+    // MARK: Old records still decode (D-035)
 
-        XCTAssertEqual(try storage.loadConfiguration().selectedCategories, [.education, .games])
-        let prefs = try storage.loadPickerPreferences()
-        XCTAssertEqual(prefs.categoryOrder.prefix(3).map { $0 }, [.education, .browsers, .games])
-        XCTAssertEqual(prefs.favourites, [.education])
+    /// The category tiles are gone. A configuration written by a build that had them carries a
+    /// `selectedCategories` key this version knows nothing about — it must be IGNORED, never a
+    /// decode failure, because a throw here resets the parent's entire setup.
+    func testAConfigurationFromTheTileEraStillDecodes() throws {
+        let json = #"{"dailyBudgetSeconds":1500,"warningOffsetsSeconds":[300,60],"selectedActivities":[],"selectedCategories":["games","browsers"]}"#
+        let decoded = try JSONDecoder().decode(ScreenTimeConfiguration.self, from: Data(json.utf8))
+        XCTAssertEqual(decoded.dailyBudgetSeconds, 1500)
+        XCTAssertEqual(decoded.warningOffsetsSeconds, [300, 60])
     }
 
-    /// A configuration written before D-021 has no picks — it must decode as "nothing ticked yet",
-    /// never as a decode failure that would reset the parent's whole setup.
-    func testAnOlderConfigurationDecodesWithNoPicks() throws {
+    /// Same for the parent's own record: `categoryOrder` / `favourites` / `favouritesAreCustom`
+    /// are gone, and the websites and named sets sitting beside them must come back untouched.
+    func testAPreferencesRecordFromTheTileEraKeepsWhatStillExists() throws {
+        let json = #"{"categoryOrder":["education","browsers"],"favourites":["games"],"favouritesAreCustom":true,"blockedWebsites":["youtube.com"],"customActivities":[],"savedSelections":[],"activityOrder":[]}"#
+        let decoded = try JSONDecoder().decode(ParentPickerPreferences.self, from: Data(json.utf8))
+        XCTAssertEqual(decoded.blockedWebsites, ["youtube.com"])
+    }
+
+    /// A configuration written before D-021 has no picks at all — also fine.
+    func testAnOlderConfigurationDecodes() throws {
         let json = #"{"dailyBudgetSeconds":900,"warningOffsetsSeconds":[300,60],"selectedActivities":[]}"#
         let decoded = try JSONDecoder().decode(ScreenTimeConfiguration.self, from: Data(json.utf8))
-        XCTAssertEqual(decoded.selectedCategories, [])
         XCTAssertEqual(decoded.dailyBudgetSeconds, 900)
     }
 
-    func testPicksSurviveAStorageRoundTrip() throws {
-        let storage = InMemoryScreenTimeStorageService()
-        var config = ScreenTimeConfiguration.default
-        config.selectedCategories = [.browsers, .games]
-        try storage.save(config)
-        try storage.save(ParentPickerPreferences(favourites: [.browsers, .games], favouritesAreCustom: true))
+    // MARK: What the parent made survives a relaunch
 
-        XCTAssertEqual(try storage.loadConfiguration().selectedCategories, [.browsers, .games])
-        XCTAssertEqual(try storage.loadPickerPreferences().favourites, [.browsers, .games])
+    func testWebsitesAndSavedSetsSurviveAStorageRoundTrip() throws {
+        let storage = InMemoryScreenTimeStorageService()
+        try storage.save(ParentPickerPreferences(
+            savedSelections: [SavedSelection(name: "School nights", snapshot: snapshot(categories: 2, apps: 3))],
+            blockedWebsites: ["youtube.com", "roblox.com"]))
+
+        let prefs = try storage.loadPickerPreferences()
+        XCTAssertEqual(prefs.blockedWebsites, ["youtube.com", "roblox.com"])
+        XCTAssertEqual(prefs.savedSelections.map(\.name), ["School nights"])
+        XCTAssertEqual(prefs.savedSelections.first?.snapshot.summary.categoryCount, 2)
     }
 
     // MARK: Start over (D-024)
 
     /// The whole point of the separate record: a reset erases the child's setup and keeps the
-    /// parent's arrangement, so nobody re-drags thirteen rows to get back to where they were.
-    func testStartOverKeepsTheParentsArrangementAndClearsTheChildsSetup() throws {
+    /// parent's own work, so nobody retypes a list of sites to get back to where they were.
+    func testStartOverKeepsTheParentsOwnWorkAndClearsTheChildsSetup() throws {
         let storage = InMemoryScreenTimeStorageService()
         try storage.save(ChildProfile(name: "Ivy"))
-        var config = ScreenTimeConfiguration(dailyBudgetSeconds: 25 * 60)
-        config.selectedCategories = [.games, .browsers]
-        try storage.save(config)
-        try storage.save(ParentPickerPreferences(categoryOrder: [.education, .browsers],
-                                                 favourites: [.education, .browsers],
-                                                 favouritesAreCustom: true))
+        try storage.save(ScreenTimeConfiguration(dailyBudgetSeconds: 25 * 60))
+        try storage.save(ParentPickerPreferences(
+            savedSelections: [SavedSelection(name: "Weekend", snapshot: snapshot(categories: 1))],
+            blockedWebsites: ["youtube.com"],
+            activityOrder: ["outside", "lego"]))
 
         try storage.eraseAll()
 
         XCTAssertNil(try storage.loadChildProfile(), "the child's profile goes")
         XCTAssertFalse(try storage.hasStoredConfiguration(), "and so does the setup")
-        XCTAssertEqual(try storage.loadConfiguration().selectedCategories, [], "including the ticks")
 
         let kept = try storage.loadPickerPreferences()
-        XCTAssertEqual(kept.favourites, [.education, .browsers], "but 'my usual' stays")
-        XCTAssertEqual(kept.categoryOrder.prefix(2).map { $0 }, [.education, .browsers], "and the order")
-        XCTAssertEqual(kept.initialSelection, [.education, .browsers],
-                       "so the fresh picker opens on the parent's own set")
+        XCTAssertEqual(kept.blockedWebsites, ["youtube.com"], "but the sites they typed stay")
+        XCTAssertEqual(kept.savedSelections.map(\.name), ["Weekend"], "and the sets they named")
+        XCTAssertEqual(kept.activityOrder, ["outside", "lego"], "and the order they dragged")
     }
 
     // MARK: The Live Activity does not outlive its session
+
 
     func testTheActivityIsRetiredWhenTheWindowRunsOut() throws {
         let storage = InMemoryScreenTimeStorageService()

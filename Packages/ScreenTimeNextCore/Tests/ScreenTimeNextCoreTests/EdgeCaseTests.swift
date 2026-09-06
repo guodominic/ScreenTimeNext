@@ -60,7 +60,9 @@ final class EdgeCaseTests: XCTestCase {
     }
 
     func testRestartInEveryStageRestoresThatStage() throws {
-        for (elapsed, expected) in [(0, ScreenTimeState.active), (700, .firstWarning), (950, .secondWarning), (1150, .finalWarning), (1200, .finished)] {
+        // D-044 — a 20-minute budget gets reminders at 5 and 1 minutes, so the stages fall at
+        // 900s (300 left) and 1140s (60 left). `.secondWarning` is unreachable with two reminders.
+        for (elapsed, expected) in [(0, ScreenTimeState.active), (900, .firstWarning), (1140, .finalWarning), (1200, .finished)] {
             try? FileManager.default.removeItem(at: directory)
             clock = Clock(Calendar.current.startOfDay(for: Date()).addingTimeInterval(12 * 3600))
             let (a, _) = try boot()
@@ -79,8 +81,9 @@ final class EdgeCaseTests: XCTestCase {
         let (c, _) = try boot(budget: 1200)
         try c.start()
         clock.now = midnight.addingTimeInterval(5 * 60)     // 00:05 — 15 of 20 minutes elapsed
+        // 300 seconds left: the 5-minute reminder, which with two reminders is the first (D-044).
         let snap = try c.tick()
-        XCTAssertEqual(snap.state, .secondWarning)
+        XCTAssertEqual(snap.state, .firstWarning)
         XCTAssertEqual(snap.remainingSeconds, 300)
     }
 

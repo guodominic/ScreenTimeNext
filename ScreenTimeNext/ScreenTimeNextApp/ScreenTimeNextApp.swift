@@ -13,9 +13,13 @@ struct ScreenTimeNextApp: App {
     /// read); the Screen Time services are swapped for real adapters here, one task at a time.
     /// This is the ONLY place any of that is decided.
     ///
-    /// Real so far: authorization (Task 004) and selection (Task 005). Monitoring (010) and the
-    /// shield (011) are still mocked, so the app runs end to end while they are built.
+    /// Real so far: authorization (004), selection (005), monitoring (010) and the shield (011).
+    /// Task 012 is what decides WHEN the shield goes up.
     private let container: ServiceContainer = ScreenTimeNextApp.makeContainer()
+
+    /// Task 010 — owns the DeviceActivity registration so no view has to think about it. Held
+    /// here because it must outlive every screen: the schedule is the app's, not a screen's.
+    @State private var monitoring: MonitoringCoordinator?
 
     private static func makeContainer() -> ServiceContainer {
         // The App Group store can only fail to open when provisioning is wrong. Falling back to the
@@ -26,8 +30,14 @@ struct ScreenTimeNextApp: App {
         } else {
             selection = MockScreenTimeSelectionService()
         }
+        // The shield needs the same storage the container will use, so it is built here rather
+        // than defaulted: a shield that wrote its ProtectionState somewhere else would leave the
+        // dashboard describing a device it is not looking at.
+        let storage: (any ScreenTimeStorageService)? = try? FileStorageService.shared()
         return .live(authorization: FamilyControlsAuthorizationService(),
                      selection: selection,
+                     monitoring: DeviceActivityMonitoringService(),
+                     shield: ManagedSettingsShieldService(storage: storage),
                      notifications: UserNotificationScheduler(),
                      presence: LiveActivityPresenter())
     }
@@ -36,6 +46,15 @@ struct ScreenTimeNextApp: App {
         WindowGroup {
             RootView()
                 .services(container)
+                .task {
+                    guard monitoring == nil else { return }
+                    let coordinator = MonitoringCoordinator(monitoring: container.monitoring,
+                                                            storage: container.storage,
+                                                            selection: container.selection,
+                                                            shield: container.shield)
+                    monitoring = coordinator
+                    coordinator.start()
+                }
         }
     }
 }

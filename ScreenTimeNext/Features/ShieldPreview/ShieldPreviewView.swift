@@ -24,13 +24,16 @@ struct ShieldPreviewView: View {
     private var moment: ShieldMoment {
         switch momentIndex {
         case 0: return .reminder(minutesLeft: minutes, activity: activity)
-        case 1: return .finished(activity: activity)
+        // D-044 — the second of the three shields a child meets. Previewable, because a parent
+        // should be able to see the one that ASKS before their child does.
+        case 1: return .chooseNext(minutesLeft: minutes, options: ShieldMomentResolver.chooserOptions(activities))
+        case 2: return .finished(activity: activity)
         default: return .spentForToday
         }
     }
 
     private var presentation: ShieldPresentation {
-        .make(for: moment, childName: childName, urgency: momentIndex == 0 ? urgency : nil)
+        .make(for: moment, childName: childName, urgency: momentIndex <= 1 ? urgency : nil)
     }
 
     var body: some View {
@@ -74,14 +77,17 @@ struct ShieldPreviewView: View {
     private var controls: some View {
         Form {
             Section {
+                // D-044 — the three shields, in the order a child meets them, plus the one they
+                // only see if they come back later in the day.
                 Picker("Moment", selection: $momentIndex) {
-                    Text("Reminder").tag(0)
-                    Text("Finished").tag(1)
-                    Text("Later today").tag(2)
+                    Text("1 · Heads-up").tag(0)
+                    Text("2 · Pick next").tag(1)
+                    Text("3 · Finished").tag(2)
+                    Text("Later").tag(3)
                 }
                 .pickerStyle(.segmented)
 
-                if momentIndex == 0 {
+                if momentIndex <= 1 {
                     Picker("Which reminder", selection: $urgency) {
                         Text("1st · green").tag(ShieldUrgency.calm)
                         Text("2nd · orange").tag(ShieldUrgency.soon)
@@ -91,7 +97,9 @@ struct ShieldPreviewView: View {
                     Stepper("Minutes left: \(minutes)", value: $minutes, in: 1...15)
                 }
 
-                if momentIndex != 2 {
+                // The chooser builds its own list from the parent's activities, and "Later today"
+                // never names one, so this only applies to the other two.
+                if momentIndex == 0 || momentIndex == 2 {
                     Picker("Next activity", selection: $activity) {
                         Text("Not chosen").tag(TransitionActivity?.none)
                         ForEach(activities) { a in

@@ -27,6 +27,11 @@ final class ParentDashboardViewModel {
     /// Task 004 — a request in flight, and whatever went wrong last time. Both are parent-facing.
     private(set) var isRequestingAuthorization = false
     private(set) var authorizationError: String?
+    /// Task 010 — whether iOS currently holds our daily schedule, and the last thing the monitor
+    /// extension had to say. The extension runs while the app is closed (PRD §14), so this is the
+    /// only way a parent — or we — can tell that the machinery is actually running.
+    private(set) var monitoringIsRegistered = false
+    private(set) var lastMonitorReport: MonitorReport?
 
     private let services: ServiceContainer
     private let controller: SessionController
@@ -58,7 +63,9 @@ final class ParentDashboardViewModel {
         Task {
             notificationsDenied = await services.notifications.isPermissionDenied
             authorization = await services.authorization.status
+            monitoringIsRegistered = await services.monitoring.isMonitoring
         }
+        lastMonitorReport = MonitorJournal()?.entries().last
         let storage = services.storage
         profile = try? storage.loadChildProfile()
         configuration = (try? storage.loadConfiguration()) ?? .default
@@ -105,37 +112,52 @@ final class ParentDashboardViewModel {
     }
 
 
-    /// Nudge the idle dial by one step — a minute under 15, two above (D-017).
+    /// D-034 — one minute per press, like every other dial in the app.
     func adjustQuickMinutes(_ direction: Int) {
         let range = ScreenTimeConfiguration.budgetRangeSeconds
-        let probe = direction < 0 ? (quickMinutes - 1) * 60 : quickMinutes * 60
-        let step = ScreenTimeConfiguration.budgetStep(near: probe) / 60
+        let step = ScreenTimeConfiguration.budgetStepSeconds / 60
         quickMinutes = min(max(quickMinutes + direction * step, range.lowerBound / 60), range.upperBound / 60)
     }
 
     /// D-016 — set today's budget from the hero and open a session in one action.
     func startSession() {
         // Only the budget changes here — everything else the parent has arranged (reminders,
-        // activities, category order, "my usual") is carried across untouched (D-019).
+        // activities, saved sets, typed websites) is carried across untouched (D-024/D-035).
         var config = configuration
         config.dailyBudgetSeconds = quickMinutes * 60
         try? services.storage.save(config)
         _ = try? controller.start()
+        // A new session means time again, so anything left shielded from the last one comes down.
+        enforce()
         reload()
     }
 
     func endSession() {
         _ = try? controller.endEarly()
+        // D-042 — ending a round is not ending the day. If budget remains this leaves the device
+        // open, which is what "End" means; if the budget is gone it shields, same as any other way
+        // of reaching zero. One rule, no special case.
+        enforce()
         refreshSession()
     }
 
-    /// Task 013 (session half, D-010). Phase 1 adds: remove ScreenTimeNext-managed shield,
-    /// adjust monitoring, reapply on expiry — all through the same protocols.
+    /// Task 013 (session half, D-010) + Task 012.
     func extend(minutes: Int) {
         guard (try? controller.extend(bySeconds: minutes * 60)) != nil else { return }
-        _ = try? services.shield.removeShield()
+        // The extension gave the budget back, so the shield comes down on the ordinary rule rather
+        // than by being told to. `temporarilyExtended` is written after, because it is a note about
+        // HOW the device came to be unshielded, not a second opinion about whether it is.
+        enforce()
         try? services.storage.save(ProtectionState.temporarilyExtended)
         reload()
+    }
+
+    /// Task 012 — one rule, one place (`Enforcement`). Every parent action that can change how much
+    /// time is left ends here.
+    private func enforce() {
+        Enforcement.reconcile(storage: services.storage,
+                              selection: services.selection,
+                              shield: services.shield)
     }
 
     var canExtend: Bool { session.window != nil }

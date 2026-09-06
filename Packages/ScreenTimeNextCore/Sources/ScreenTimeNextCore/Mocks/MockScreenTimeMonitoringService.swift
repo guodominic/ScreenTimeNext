@@ -10,6 +10,7 @@ public final class MockScreenTimeMonitoringService: ScreenTimeMonitoringService,
 
     public struct Registration: Equatable, Sendable {
         public let budgetSeconds: Int
+        public let warningOffsetsSeconds: [Int]
         public let selection: SelectionSnapshot
     }
 
@@ -27,10 +28,14 @@ public final class MockScreenTimeMonitoringService: ScreenTimeMonitoringService,
         get async { lock.withLock { _isMonitoring } }
     }
 
-    public func startMonitoring(budgetSeconds: Int, selection: SelectionSnapshot) async throws {
+    public func startMonitoring(budgetSeconds: Int,
+                                warningOffsetsSeconds: [Int] = [],
+                                selection: SelectionSnapshot) async throws {
         try lock.withLock {
             if let e = _failNext { _failNext = nil; throw e }
-            _registrations.append(Registration(budgetSeconds: budgetSeconds, selection: selection))
+            _registrations.append(Registration(budgetSeconds: budgetSeconds,
+                                               warningOffsetsSeconds: warningOffsetsSeconds,
+                                               selection: selection))
             _isMonitoring = true
         }
     }
@@ -42,9 +47,13 @@ public final class MockScreenTimeMonitoringService: ScreenTimeMonitoringService,
         }
     }
 
-    public func restartMonitoring(budgetSeconds: Int, selection: SelectionSnapshot) async throws {
+    public func restartMonitoring(budgetSeconds: Int,
+                                  warningOffsetsSeconds: [Int] = [],
+                                  selection: SelectionSnapshot) async throws {
         try await stopMonitoring()
-        try await startMonitoring(budgetSeconds: budgetSeconds, selection: selection)
+        try await startMonitoring(budgetSeconds: budgetSeconds,
+                                  warningOffsetsSeconds: warningOffsetsSeconds,
+                                  selection: selection)
     }
 
     // MARK: Test controls

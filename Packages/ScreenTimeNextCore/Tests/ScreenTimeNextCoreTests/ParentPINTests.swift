@@ -60,12 +60,12 @@ final class ParentPINTests: XCTestCase {
     func testStartOverClearsThePIN() throws {
         let storage = InMemoryScreenTimeStorageService()
         try storage.save(ParentPIN.make("1111"))
-        try storage.save(ParentPickerPreferences(favourites: [.games], favouritesAreCustom: true))
+        try storage.save(ParentPickerPreferences(blockedWebsites: ["youtube.com"]))
 
         try storage.eraseAll()
 
         XCTAssertNil(try storage.loadParentPIN())
-        XCTAssertEqual(try storage.loadPickerPreferences().favourites, [.games], "preferences still stay")
+        XCTAssertEqual(try storage.loadPickerPreferences().blockedWebsites, ["youtube.com"], "preferences still stay")
     }
 
     // MARK: Lockout

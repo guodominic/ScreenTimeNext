@@ -24,12 +24,18 @@ public enum WarningStateEngine {
         return .secondWarning
     }
 
-    /// D-016 — where the child is asked to choose what's next: the **second-to-last** reminder.
-    /// Close enough to the end to feel real, far enough that they aren't choosing under pressure
-    /// in the final minute. With a single reminder there is no second-to-last, so it is that one.
+    /// D-044 — where the child is asked to choose what's next: the **last** reminder.
+    ///
+    /// This was the second-to-last (D-016), on the reasoning that choosing in the final minute is
+    /// choosing under pressure. Two things changed it. The reminder is now a full-screen shield
+    /// rather than a notification, so the sequence a child actually experiences is: heads-up →
+    /// decide → go. Asking on the first shield puts the decision before they have felt the time
+    /// running out, and the answer stops meaning anything by the end. And with two reminders
+    /// (D-044) "second-to-last" IS the first one, which is the earliest possible moment — the
+    /// opposite of what the old rule was protecting.
     public static func chooserIndex(warningCount count: Int) -> Int? {
         guard count > 0 else { return nil }
-        return count == 1 ? 0 : count - 2
+        return count - 1
     }
 
     /// True when the warning at `index` is the one that carries the activity chooser.

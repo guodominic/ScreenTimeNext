@@ -1,17 +1,19 @@
 //  ContentPickerView.swift
 //  ScreenTimeNext
 //
-//  D-018 / D-019 — "Pick apps and categories". Scroll, tap what the budget covers, see the counts,
-//  start. Browsers sit first by default (the one row that covers something no app category does,
-//  and the easiest to overlook), the parent can drag the rows into whatever order suits them, and
-//  "My usual" is theirs to define rather than three categories we picked for them.
+//  D-035 — "Pick apps and categories". One honest screen:
+//    • Apple's `FamilyActivityPicker` is the ONLY way to choose apps and categories. It is the only
+//      thing that produces enforceable tokens (B-005), so it is the only thing we offer.
+//    • Websites typed by hand (D-033), which `ManagedSettings` blocks from a plain string and which
+//      Apple's picker would never have offered.
+//    • The running counts, tappable to see exactly what is covered.
+//    • Saved sets (D-030), so a whole selection comes back in one tap.
 //
-//  Phase 0 draws these rows itself. Phase 1 replaces the rows inside `categorySection` with Apple's
-//  `FamilyActivityPicker` bound to a `FamilyActivitySelection` — it is a SwiftUI view, so it drops
-//  in here inline and brings its own Categories / Apps / Websites sections. The header counts and
-//  the Start button read from the same `SelectionSummary` either way.
+//  There are no category tiles. They looked like they picked something and they did not: only a
+//  token from Apple's picker can shield anything. A control that promises what it cannot deliver is
+//  worse than no control at all.
 //
-//  §16: no row names a real app or brand.
+//  §16: nothing here names a real app or brand.
 
 import SwiftUI
 import Observation
@@ -21,167 +23,71 @@ import ScreenTimeNextCore
 /// and the counts all agree.
 @Observable
 final class ContentPickerModel {
-    var categories: Set<ContentCategory> = []
-    /// Individual apps chosen through Apple's picker. Phase 0 can only be given a sample count.
-    var applicationCount: Int = 0
-    /// Task 005 — the real thing, once Screen Time access exists: an opaque record of what the
-    /// parent picked in Apple's picker. When this is set it OUTRANKS the category tiles, because
-    /// it is the only selection that can actually shield anything (B-005).
+
+    /// D-035 — what Apple's picker produced. The ONLY thing that can shield an app or a category.
     var realSelection: SelectionSnapshot?
-    /// The row order, as the parent arranged it. Always complete — see `completeOrder`.
-    var order: [ContentCategory]
-    /// The parent's own "my usual" set, applied by one tap.
-    var favourites: [ContentCategory]
-    /// False while `favourites` is still the value we chose rather than one the parent saved.
-    var favouritesAreCustom: Bool
-    /// Set briefly after "Save as my usual" so the parent gets a "Saved" to look at. Without it the
-    /// button simply vanishes (the selection now matches) and nothing says the save happened.
-    var justSavedFavourites = false
+
+    /// D-033 — websites the parent typed. Blocked by name, not by token, so unlike the selection
+    /// these do not come from Apple's picker at all.
+    var blockedWebsites: [String] = []
+
+    /// D-030 — whole selections the parent named, re-applied in one tap.
+    var savedSelections: [SavedSelection] = []
 
     /// D-027 — where a real selection is written the moment Apple's picker returns one.
-    ///
-    /// Without this the chain was: pick in Apple's picker → Done → Done again on the wrapper →
-    /// Save in Settings → disk. Four steps, three of them labelled as if they had already saved.
-    /// Anyone who picked and walked away lost their choice, which is exactly what happened.
     private let selectionStore: (any ScreenTimeSelectionService)?
-
-    /// D-022 — where "my usual" and the row order are written the moment they change.
-    ///
-    /// nil during first-run setup, deliberately. `loadConfiguration()` returns defaults rather than
-    /// throwing when no file exists, so writing here would CREATE a configuration — and
-    /// `hasStoredConfiguration()` is what marks the app as set up (D-016). A parent who dragged one
-    /// row and quit would come back to a skipped onboarding.
+    /// D-022 — where the parent's own lists are written the moment they change.
     private let autosave: (any ScreenTimeStorageService)?
 
-    init(categories: Set<ContentCategory> = [],
-         applicationCount: Int = 0,
-         order: [ContentCategory] = ContentCategory.defaultOrder,
-         favourites: [ContentCategory] = ContentCategory.defaultFavourites,
-         favouritesAreCustom: Bool = false,
-         autosave: (any ScreenTimeStorageService)? = nil,
+    init(autosave: (any ScreenTimeStorageService)? = nil,
          selectionStore: (any ScreenTimeSelectionService)? = nil) {
-        self.categories = categories
-        self.applicationCount = applicationCount
-        self.order = ContentCategory.completeOrder(order)
-        self.favourites = favourites
-        self.favouritesAreCustom = favouritesAreCustom
         self.autosave = autosave
         self.selectionStore = selectionStore
     }
 
-    /// Apple's picker came back. Keep it AND write it, in that order, right now.
-    ///
-    /// Writing the selection does not mark the app as set up — that is `hasStoredConfiguration()`,
-    /// a different record — so this is safe during first-run setup too.
+    var summary: SelectionSummary { realSelection?.summary ?? .empty }
+
+    /// True once the parent has picked through Apple's picker — i.e. once anything is enforceable.
+    var hasRealSelection: Bool { !(realSelection?.summary.isEmpty ?? true) }
+
+    var isEmpty: Bool { !hasRealSelection && blockedWebsites.isEmpty }
+
+    // MARK: Selection
+
+    /// Apple's picker came back. Keep it AND write it, in that order, right now (D-027).
     func applyRealSelection(_ picked: SelectionSnapshot?) {
         realSelection = picked
-        justSavedFavourites = false
-        guard let selectionStore else { return }
-        if let picked {
-            try? selectionStore.save(picked)
-        } else {
-            try? selectionStore.clearSelection()
+        if let selectionStore {
+            if let picked { try? selectionStore.save(picked) } else { try? selectionStore.clearSelection() }
         }
-        // D-028 — the dashboard shows what is covered, so it has to hear about this now rather
-        // than on the next foreground. Settings' Save used to be the only thing that told it.
         NotificationCenter.default.post(name: .configurationDidChange, object: nil)
     }
 
-    var summary: SelectionSummary {
-        realSelection?.summary ?? ContentCategory.summary(categories: categories, apps: applicationCount)
+    /// Back to nothing — the picker's selection AND the typed sites, because "Clear" that leaves
+    /// half the list behind is the kind of half-measure a parent finds out about at bedtime.
+    func clearAll() {
+        blockedWebsites = []
+        saveLists()
+        applyRealSelection(nil)
     }
 
-    /// True once the parent has picked through Apple's picker — i.e. once the selection can be
-    /// enforced rather than merely displayed.
-    var hasRealSelection: Bool { !(realSelection?.summary.isEmpty ?? true) }
-
-    var isEmpty: Bool { summary.isEmpty }
-
-    func toggle(_ category: ContentCategory) {
-        if categories.contains(category) { categories.remove(category) } else { categories.insert(category) }
-        justSavedFavourites = false
-    }
-
-    func move(from source: IndexSet, to destination: Int) {
-        order.move(fromOffsets: source, toOffset: destination)
-        saveArrangement()
-    }
-
-    // MARK: My usual
-
-    var hasFavourites: Bool { !favourites.isEmpty }
-
-    /// True when what is ticked right now already IS the saved set — so the button can offer
-    /// "save" only when saving would actually change something.
-    var matchesFavourites: Bool { categories == Set(favourites) }
-
-    func applyFavourites() {
-        categories = Set(favourites)
-        justSavedFavourites = false
-    }
-
-    /// D-022 — this writes to storage NOW, not when some later screen is saved.
-    ///
-    /// It used to only change memory: the value reached disk when the parent went on to press
-    /// Settings' own Save. "Done" on the picker reads as "saved", so anyone who pressed Done and
-    /// left lost what they had just saved — which is exactly what happened.
-    func saveCurrentAsFavourites() {
-        let picked = order.filter { categories.contains($0) }
-        // Nothing ticked (or only individual apps, which have no row) is not a usable "usual" —
-        // saving it would leave the button offering an empty set forever.
-        guard !picked.isEmpty else { return }
-        favourites = picked
-        favouritesAreCustom = true
-        justSavedFavourites = true
-        saveArrangement()
-    }
-
-    /// The parent's arrangement — their order and their "usual". Not the ticks: those belong to the
-    /// selection the surrounding screen commits (Start, or Settings' Save).
-    private func saveArrangement() {
-        guard let autosave else { return }
-        try? autosave.save(preferences(mergedInto: try? autosave.loadPickerPreferences()))
-    }
-
-    /// D-024 — written to their own record, which "Start over" leaves alone.
-    ///
-    /// D-029 — it MERGES rather than replaces. This record also holds the parent's custom
-    /// activities and saved selections, which this screen knows nothing about; constructing a fresh
-    /// one here would have silently deleted them the next time a row was dragged.
-    func preferences(mergedInto existing: ParentPickerPreferences?) -> ParentPickerPreferences {
-        var merged = existing ?? .default
-        merged.categoryOrder = ContentCategory.completeOrder(order)
-        merged.favourites = favourites
-        merged.favouritesAreCustom = favouritesAreCustom
-        merged.savedSelections = savedSelections
-        merged.blockedWebsites = blockedWebsites
-        return merged
-    }
-
-    // MARK: Saved selections (D-030)
-
-    /// Whole selections the parent named. The reason this exists is websites: a domain can only be
-    /// created inside Apple's picker (no public API turns a string into a `WebDomainToken`), so
-    /// remembering the selection that contains it is the only way to stop them typing it again.
-    var savedSelections: [SavedSelection] = []
-
-    /// D-033 — websites the parent typed. Blocked by name, not by token, so unlike everything else
-    /// on this screen they do NOT come from Apple's picker.
-    var blockedWebsites: [String] = []
+    // MARK: Websites (D-033)
 
     @discardableResult
     func addWebsite(_ raw: String) -> Bool {
         var preferences = ParentPickerPreferences(blockedWebsites: blockedWebsites)
         guard preferences.addWebsite(raw) else { return false }
         blockedWebsites = preferences.blockedWebsites
-        saveArrangement()
+        saveLists()
         return true
     }
 
     func removeWebsite(_ domain: String) {
         blockedWebsites.removeAll { $0 == domain }
-        saveArrangement()
+        saveLists()
     }
+
+    // MARK: Saved sets (D-030)
 
     var canSaveCurrentSelection: Bool { realSelection != nil }
 
@@ -194,113 +100,77 @@ final class ContentPickerModel {
         } else {
             savedSelections.append(SavedSelection(name: trimmed, snapshot: realSelection))
         }
-        saveArrangement()
+        saveLists()
     }
 
-    func apply(_ saved: SavedSelection) {
-        applyRealSelection(saved.snapshot)
-    }
+    func apply(_ saved: SavedSelection) { applyRealSelection(saved.snapshot) }
 
     func delete(_ saved: SavedSelection) {
         savedSelections.removeAll { $0.id == saved.id }
-        saveArrangement()
-    }
-
-    func clear() {
-        categories.removeAll()
-        applicationCount = 0
-        justSavedFavourites = false
+        saveLists()
     }
 
     // MARK: Persistence
-    //
-    // D-021 — the ticks, the row order and "my usual" all persist, so the next launch opens on the
-    // choice the parent already made. §16 is about Apple's opaque selection TOKENS, which are still
-    // never stored here; these are our own catalogue rows.
 
-    /// `autosaving` is for screens that run AFTER setup (Settings). First-run setup passes false,
-    /// so nothing is written until the parent presses Start — see `autosave`.
-    ///
-    /// D-024 — the arrangement comes from `ParentPickerPreferences` (survives "Start over") and the
-    /// ticks from the configuration (does not). After a reset there are no ticks, so the picker
-    /// opens on the parent's own saved "usual" — which is what makes starting over feel like a
-    /// fresh setup rather than losing your work.
+    /// D-029 — MERGES into the stored record. It also holds the parent's custom activities and
+    /// their order, which this screen knows nothing about; writing a fresh one would delete them.
+    func preferences(mergedInto existing: ParentPickerPreferences?) -> ParentPickerPreferences {
+        var merged = existing ?? .default
+        merged.savedSelections = savedSelections
+        merged.blockedWebsites = blockedWebsites
+        return merged
+    }
+
+    private func saveLists() {
+        guard let autosave else { return }
+        try? autosave.save(preferences(mergedInto: try? autosave.loadPickerPreferences()))
+    }
+
     static func loaded(from storage: any ScreenTimeStorageService,
                        selection: (any ScreenTimeSelectionService)? = nil,
                        autosaving: Bool = false) -> ContentPickerModel {
         let preferences = (try? storage.loadPickerPreferences()) ?? .default
-        let ticked = (try? storage.loadConfiguration())?.selectedCategories ?? []
-        let model = ContentPickerModel(categories: ticked.isEmpty ? preferences.initialSelection : Set(ticked),
-                                       order: preferences.categoryOrder,
-                                       favourites: preferences.favourites,
-                                       favouritesAreCustom: preferences.favouritesAreCustom,
-                                       autosave: autosaving ? storage : nil,
-                                       selectionStore: selection)
+        let model = ContentPickerModel(autosave: autosaving ? storage : nil, selectionStore: selection)
         model.savedSelections = preferences.savedSelections
         model.blockedWebsites = preferences.blockedWebsites
-        // D-027 — a stored selection is loaded here, so the picker opens on what the parent chose
-        // last time whatever route they took to get here.
         model.realSelection = try? selection?.loadSelection()
         return model
     }
 
-    /// Commit everything: the arrangement to its own record, the ticks to the configuration.
+    /// Commit on the way out of first-run setup, where nothing autosaves (D-022).
     func persist(to storage: any ScreenTimeStorageService) {
         try? storage.save(preferences(mergedInto: try? storage.loadPickerPreferences()))
-        guard var config = try? storage.loadConfiguration() else { return }
-        config.selectedCategories = order.filter { categories.contains($0) }   // stored in row order
-        try? storage.save(config)
     }
 
-    /// What gets written into the draft / configuration. Counts are ours to describe; the opaque
-    /// payload is the selection adapter's business and this screen never touches it (§13/§16 —
-    /// scripts/privacy-audit.sh fails the build if it does).
-    func snapshot(basedOn existing: SelectionSnapshot?) -> SelectionSnapshot? {
-        // Task 005 — a real selection is passed through untouched. Re-summarising it would be
-        // wrong: its counts came from Apple's tokens, not from anything this screen knows.
-        if let realSelection { return realSelection }
-        guard !isEmpty else { return nil }
-        return existing?.withSummary(summary) ?? .phase0Placeholder(summary: summary)
-    }
+    func snapshot(basedOn existing: SelectionSnapshot?) -> SelectionSnapshot? { realSelection }
 }
 
 struct ContentPickerView: View {
     @Bindable var model: ContentPickerModel
-    /// Shown as a lock hint on the "specific apps" row until the entitlement is live.
+    /// Without Screen Time access nothing here can be enforced, and the screen says so.
     var screenTimeAccessAvailable: Bool = false
     /// Onboarding sets these; Settings leaves them nil and lets the navigation title do the work.
     var headline: String?
     var subheadline: String?
 
-    @State private var showAppPickerNote = false
     @State private var showSystemPicker = false
     @State private var showCoveredContent = false
     @State private var showSaveSetSheet = false
-    @State private var isReordering = false
     @State private var newWebsite = ""
     @State private var websiteError: String?
 
     /// A stored selection only MEANS anything while Screen Time access exists. Without it, even a
-    /// real snapshot enforces nothing, and a green shield saying otherwise would be a lie. Phase 0
-    /// placeholder records also land here, which is the other reason the judgement belongs in the
-    /// view rather than in the model: only the view knows whether access was granted.
+    /// real snapshot enforces nothing, and a green shield saying otherwise would be a lie.
     private var isEnforceable: Bool { screenTimeAccessAvailable && model.hasRealSelection }
 
     var body: some View {
         List {
             if headline != nil || subheadline != nil { titleSection }
             countSection
-            categorySection
             appSection
             websiteSection
         }
         .listSectionSpacing(12)
-        .environment(\.editMode, .constant(isReordering ? .active : .inactive))
-        .animation(.snappy(duration: 0.25), value: isReordering)
-        .sheet(isPresented: $showAppPickerNote) {
-            SpecificAppsNote(onUseSample: { model.applicationCount = 3 })
-                .presentationDetents([.medium])
-        }
         .sheet(isPresented: $showSaveSetSheet) {
             SaveSelectionSetSheet { name in model.saveCurrentSelection(named: name) }
                 .presentationDetents([.height(240)])
@@ -342,19 +212,24 @@ struct ContentPickerView: View {
         }
     }
 
-    /// The running total, plus the two one-tap shortcuts.
+    /// The running total, plus the saved-set shortcuts.
     private var countSection: some View {
         Section {
             countRow
                 .listRowBackground(Color.clear)
                 .listRowInsets(EdgeInsets(top: 2, leading: 4, bottom: 8, trailing: 4))
 
-            usualRow
+            toolsRow
         } footer: {
-            // D-028 — only offered when there is something real behind the numbers. Tile counts
-            // have nothing to show: they are not a selection, they are a shortcut for making one.
-            if isEnforceable {
-                Text("Tap the numbers to see exactly what's covered.")
+            // D-038 — the honest answer to "so how many apps IS that?", said where the question
+            // gets asked rather than left for a parent to wonder about.
+            VStack(alignment: .leading, spacing: 4) {
+                if model.summary.categoryCount > 0 {
+                    Text("Each category covers every app in it. iOS doesn't tell apps which apps those are, or how many — only Apple's picker knows, which is why the picking happens in there.")
+                }
+                if isEnforceable {
+                    Text("Tap the numbers to see exactly what's covered.")
+                }
             }
         }
     }
@@ -363,8 +238,12 @@ struct ContentPickerView: View {
     private var countRow: some View {
         let pills = HStack(spacing: 10) {
             countPill(model.summary.categoryCount, "categories", "square.stack.3d.up.fill", Theme.sky)
-            countPill(model.blockedWebsites.count, "websites", "globe", Theme.mint)
-            countPill(model.summary.applicationCount, "apps", "app.badge", Theme.lavender)
+            // D-038 — "apps PICKED", not "apps covered". A ticked category covers every app inside
+            // it, and this number does not include them, because iOS never tells us what they are
+            // (B-005). Labelling it "apps" made a screen with one whole category ticked read
+            // "0 apps", which is the opposite of what is true.
+            countPill(model.summary.applicationCount, "apps picked", "app.badge", Theme.lavender)
+            countPill(websiteCount, "websites", "globe", Theme.mint)
         }
         if isEnforceable {
             Button { showCoveredContent = true } label: { pills }
@@ -373,6 +252,10 @@ struct ContentPickerView: View {
             pills
         }
     }
+
+    /// Apple's picker can carry web domains too, and the parent can type their own (D-033). Both
+    /// end up blocked, so both belong in the one number.
+    private var websiteCount: Int { model.summary.webDomainCount + model.blockedWebsites.count }
 
     private func countPill(_ count: Int, _ label: String, _ symbol: String, _ color: Color) -> some View {
         VStack(spacing: 3) {
@@ -393,42 +276,14 @@ struct ContentPickerView: View {
             .fill(count > 0 ? color.opacity(0.14) : Color(.secondarySystemBackground)))
     }
 
-    /// D-019 — "my usual" is the parent's own set, not three categories we chose for them.
-    private var usualRow: some View {
+    /// Saved sets, and a way back to nothing.
+    private var toolsRow: some View {
         HStack(spacing: 10) {
-            Button { withAnimation(.snappy) { model.applyFavourites() } } label: {
-                Label(usualLabel, systemImage: "wand.and.stars")
-                    .font(.footnote.weight(.semibold))
-            }
-            .buttonStyle(.bordered)
-            .tint(Theme.coral)
-            .disabled(!model.hasFavourites)
-
-            if isEnforceable || !model.savedSelections.isEmpty {
-                savedSetsMenu
-            }
-            if model.justSavedFavourites {
-                // The button disappears the moment it works (the selection now matches), so
-                // without this nothing tells the parent the save happened.
-                Label("Saved", systemImage: "checkmark.circle.fill")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(Theme.grass)
-                    .transition(.opacity.combined(with: .scale))
-            } else if !model.isEmpty && !model.matchesFavourites {
-                Button {
-                    withAnimation(.snappy) { model.saveCurrentAsFavourites() }
-                } label: {
-                    Label("Save as my usual", systemImage: "pin.fill")
-                        .font(.footnote.weight(.semibold))
-                }
-                .buttonStyle(.bordered)
-                .tint(Theme.sky)
-            }
-
+            savedSetsMenu
             if !model.isEmpty {
-                Button { withAnimation(.snappy) { model.clear() } } label: {
-                    Image(systemName: "xmark")
-                        .font(.footnote.weight(.bold))
+                Button { withAnimation(.snappy) { model.clearAll() } } label: {
+                    Label("Clear", systemImage: "xmark")
+                        .font(.footnote.weight(.semibold))
                 }
                 .buttonStyle(.bordered)
                 .tint(.secondary)
@@ -440,7 +295,7 @@ struct ContentPickerView: View {
         .listRowInsets(EdgeInsets(top: 0, leading: 4, bottom: 4, trailing: 4))
     }
 
-    /// D-030 — one tap re-applies a whole saved selection, websites included.
+    /// D-030 — one tap re-applies a whole saved selection.
     private var savedSetsMenu: some View {
         Menu {
             if model.savedSelections.isEmpty {
@@ -475,79 +330,62 @@ struct ContentPickerView: View {
         .tint(Theme.mint)
     }
 
-    private var usualLabel: String {
-        guard model.hasFavourites else { return "No usual set yet" }
-        return "My usual (\(model.favourites.count))"
-    }
+    // MARK: Apps and categories — Apple's picker, and nothing pretending to be it
 
-    // MARK: Categories — one list, in the parent's own order
-
-    private var categorySection: some View {
+    private var appSection: some View {
         Section {
-            ForEach(model.order) { category in
-                row(for: category)
+            Button {
+                if screenTimeAccessAvailable { showSystemPicker = true }
+            } label: {
+                appRowLabel
             }
-            .onMove { model.move(from: $0, to: $1) }
+            .buttonStyle(.plain)
+            .disabled(!screenTimeAccessAvailable)
+            .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
+            .listRowBackground(Color.clear)
         } header: {
-            HStack {
-                Text("Categories")
-                Spacer()
-                Button(isReordering ? "Done" : "Reorder") { isReordering.toggle() }
-                    .font(.caption.weight(.bold))
-                    .textCase(nil)
-            }
+            Text("Apps and categories")
         } footer: {
-            Text(isReordering
-                 ? "Drag the handles to put the ones you use most at the top."
-                 : "Tap to include. Tap Reorder to arrange them your way.")
+            Text(screenTimeAccessAvailable
+                 ? "iOS keeps the list of installed apps private, so choosing happens inside Apple's own picker. Whole categories are in there too."
+                 : "Turn on Screen Time access first — without it nothing can be covered.")
         }
     }
 
-    private func row(for category: ContentCategory) -> some View {
-        let isOn = model.categories.contains(category)
-        let color = Self.color(for: category)
-        return Button {
-            withAnimation(.snappy(duration: 0.22)) { model.toggle(category) }
-        } label: {
-            rowLabel(category, color: color, isOn: isOn)
-        }
-        .buttonStyle(.plain)
-        .sensoryFeedback(.selection, trigger: isOn)
-        .accessibilityAddTraits(isOn ? AccessibilityTraits([.isButton, .isSelected]) : AccessibilityTraits.isButton)
-        .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
-        .listRowBackground(Color.clear)
-    }
-
-    private func rowLabel(_ category: ContentCategory, color: Color, isOn: Bool) -> some View {
+    private var appRowLabel: some View {
         HStack(spacing: 12) {
-            IconChip(symbol: category.symbolName, color: color, size: 34)
+            IconChip(symbol: isEnforceable ? "checkmark.shield.fill" : "plus.app.fill",
+                     color: isEnforceable ? Theme.grass : Theme.lavender, size: 34)
             VStack(alignment: .leading, spacing: 2) {
-                Text(category.displayName)
+                Text(appRowTitle)
                     .font(.system(.body, design: .rounded).weight(.semibold))
                     .foregroundStyle(Color.primary)
-                Text(category.hint)
+                Text(screenTimeAccessAvailable
+                     ? "Opens Apple's picker — apps, categories and sites"
+                     : "Needs Screen Time access")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
-            if !isReordering {
-                Image(systemName: isOn ? "checkmark.circle.fill" : "circle")
-                    .font(.title3)
-                    .foregroundStyle(isOn ? color : Color.secondary.opacity(0.45))
-                    .scaleEffect(isOn ? 1.1 : 1.0)
-            }
+            Image(systemName: screenTimeAccessAvailable ? "chevron.right" : "lock.fill")
+                .font(.footnote.weight(.bold))
+                .foregroundStyle(.secondary)
         }
         .padding(12)
-        .background(rowBackground(color: color, isOn: isOn))
+        .background(RoundedRectangle(cornerRadius: 18, style: .continuous)
+            .fill(Color(.secondarySystemBackground)))
     }
 
-    private func rowBackground(color: Color, isOn: Bool) -> some View {
-        RoundedRectangle(cornerRadius: 18, style: .continuous)
-            .fill(isOn ? color.opacity(0.16) : Color(.secondarySystemBackground))
-            .overlay(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(isOn ? color.opacity(0.55) : Color.clear, lineWidth: 2)
-            )
+    private var appRowTitle: String {
+        if isEnforceable {
+            let s = model.summary
+            var parts: [String] = []
+            if s.categoryCount > 0 { parts.append("\(s.categoryCount) categories") }
+            if s.applicationCount > 0 { parts.append("\(s.applicationCount) apps") }
+            if s.webDomainCount > 0 { parts.append("\(s.webDomainCount) websites") }
+            return parts.isEmpty ? "Change what's covered" : parts.joined(separator: " · ")
+        }
+        return screenTimeAccessAvailable ? "Choose what's covered" : "Pick apps and categories"
     }
 
     // MARK: Websites (D-033)
@@ -586,7 +424,7 @@ struct ContentPickerView: View {
                 Text(websiteError).font(.caption).foregroundStyle(Theme.ruby)
             }
         } header: {
-            Text("Websites")
+            Text("Websites you type")
         } footer: {
             Text("Type a site to block it in every browser, including private browsing. Swipe to remove.")
         }
@@ -602,84 +440,6 @@ struct ContentPickerView: View {
             websiteError = ParentPickerPreferences.normalizedDomain(typed) == nil
                 ? "That doesn't look like a website address."
                 : "That one's already on the list."
-        }
-    }
-
-    // MARK: Specific apps
-
-    /// Task 005 — with Screen Time access this opens Apple's own picker, which is the only thing
-    /// that can produce enforceable tokens (B-005). Without it, the honest explanation.
-    private var appSection: some View {
-        Section {
-            Button {
-                if screenTimeAccessAvailable { showSystemPicker = true } else { showAppPickerNote = true }
-            } label: {
-                appRowLabel
-            }
-            .buttonStyle(.plain)
-            .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
-            .listRowBackground(Color.clear)
-        } header: {
-            Text(screenTimeAccessAvailable ? "Apps and websites" : "Specific apps")
-        } footer: {
-            if isEnforceable {
-                Text("These are what the timer actually covers. The tiles above are a shortcut for choosing them.")
-            }
-        }
-    }
-
-    private var appRowLabel: some View {
-        HStack(spacing: 12) {
-            IconChip(symbol: isEnforceable ? "checkmark.shield.fill" : "plus.app.fill",
-                     color: isEnforceable ? Theme.grass : Theme.lavender, size: 34)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(appRowTitle)
-                    .font(.system(.body, design: .rounded).weight(.semibold))
-                    .foregroundStyle(Color.primary)
-                Text(screenTimeAccessAvailable
-                     ? "Opens Apple's picker — the only place real choices can be made"
-                     : "Needs Screen Time access")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer(minLength: 0)
-            Image(systemName: screenTimeAccessAvailable ? "chevron.right" : "lock.fill")
-                .font(.footnote.weight(.bold))
-                .foregroundStyle(.secondary)
-        }
-        .padding(12)
-        .background(RoundedRectangle(cornerRadius: 18, style: .continuous)
-            .fill(Color(.secondarySystemBackground)))
-    }
-
-    private var appRowTitle: String {
-        if isEnforceable {
-            let s = model.summary
-            var parts: [String] = []
-            if s.categoryCount > 0 { parts.append("\(s.categoryCount) categories") }
-            if s.applicationCount > 0 { parts.append("\(s.applicationCount) apps") }
-            if s.webDomainCount > 0 { parts.append("\(s.webDomainCount) websites") }
-            return parts.isEmpty ? "Change what's covered" : parts.joined(separator: " · ")
-        }
-        return screenTimeAccessAvailable ? "Choose what's covered" : "Pick individual apps"
-    }
-
-    /// A stable colour per row, so the list reads as a set of friendly tiles rather than a form.
-    static func color(for category: ContentCategory) -> Color {
-        switch category {
-        case .games:         return Theme.coral
-        case .entertainment: return Theme.lavender
-        case .social:        return Theme.sky
-        case .creativity:    return Theme.peach
-        case .education:     return Theme.mint
-        case .reading:       return Theme.sun
-        case .productivity:  return Theme.sky
-        case .health:        return Theme.grass
-        case .shopping:      return Theme.tangerine
-        case .travel:        return Theme.mint
-        case .utilities:     return Theme.lavender
-        case .browsers:      return Theme.sky
-        case .other:         return Theme.peach
         }
     }
 }
@@ -736,35 +496,8 @@ private struct SaveSelectionSetSheet: View {
     }
 }
 
-/// Phase 0 stand-in for Apple's `FamilyActivityPicker`. Honest about why it is not here yet, and
-/// still lets the counts and the Start button be exercised.
-private struct SpecificAppsNote: View {
-    @Environment(\.dismiss) private var dismiss
-    let onUseSample: () -> Void
-
-    var body: some View {
-        VStack(spacing: 16) {
-            Mascot(mood: .thinking, size: 92, tint: Theme.lavender)
-            Text("Picking apps one by one")
-                .font(.system(.title3, design: .rounded).bold())
-            Text("iOS keeps the list of installed apps private. Choosing individual apps uses Apple's own picker, which needs Screen Time access — categories work today and cover most of what you'd pick anyway.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-            Button { onUseSample(); dismiss() } label: {
-                Text("Use 3 sample apps for now")
-            }
-            .buttonStyle(PillButtonStyle(color: Theme.lavender))
-            Button("Not now") { dismiss() }
-                .font(.footnote)
-        }
-        .padding(24)
-        .readableWidth(460)
-    }
-}
-
 #Preview {
     NavigationStack {
-        ContentPickerScreen(model: ContentPickerModel(categories: [.games, .browsers])) { _ in }
+        ContentPickerScreen(model: ContentPickerModel()) { _ in }
     }
 }

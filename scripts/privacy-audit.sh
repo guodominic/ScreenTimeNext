@@ -24,13 +24,15 @@ net=$(grep -rnE 'URLSession|NWConnection|import Network\b|CFNetwork|import WebKi
 # Test sources are excluded, as they already are for logging (rule 3): they never ship, and website
 # normalisation cannot be tested without example URLs to normalise. If a real endpoint ever appears
 # in shipping code, rules 1 and 3 still catch the machinery around it.
-urls=$(grep -rnE '"https?://[^"]' --include='*.swift' ScreenTimeNext Packages DeviceActivityMonitorExtension 2>/dev/null \
+urls=$(grep -rnE '"https?://[^"]' --include='*.swift' ScreenTimeNext Packages \
+              DeviceActivityMonitorExtension ShieldConfigurationExtension ShieldActionExtension 2>/dev/null \
        | grep -v '/Tests/' || true)
 [ -n "$urls" ] && report "URL endpoint literal found in shipping source" "$urls"
 
 # 3) No logging calls in production sources (tests excluded). print/NSLog/os_log/Logger.
 logs=$(grep -rnE '\bprint\(|NSLog\(|os_log\(|\bLogger\(|\.log\(' --include='*.swift' \
-       ScreenTimeNext Packages/ScreenTimeNextCore/Sources DeviceActivityMonitorExtension 2>/dev/null || true)
+       ScreenTimeNext Packages/ScreenTimeNextCore/Sources \
+       DeviceActivityMonitorExtension ShieldConfigurationExtension ShieldActionExtension 2>/dev/null || true)
 [ -n "$logs" ] && report "logging call in production source — nothing may log selection tokens (§16)" "$logs"
 
 # 4) No third-party SDKs: the only package dependency is the local core.
@@ -49,5 +51,26 @@ sdk=$(grep -rniE 'firebase|amplitude|mixpanel|segment\.|sentry|crashlytics|admob
       --include='*.swift' --include='*.pbxproj' . 2>/dev/null | grep -v '^./.git/' || true)
 [ -n "$sdk" ] && report "analytics/ads SDK reference" "$sdk"
 
+# 7) Rule 6 — ManagedSettings is a SHARED system surface. `clearAllSettings()` on it would erase
+# whatever Apple's own Screen Time and every other parental-control app on the device wrote: a
+# family could lose months of Screen Time rules because our timer ended. Removal must always name
+# our own keys in our own named store. This is the guard, not a promise (Task 011 / D-040).
+# `grep -vE '//.*clearAllSettings'` drops lines where the name appears AFTER a `//` — i.e. the
+# comments in this codebase explaining why the call is forbidden. A real call has no `//` before it,
+# and a call with a trailing comment is still caught.
+clearall=$(grep -rn 'clearAllSettings' --include='*.swift' \
+           ScreenTimeNext Packages DeviceActivityMonitorExtension \
+           ShieldConfigurationExtension ShieldActionExtension 2>/dev/null \
+           | grep -vE '//.*clearAllSettings' || true)
+[ -n "$clearall" ] && report "clearAllSettings() found — rule 6 forbids clearing ManagedSettings wholesale" "$clearall"
+
+# 8) Rule 7 / §15 — never shield everything. `.all(` as a shield policy would cover a phone call,
+# Messages and the camera. We shield exactly what the parent's selection names.
+shieldall=$(grep -rnE 'shield\.[A-Za-z]+ *= *\.all\(' --include='*.swift' \
+            ScreenTimeNext DeviceActivityMonitorExtension \
+            ShieldConfigurationExtension ShieldActionExtension 2>/dev/null \
+            | grep -vE '//.*shield\.' || true)
+[ -n "$shieldall" ] && report "shield set to .all(...) — rule 7 shields only the parent's selection" "$shieldall"
+
 if [ $fail -ne 0 ]; then exit 1; fi
-echo "privacy audit OK (no networking, no logging, no third-party SDKs, payload opaque)"
+echo "privacy audit OK (no networking, no logging, no third-party SDKs, payload opaque, no global ManagedSettings clear)"

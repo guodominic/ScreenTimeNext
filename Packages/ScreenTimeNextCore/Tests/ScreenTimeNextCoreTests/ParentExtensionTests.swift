@@ -37,7 +37,9 @@ final class ParentExtensionTests: XCTestCase {
         clock.advance(900)
         XCTAssertEqual(try controller.tick().state, .finished)
         let snap = try controller.extend(bySeconds: 600)
-        XCTAssertEqual(snap?.state, .firstWarning, "+10 at zero lands exactly on the first (10-minute) warning")
+        // D-044 — the reminders are 5 and 1 minutes now, so ten minutes of extra time lands well
+        // clear of both: the child gets an ordinary session back, not a session already warning.
+        XCTAssertEqual(snap?.state, .active, "+10 at zero is past both reminders")
         XCTAssertEqual(snap?.remainingSeconds, 600)
         clock.advance(1)
         XCTAssertEqual(try controller.tick().remainingSeconds, 599)
@@ -69,7 +71,7 @@ final class ParentExtensionTests: XCTestCase {
         XCTAssertEqual(snap?.chosenActivity, .outside)
         XCTAssertEqual(scheduler.plans.count, plansBefore + 1)
         // New plan is derived from the new end: full set again (20 minutes ahead).
-        XCTAssertEqual(scheduler.latestPlan?.count, 4)
+        XCTAssertEqual(scheduler.latestPlan?.count, 3, "D-044 — two reminders plus the finish")
     }
 
     func testExtensionIsBeyondBudgetSoRemainingTodayStaysZero() throws {

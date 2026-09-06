@@ -189,7 +189,7 @@ final class BlockedWebsiteTests: XCTestCase {
     }
 
     /// A saved order written before an activity existed — or after one was deleted — must never
-    /// hide a row. Same contract as `ContentCategory.completeOrder`.
+    /// hide a row.
     func testAStaleOrderCannotHideAnActivity() {
         let prefs = ParentPickerPreferences(activityOrder: ["reading", "deleted.thing"])
         let ordered = prefs.allActivities
@@ -210,5 +210,67 @@ final class BlockedWebsiteTests: XCTestCase {
                                                from: try JSONEncoder().encode(prefs))
         XCTAssertEqual(decoded.activityOrder, ["outside", "lego"])
         XCTAssertEqual(decoded.blockedWebsites, ["example.com"])
+    }
+
+    // MARK: Removing built-ins (D-039)
+
+    func testAHiddenBuiltInIsNotOffered() {
+        let prefs = ParentPickerPreferences(hiddenActivityIDs: ["bath", "homework"])
+        let ids = prefs.allActivities.map(\.id)
+        XCTAssertFalse(ids.contains("bath"))
+        XCTAssertFalse(ids.contains("homework"))
+        XCTAssertEqual(prefs.allActivities.count, TransitionActivity.allCases.count - 2)
+        XCTAssertTrue(prefs.hasHiddenBuiltIns, "so Settings can offer them back")
+    }
+
+    /// Hidden, not deleted — the whole reason removal is reversible in one tap.
+    func testClearingTheHiddenListBringsTheBuiltInsBack() {
+        var prefs = ParentPickerPreferences(hiddenActivityIDs: ["bath"])
+        prefs.hiddenActivityIDs = []
+        XCTAssertEqual(prefs.allActivities.count, TransitionActivity.allCases.count)
+        XCTAssertFalse(prefs.hasHiddenBuiltIns)
+    }
+
+    func testHidingSurvivesARoundTrip() throws {
+        let prefs = ParentPickerPreferences(hiddenActivityIDs: ["snack"])
+        let decoded = try JSONDecoder().decode(ParentPickerPreferences.self,
+                                               from: try JSONEncoder().encode(prefs))
+        XCTAssertEqual(decoded.hiddenActivityIDs, ["snack"])
+        XCTAssertFalse(decoded.allActivities.map(\.id).contains("snack"))
+    }
+
+    /// A record written before D-039 has no hidden list at all, and must decode as "nothing
+    /// hidden" rather than as a failure that would cost the family everything else in the record.
+    func testARecordFromBeforeHidingExistedDecodes() throws {
+        let json = #"{"customActivities":[],"savedSelections":[],"blockedWebsites":[],"activityOrder":["outside"]}"#
+        let decoded = try JSONDecoder().decode(ParentPickerPreferences.self, from: Data(json.utf8))
+        XCTAssertTrue(decoded.hiddenActivityIDs.isEmpty)
+        XCTAssertEqual(decoded.allActivities.count, TransitionActivity.allCases.count)
+    }
+
+    /// §6.11 — the child has to be able to choose SOMETHING. Removal stops one short of empty.
+    func testTheLastActivityCannotBeRemoved() {
+        let kept = TransitionActivity.outside
+        let hideEverythingElse = TransitionActivity.allCases.map(\.id).filter { $0 != kept.id }
+        let prefs = ParentPickerPreferences(hiddenActivityIDs: hideEverythingElse)
+
+        XCTAssertEqual(prefs.allActivities.map(\.id), [kept.id])
+        XCTAssertFalse(prefs.canRemoveActivity(kept.id), "the last row stays")
+    }
+
+    func testRemovalIsAllowedWhileMoreThanOneRemains() {
+        let prefs = ParentPickerPreferences()
+        XCTAssertTrue(prefs.canRemoveActivity("bath"))
+    }
+
+    /// A parent's own activity counts toward "something is left", so the built-ins can all go.
+    func testEveryBuiltInCanGoIfTheFamilyAddedTheirOwn() {
+        let piano = TransitionActivity.custom(displayName: "Piano", symbolName: "music.note")
+        let allBuiltIns = TransitionActivity.allCases.map(\.id)
+        let prefs = ParentPickerPreferences(customActivities: [piano],
+                                            hiddenActivityIDs: Array(allBuiltIns.dropLast()))
+
+        XCTAssertTrue(prefs.canRemoveActivity(allBuiltIns.last!),
+                      "their own activity is what keeps the chooser from emptying")
     }
 }

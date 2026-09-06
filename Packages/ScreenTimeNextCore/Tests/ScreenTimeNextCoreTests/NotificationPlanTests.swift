@@ -14,8 +14,9 @@ final class NotificationPlanTests: XCTestCase {
     func testFullPlanForFreshWindow() {
         let window = SessionWindow(startedAt: start, budgetSeconds: 1200)
         let plan = NotificationPlan.make(for: window, configuration: .default, childName: "Ivy", now: start)
-        XCTAssertEqual(plan.map(\.identifier), [NotificationIdentifier.warning(0), NotificationIdentifier.warning(1), NotificationIdentifier.warning(2), NotificationIdentifier.finished])
-        XCTAssertEqual(plan.map { Int($0.fireDate.timeIntervalSince(start)) }, [600, 900, 1140, 1200])
+        // D-044 — two reminders (5 and 1 minutes before the end) plus the finish.
+        XCTAssertEqual(plan.map(\.identifier), [NotificationIdentifier.warning(0), NotificationIdentifier.warning(1), NotificationIdentifier.finished])
+        XCTAssertEqual(plan.map { Int($0.fireDate.timeIntervalSince(start)) }, [900, 1140, 1200])
         XCTAssertTrue(plan[0].body.contains("Ivy"))
         XCTAssertFalse(plan.contains { $0.title.uppercased().contains("TIME'S UP") })
     }
@@ -31,16 +32,19 @@ final class NotificationPlanTests: XCTestCase {
 
     func testPastNotificationsAreDropped() {
         let window = SessionWindow(startedAt: start, budgetSeconds: 1200)
-        let later = start.addingTimeInterval(950)   // past the 10- and 5-minute marks
+        let later = start.addingTimeInterval(950)   // past the 5-minute mark
         let plan = NotificationPlan.make(for: window, configuration: .default, childName: "Ivy", now: later)
-        XCTAssertEqual(plan.map(\.identifier), [NotificationIdentifier.warning(2), NotificationIdentifier.finished])
+        XCTAssertEqual(plan.map(\.identifier), [NotificationIdentifier.warning(1), NotificationIdentifier.finished])
     }
 
     func testChosenActivityAppearsInLaterCopy() {
         let window = SessionWindow(startedAt: start, budgetSeconds: 1200, chosenActivity: .lego)
         let plan = NotificationPlan.make(for: window, configuration: .default, childName: "Ivy", now: start)
-        XCTAssertTrue(plan[1].body.contains("LEGO"))
-        XCTAssertTrue(plan[3].body.contains("Let's go build!"))
+        // Two reminders and the finish: indices 0, 1, 2. `plan[3]` used to be the finish and is
+        // now off the end — the second thing that crashed the run when the third dial went away.
+        XCTAssertEqual(plan.count, 3)
+        XCTAssertTrue(plan[1].body.contains("LEGO"), "the last reminder names what was chosen")
+        XCTAssertTrue(plan[2].body.contains("Let's go build!"), "and so does the finish")
     }
 
     /// A window shorter than some reminders: only the ones that fit exist, re-indexed from 0,
@@ -53,16 +57,17 @@ final class NotificationPlanTests: XCTestCase {
         XCTAssertTrue(plan[0].body.contains("What do you want to do next?"), "the only fitting reminder is the first warning")
     }
 
-    /// Dominic's case: 8-minute budget, reminders 10/5/1 → 10 is dropped, 5 and 1 fire.
+    /// Dominic's case: an 8-minute budget with reminders longer than it. They are dropped rather
+    /// than fired at Start, and the finish still happens.
     func testReminderEqualToOrLongerThanBudgetIsDropped() {
         var config = ScreenTimeConfiguration.default
         config.warningOffsetsSeconds = [600, 480, 300, 60]
-        XCTAssertEqual(config.warningOffsetsSeconds, [600, 480, 300],
-                       "assignment normalizes too — the three longest, earliest-first")
+        XCTAssertEqual(config.warningOffsetsSeconds, [600, 480],
+                       "D-044 — assignment normalizes too: the two longest, earliest-first")
         let window = SessionWindow(startedAt: start, budgetSeconds: 480)
         let plan = NotificationPlan.make(for: window, configuration: config, childName: "Ivy", now: start)
-        XCTAssertEqual(plan.map { Int($0.fireDate.timeIntervalSince(start)) }, [180, 480],
-                       "600 and 480 don't fit an 8-minute window; only the 5-minute one does (3 min in)")
+        XCTAssertEqual(plan.map { Int($0.fireDate.timeIntervalSince(start)) }, [480],
+                       "neither 600 nor 480 fits an 8-minute window — only the finish is left")
     }
 
     // MARK: Controller integration
@@ -81,7 +86,7 @@ final class NotificationPlanTests: XCTestCase {
         let clock = start
         let (controller, _) = try makeController(scheduler) { clock }
         try controller.start()
-        XCTAssertEqual(scheduler.latestPlan?.count, 4)
+        XCTAssertEqual(scheduler.latestPlan?.count, 3, "D-044 — two reminders plus the finish")
         try controller.endEarly()
         XCTAssertEqual(scheduler.cancelCount, 1)
     }

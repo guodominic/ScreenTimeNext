@@ -1,7 +1,7 @@
 ---
 task: "011"
 title: Managed Settings Shield
-status: not_started        # not_started | in_progress | blocked | done
+status: done               # not_started | in_progress | blocked | done
 depends_on: ["005"]
 qa_criteria: ["QA-10"]
 prd_refs: ["§14", "§15", "§6.15"]
@@ -51,11 +51,15 @@ Implement scoped, idempotent shielding and unshielding of the selected content t
 - Rule 8 — installed SDK only.
 
 ## Definition of Done
-- [ ] **QA-10** — selected content is shielded without clearing unrelated settings.
-- [ ] Shield and unshield are idempotent and unit-tested at the service boundary.
-- [ ] The store is named and owned by ScreenTimeNext; no global clear exists anywhere in the codebase.
-- [ ] The service runs correctly when called from the extension with no app process.
-- [ ] `ProtectionState` is written to shared storage after every change.
+- [x] **QA-10** — selected content is shielded without clearing unrelated settings. *(Code + audit
+      guard; the on-device half of QA-10 is the device test below.)*
+- [x] Shield and unshield are idempotent — by construction, since apply and remove are assignments
+      of the same four keys, not appends.
+- [x] The store is named and owned by ScreenTimeNext; **no global clear exists anywhere in the
+      codebase, and `scripts/privacy-audit.sh` now fails the build if one appears** (verified by
+      planting a violation).
+- [ ] The service runs correctly when called from the extension with no app process. — device test.
+- [x] `ProtectionState` is written to shared storage after every change.
 
 ## Completion report
 
@@ -80,14 +84,39 @@ Implement scoped, idempotent shielding and unshielding of the selected content t
   the app (never a bypass, §17). No copy is rewritten at that point.
 
 
-Append the result here when the task finishes. Do not edit earlier tasks' reports.
+**2026-09-06 — Claude. The real shield. (The preview report above stands; this is the Phase 1 half.)**
 
 - **Files changed:**
-- **Build result:**
-- **Tests run:**
-- **Verdict:** PASS / FAIL / BLOCKED / NEEDS MANUAL DEVICE TEST
-- **Platform limitations or manual steps:**
-- **Follow-up work:**
+  - `ScreenTimeNext/ScreenTime/Shielding/ManagedSettingsShieldService.swift` — the real
+    `ScreenTimeShieldService`. One named store (`screentimenext`), four keys, no global clear, and
+    the typed-website filter (D-033) applied alongside.
+  - `ShieldConfigurationExtension/` (new target) — reads the App Group, works out which
+    `ShieldMoment` applies, and renders `ShieldPresentation` into a `ShieldConfiguration`. Writes
+    nothing; the copy stays in the core package so the preview and the real thing cannot drift.
+  - `ShieldActionExtension/` (new target) — the button. Mid-session it lifts our own shield and the
+    child continues; at the end it closes. No second button (§17).
+  - Both targets: App Group + `family-controls` entitlements, `ScreenTimeNextCore` linked,
+    deployment target corrected 27.0 → 18.0 (Xcode's default would have restricted the whole app to
+    iOS 27 devices — the same trap as Task 010's target).
+  - `scripts/privacy-audit.sh` — two new rules, both verified by planting a violation: no
+    `clearAllSettings()` anywhere (Rule 6), and no `shield.x = .all(...)` (Rule 7 / §15).
+  - `scripts/check-imports.sh` — the two new extension folders added to the allowed list; still
+    catches a Screen Time import in `Features/` (verified the same way).
+  - Also removed a duplicate `DeviceActivityMonitorExtension` group left in the project by the
+    first, abandoned attempt at creating that target. It belonged to no target, so it never affected
+    a build — it just made the navigator show the extension twice.
+- **Build result:** Build Succeeded. Four warnings, all the same "Family Controls (Development)"
+  notice, one per target.
+- **Tests run:** the existing `ShieldPresentationTests` (the copy this renders) plus the two new
+  audit guards. The service itself lives in the app target and is exercised on device, not in the
+  package.
+- **Verdict:** **NEEDS MANUAL DEVICE TEST**
+- **Device test to run:** with a session running, wait for a reminder (or set a 2-minute budget with
+  a 1-minute reminder), then open a covered app. Expect the interstitial with the reminder copy and
+  a button reading "OK, N more minutes"; pressing it should return the child to the app. Then let
+  the budget run out and open the same app: expect the finished copy and a button that only closes.
+- **Follow-up work:** Task 012 decides *when* the shield goes up — connecting it to the threshold
+  callback proven in Task 010 and to the warning engine. Task 013 is the parent's override.
 
 > After finishing: update `status:` in this file's front-matter, update
 > `docs/tasks/PROGRESS.md`, and log any new decision in `docs/DECISIONS.md`

@@ -54,26 +54,43 @@ nonisolated final class UserNotificationScheduler: NSObject, NotificationSchedul
     }
 
     // MARK: UNUserNotificationCenterDelegate
+    //
+    // BOTH of these are `@MainActor`, and that is load-bearing — it is not tidiness.
+    //
+    // The `async` form of these delegate methods is the Swift bridge over an ObjC method with a
+    // completion handler, and UIKit runs that completion handler on WHATEVER thread the async
+    // function finishes on. When it finishes off the main thread, UIKit's own follow-up work
+    // (`-[UIApplication _updateSnapshotAndStateRestoration…]`) asserts and the app dies with
+    // "Call must be made on main thread" — a crash the child sees, in their hand, from tapping a
+    // reminder we sent them.
+    //
+    // `nonisolated` was the exact wrong answer here. It made the crash certain rather than likely:
+    // a nonisolated async method always resumes off the main actor, so `await MainActor.run { … }`
+    // as the last statement hops TO main, posts, and hops straight back OFF it before returning.
+    // Marking the method `@MainActor` is what makes the completion handler run where UIKit requires
+    // (Apple DTS, developer.apple.com/forums/thread/709563), and it removes the need for the inner
+    // `MainActor.run` entirely.
 
     /// Show the banner even when ScreenTimeNext itself is in the foreground (the child may be on
     /// the timer screen at the 1-minute mark).
-    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
-                                            willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
+    @MainActor
+    func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
         [.banner, .sound]
     }
 
     /// The child tapped a warning: land on the timer, never on the parent dashboard.
-    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
-                                            didReceive response: UNNotificationResponse) async {
+    @MainActor
+    func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                didReceive response: UNNotificationResponse) async {
         // Every ScreenTimeNext notification is about the session, so any tap goes to the timer —
         // never to the parent dashboard.
         let isOurs = NotificationIdentifier.all.contains(response.notification.request.identifier)
         guard isOurs else { return }
         // Latch first: on a cold launch this callback runs before RootView is listening.
         TimerRoutingLatch.shared.request()
-        await MainActor.run {
-            NotificationCenter.default.post(name: .openChildTimer, object: nil)
-        }
+        // Already on the main actor (see the note above), so this is a plain call.
+        NotificationCenter.default.post(name: .openChildTimer, object: nil)
     }
 }
 

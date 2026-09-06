@@ -47,13 +47,12 @@ final class SessionControllerTests: XCTestCase {
 
     /// QA-07 — the full progression, driven only by the clock.
     func testProgressionThroughWarningsToFinished() throws {
+        // D-044 — two reminders (5 and 1 minutes), so the stages are active → first → final.
         try controller.start()
-        clock.advance(599)   // 601 left
+        clock.advance(899)   // 301 left
         XCTAssertEqual(try controller.tick().state, .active)
-        clock.advance(1)     // 600 left — inclusive boundary
+        clock.advance(1)     // 300 left — inclusive boundary
         XCTAssertEqual(try controller.tick().state, .firstWarning)
-        clock.advance(300)   // 300 left
-        XCTAssertEqual(try controller.tick().state, .secondWarning)
         clock.advance(240)   // 60 left
         XCTAssertEqual(try controller.tick().state, .finalWarning)
         clock.advance(60)    // 0 left
@@ -66,12 +65,12 @@ final class SessionControllerTests: XCTestCase {
     /// reports the right remaining time immediately, with no catch-up.
     func testRelaunchAfterLongGapRestoresCorrectRemaining() throws {
         try controller.start()
-        clock.advance(700)
+        clock.advance(950)
         let c = clock!
         let relaunched = SessionController(storage: storage, now: { c.now })
         let snap = try relaunched.restore()
-        XCTAssertEqual(snap.remainingSeconds, 500)
-        XCTAssertEqual(snap.state, .firstWarning)
+        XCTAssertEqual(snap.remainingSeconds, 250)
+        XCTAssertEqual(snap.state, .firstWarning, "250 left is inside the 5-minute reminder")
     }
 
     func testFinishedWindowCountsAgainstBudgetEvenBeforeFinalization() throws {
@@ -134,10 +133,10 @@ final class SessionControllerTests: XCTestCase {
 
     func testSessionNeverStepsBackwardOnJitter() throws {
         try controller.start()
-        clock.advance(900)   // 300 left → secondWarning
-        XCTAssertEqual(try controller.tick().state, .secondWarning)
-        clock.advance(-2)    // tiny jitter back to 302
-        XCTAssertEqual(try controller.tick().state, .secondWarning)
+        clock.advance(1140)  // 60 left → the last reminder
+        XCTAssertEqual(try controller.tick().state, .finalWarning)
+        clock.advance(-2)    // tiny jitter back to 62
+        XCTAssertEqual(try controller.tick().state, .finalWarning, "a session never steps backward")
     }
 
     /// D-013 — a warning the parent removed simply does not exist as a stage.
@@ -159,18 +158,20 @@ final class SessionControllerTests: XCTestCase {
     /// Reminders longer than what is left today are ignored; the earliest fitting one carries the chooser.
     func testRemindersThatDoNotFitTheWindowAreIgnored() throws {
         var config = try storage.loadConfiguration()   // budget 1200
+        // D-044 — assignment keeps the two longest, so this stores [600, 300].
         config.warningOffsetsSeconds = [600, 300, 60]
+        XCTAssertEqual(config.warningOffsetsSeconds, [600, 300])
         try storage.save(config)
         try controller.start()
-        clock.advance(1000)          // 200 left, then end early → 200 used... use endEarly to make a short remaining budget
+        clock.advance(1000)
         try controller.endEarly()    // used 1000 → 200 left today
         let snap = try controller.start()
         XCTAssertEqual(snap.remainingSeconds, 200)
-        XCTAssertEqual(snap.state, .active, "10- and 5-minute reminders don't fit a 200 s window")
-        clock.advance(140)           // 60 left → the only fitting reminder → firstWarning
+        XCTAssertEqual(snap.state, .active, "neither reminder fits a 200 s window")
+        clock.advance(140)           // 60 left — and still no reminder fits
         let warn = try controller.tick()
-        XCTAssertEqual(warn.state, .firstWarning)
-        XCTAssertEqual(warn.activeWarningMinutes, 1)
+        XCTAssertEqual(warn.state, .active, "a window shorter than every reminder simply has none")
+        XCTAssertNil(warn.activeWarningMinutes)
     }
 
     /// The "Session: Not started" bug — a fresh controller must adopt an existing window on tick.

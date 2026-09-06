@@ -81,7 +81,7 @@ final class MockServicesTests: XCTestCase {
         let snap = MockScreenTimeSelectionService.sampleSnapshot()
         var running = await mon.isMonitoring
         XCTAssertFalse(running)
-        try await mon.startMonitoring(budgetSeconds: 3600, selection: snap)
+        try await mon.startMonitoring(budgetSeconds: 3600, warningOffsetsSeconds: [600, 60], selection: snap)
         try await mon.restartMonitoring(budgetSeconds: 1800, selection: snap)
         running = await mon.isMonitoring
         XCTAssertTrue(running)
