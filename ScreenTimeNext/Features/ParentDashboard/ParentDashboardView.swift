@@ -6,6 +6,7 @@
 //  (D-013); Start over lives at the bottom of this screen.
 
 import SwiftUI
+import Combine
 import UIKit
 import ScreenTimeNextCore
 
@@ -18,6 +19,7 @@ struct ParentDashboardView: View {
     @State private var confirmReset = false
     @State private var showExtend = false
     @State private var showShieldPreview = false
+    @State private var showCoveredContent = false
     let onOpenTimer: () -> Void
     let onReset: () -> Void
 
@@ -56,6 +58,11 @@ struct ParentDashboardView: View {
             .onDisappear { viewModel.disappeared() }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active { viewModel.reload() }
+            }
+            // D-028 — the picker writes its selection the moment it closes, so the dashboard has
+            // to hear about it then, not on the next foreground.
+            .onReceive(NotificationCenter.default.publisher(for: .configurationDidChange)) { _ in
+                viewModel.reload()
             }
             .sheet(isPresented: $showShieldPreview) {
                 ShieldPreviewView(childName: name,
@@ -215,10 +222,16 @@ struct ParentDashboardView: View {
         Section {
             if viewModel.selectionSummary.isEmpty {
                 Text("Nothing selected yet").foregroundStyle(.secondary)
-            } else {
-                SelectionSummaryView(summary: viewModel.selectionSummary)
-                    .listRowInsets(EdgeInsets())
-                    .listRowBackground(Color.clear)
+            } else if let snapshot = viewModel.selection {
+                Button { showCoveredContent = true } label: {
+                    SelectionSummaryView(summary: viewModel.selectionSummary)
+                }
+                .buttonStyle(.plain)
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
+                .sheet(isPresented: $showCoveredContent) {
+                    CoveredContentSheet(snapshot: snapshot)
+                }
             }
             Button { showShieldPreview = true } label: {
                 HStack(spacing: 12) {

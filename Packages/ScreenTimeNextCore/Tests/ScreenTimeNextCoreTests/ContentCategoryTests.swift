@@ -16,12 +16,21 @@ final class ContentCategoryTests: XCTestCase {
         }
     }
 
-    /// Browsers stand for web domains, so they must not inflate the categories count.
-    func testBrowsersCountAsWebsitesNotCategories() {
+    /// D-028 — "Web browsers" is a category of APPS. Counting it as a website made the summary
+    /// claim a website had been picked when none had; only Apple's picker can produce one.
+    func testBrowsersCountAsACategory() {
         let summary = ContentCategory.summary(categories: [.games, .social, .browsers])
-        XCTAssertEqual(summary.categoryCount, 2)
-        XCTAssertEqual(summary.webDomainCount, 1)
+        XCTAssertEqual(summary.categoryCount, 3)
+        XCTAssertEqual(summary.webDomainCount, 0)
         XCTAssertEqual(summary.applicationCount, 0)
+    }
+
+    /// A tile can never stand for a website, whatever is ticked.
+    func testTilesNeverProduceAWebsiteCount() {
+        for category in ContentCategory.allCases {
+            XCTAssertEqual(ContentCategory.summary(categories: [category]).webDomainCount, 0,
+                           "\(category) claimed to be a website")
+        }
     }
 
     func testAppCountIsPassedThrough() {
@@ -30,15 +39,21 @@ final class ContentCategoryTests: XCTestCase {
         XCTAssertEqual(summary.categoryCount, 1)
     }
 
+    func testBrowsersStillComeFirst() {
+        XCTAssertEqual(ContentCategory.defaultOrder.first, .browsers)
+        XCTAssertEqual(ContentCategory.defaultOrder.count, ContentCategory.allCases.count)
+        XCTAssertEqual(Set(ContentCategory.defaultOrder), Set(ContentCategory.allCases))
+    }
+
     func testNothingPickedIsAnEmptySummary() {
         XCTAssertTrue(ContentCategory.summary(categories: []).isEmpty)
         XCTAssertFalse(ContentCategory.summary(categories: [.browsers]).isEmpty)
     }
 
-    func testBrowsersIsTheOnlyWebRowAndIsNotInTheCategoryList() {
-        XCTAssertEqual(ContentCategory.allCases.filter(\.isWeb), [.browsers])
-        XCTAssertFalse(ContentCategory.appCategories.contains(.browsers))
-        XCTAssertEqual(ContentCategory.appCategories.count, ContentCategory.allCases.count - 1)
+    func testEveryRowIsACategoryIncludingBrowsers() {
+        XCTAssertTrue(ContentCategory.allCases.filter(\.isWeb).isEmpty)
+        XCTAssertTrue(ContentCategory.appCategories.contains(.browsers))
+        XCTAssertEqual(ContentCategory.appCategories.count, ContentCategory.allCases.count)
     }
 
     func testTheDefaultUsualSetAreRealRows() {

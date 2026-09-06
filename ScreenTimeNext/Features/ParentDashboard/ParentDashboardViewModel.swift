@@ -14,6 +14,8 @@ final class ParentDashboardViewModel {
     private(set) var profile: ChildProfile?
     private(set) var configuration: ScreenTimeConfiguration = .default
     private(set) var selectionSummary: SelectionSummary = .empty
+    /// D-028 — kept whole, so the parent can open it and see what the counts stand for.
+    private(set) var selection: SelectionSnapshot?
     private(set) var protectionState: ProtectionState = .unshielded
     private(set) var session: ChildSessionSnapshot = .idle
     private(set) var remainingTodaySeconds: Int = 0
@@ -63,7 +65,8 @@ final class ParentDashboardViewModel {
         if session.window == nil {
             quickMinutes = configuration.dailyBudgetSeconds / 60
         }
-        selectionSummary = (try? services.selection.loadSelection())?.summary ?? .empty
+        selection = try? services.selection.loadSelection()
+        selectionSummary = selection?.summary ?? .empty
         protectionState = (try? storage.loadProtectionState()) ?? .unshielded
         refreshSession()
     }

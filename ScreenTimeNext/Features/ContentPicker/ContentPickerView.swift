@@ -82,6 +82,9 @@ final class ContentPickerModel {
         } else {
             try? selectionStore.clearSelection()
         }
+        // D-028 — the dashboard shows what is covered, so it has to hear about this now rather
+        // than on the next foreground. Settings' Save used to be the only thing that told it.
+        NotificationCenter.default.post(name: .configurationDidChange, object: nil)
     }
 
     var summary: SelectionSummary {
@@ -212,6 +215,7 @@ struct ContentPickerView: View {
 
     @State private var showAppPickerNote = false
     @State private var showSystemPicker = false
+    @State private var showCoveredContent = false
     @State private var isReordering = false
 
     /// A stored selection only MEANS anything while Screen Time access exists. Without it, even a
@@ -233,6 +237,11 @@ struct ContentPickerView: View {
         .sheet(isPresented: $showAppPickerNote) {
             SpecificAppsNote(onUseSample: { model.applicationCount = 3 })
                 .presentationDetents([.medium])
+        }
+        .sheet(isPresented: $showCoveredContent) {
+            if let snapshot = model.realSelection {
+                CoveredContentSheet(snapshot: snapshot)
+            }
         }
         .sheet(isPresented: $showSystemPicker) {
             NavigationStack {
@@ -269,15 +278,32 @@ struct ContentPickerView: View {
     /// The running total, plus the two one-tap shortcuts.
     private var countSection: some View {
         Section {
-            HStack(spacing: 10) {
-                countPill(model.summary.categoryCount, "categories", "square.stack.3d.up.fill", Theme.sky)
-                countPill(model.summary.webDomainCount, "websites", "globe", Theme.mint)
-                countPill(model.summary.applicationCount, "apps", "app.badge", Theme.lavender)
-            }
-            .listRowBackground(Color.clear)
-            .listRowInsets(EdgeInsets(top: 2, leading: 4, bottom: 8, trailing: 4))
+            countRow
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: 2, leading: 4, bottom: 8, trailing: 4))
 
             usualRow
+        } footer: {
+            // D-028 — only offered when there is something real behind the numbers. Tile counts
+            // have nothing to show: they are not a selection, they are a shortcut for making one.
+            if isEnforceable {
+                Text("Tap the numbers to see exactly what's covered.")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var countRow: some View {
+        let pills = HStack(spacing: 10) {
+            countPill(model.summary.categoryCount, "categories", "square.stack.3d.up.fill", Theme.sky)
+            countPill(model.summary.webDomainCount, "websites", "globe", Theme.mint)
+            countPill(model.summary.applicationCount, "apps", "app.badge", Theme.lavender)
+        }
+        if isEnforceable {
+            Button { showCoveredContent = true } label: { pills }
+                .buttonStyle(.plain)
+        } else {
+            pills
         }
     }
 

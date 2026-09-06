@@ -827,6 +827,40 @@ again, so a "try again" button there would do nothing at all.
 means "no answer right now", not "never asked". Any future authorization logic should assume the
 same, and any new save button should be checked against the D-022 rule before it ships.
 
+## D-028 — Show what's covered; a browser is a category; no per-category app counts, ever
+**Date:** 2026-09-06 · **Status:** accepted · **Task:** 005
+
+**Context.** Four requests about the selection screen, one of which cannot be built.
+
+**The one that cannot.** "After picking a category, show how many apps on this device belong to
+it." This is B-005 and it is permanent, not a gap: an Apple Frameworks Engineer states outright
+that there is no way to extract application tokens from a category token, and there is no API to
+list installed apps at all, so even the denominator is unavailable. The honest replacement is to
+say what a category MEANS — the "What's covered" sheet now tells the parent that a category covers
+every app of that kind on the device and that iOS does not let apps list them. A number we cannot
+know is worse than a sentence we can stand behind.
+
+**The three that can.**
+- **Tap the counts to see the contents.** `Label(token)` is Apple's own view: it draws the app's
+  name and icon inside the system's process, so the app never learns the identity, cannot copy it
+  into a string, and nothing is logged or persisted. That keeps §16 intact while answering the
+  question a count cannot. Rendering goes through `FamilyControlAgent` on the main thread and can
+  freeze the UI when many labels appear at once (FB12332927), so every list here is a `List`, which
+  builds rows lazily.
+  Offered only when a REAL selection exists: tile counts have nothing behind them to show.
+- **A web browser is a category, not a website.** Ticking "Web browsers" means "the apps people
+  browse with" — an app category like any other. Counting it on the websites line made the summary
+  claim a website had been picked when none had, and only Apple's picker can produce one.
+- **The dashboard hears about a new selection immediately.** The picker writes when it closes
+  (D-027), so it now posts `configurationDidChange` as well; the dashboard was waiting for
+  Settings' Save, which the parent no longer has to press.
+
+**Consequences.**
+- `ContentCategory.summary` can never report a web domain. A tile is a shortcut for making a
+  selection, never a selection itself — the type now says so.
+- Every place showing counts should offer the sheet. A number the parent cannot check is a number
+  they have to take on trust, and this app asks for enough trust already.
+
 <!-- Template for new entries:
 
 ## D-NNN — <short imperative title>

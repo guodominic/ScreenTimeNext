@@ -92,19 +92,21 @@ public enum ContentCategory: String, Codable, CaseIterable, Identifiable, Sendab
         }
     }
 
-    /// `browsers` stands for web domains rather than installed apps, so it counts on the websites
-    /// line of the summary instead of the categories line.
-    public var isWeb: Bool { self == .browsers }
+    /// D-028 — "Web browsers" is a CATEGORY of apps, not a website. Ticking it means "the apps
+    /// people browse with", which is an app category like any other; a website is a specific
+    /// domain, which only Apple's picker can produce. Counting it on the websites line made the
+    /// summary say something untrue about what had been picked.
+    public var isWeb: Bool { false }
 
-    /// The rows shown under "Categories". `browsers` gets its own section.
-    public static var appCategories: [ContentCategory] {
-        allCases.filter { !$0.isWeb }
-    }
+    /// Every row is a category now, so this is the whole catalogue. Kept as its own name because
+    /// callers read better for it, and because the distinction may return if Apple ever exposes a
+    /// domain-category token.
+    public static var appCategories: [ContentCategory] { allCases }
 
     /// D-019 — the order rows appear in before the parent drags anything. Browsers first: it is
-    /// the one row that covers something no app category does, and it is the easiest to overlook.
+    /// the row most families forget, and the one that quietly undoes a budget when they do.
     public static var defaultOrder: [ContentCategory] {
-        [.browsers] + allCases.filter { !$0.isWeb }
+        [.browsers] + allCases.filter { $0 != .browsers }
     }
 
     /// The starting "my usual" set. The parent can overwrite it with whatever they actually use.
@@ -122,13 +124,14 @@ public enum ContentCategory: String, Codable, CaseIterable, Identifiable, Sendab
         return ordered
     }
 
-    /// Counts a set the way the summary reports it: web rows on the websites line, the rest on
-    /// the categories line. `apps` comes from the picker and is passed through untouched.
+    /// Counts a set the way the summary reports it. `apps` comes from the picker and is passed
+    /// through untouched.
     public static func summary(categories: Set<ContentCategory>, apps: Int = 0) -> SelectionSummary {
         SelectionSummary(
             applicationCount: apps,
-            categoryCount: categories.filter { !$0.isWeb }.count,
-            webDomainCount: categories.filter(\.isWeb).count
+            categoryCount: categories.count,
+            // Only Apple's picker can produce a website; a tile never can (D-028).
+            webDomainCount: 0
         )
     }
 }
