@@ -23,6 +23,8 @@ struct SettingsView: View {
     @State private var customActivities: [TransitionActivity] = []
     @State private var showActivityEditor = false
     @State private var editingActivity: TransitionActivity?
+    @State private var parentPIN: ParentPIN?
+    @State private var showPINEditor = false
 
     private var allActivities: [TransitionActivity] { TransitionActivity.allCases + customActivities }
     @State private var existingProfileID: UUID?
@@ -38,6 +40,31 @@ struct SettingsView: View {
                 Text("Child")
             } footer: {
                 Text("Only used to greet your child by name. It stays on this device, and the app works fine without it.")
+            }
+
+            Section {
+                // D-031 — first in Settings, because a parent who never sets one has no gate at
+                // all, and the thing behind the gate hands out more screen time.
+                Button { showPINEditor = true } label: {
+                    HStack(spacing: 12) {
+                        IconChip(symbol: parentPIN == nil ? "lock.open.fill" : "lock.fill",
+                                 color: parentPIN == nil ? .orange : Theme.grass)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(parentPIN == nil ? "Set a parent PIN" : "Change parent PIN")
+                                .fontWeight(.semibold)
+                                .foregroundStyle(Color.primary)
+                            Text(parentPIN == nil
+                                 ? "Without one, holding “Parents” is all it takes to leave the timer."
+                                 : "Needed to leave the timer and open settings.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                if parentPIN != nil {
+                    Button("Turn the PIN off", role: .destructive) { setPIN(nil) }
+                }
+            } header: {
+                Text("Parent gate")
             }
 
             Section {
@@ -115,6 +142,12 @@ struct SettingsView: View {
                 Button("Save") { save() }
             }
         }
+        .sheet(isPresented: $showPINEditor) {
+            ParentPINView(mode: parentPIN.map { ParentPINView.Mode.change(existing: $0) } ?? .create) { pin in
+                setPIN(pin)
+            }
+            .presentationDetents([.large])
+        }
         .sheet(isPresented: $showActivityEditor) {
             ActivityEditorSheet(existing: editingActivity) { saved in
                 if let index = customActivities.firstIndex(of: saved) {
@@ -163,6 +196,13 @@ struct SettingsView: View {
         }
     }
 
+    /// D-031 / D-022 — written immediately. A PIN that only takes effect after pressing Save is a
+    /// gate a parent thinks they set and did not.
+    private func setPIN(_ pin: ParentPIN?) {
+        parentPIN = pin
+        try? services.storage.save(pin)
+    }
+
     private func remove(_ activity: TransitionActivity) {
         customActivities.removeAll { $0 == activity }
         activities.remove(activity)
@@ -192,6 +232,7 @@ struct SettingsView: View {
         warningMinutes = mins
         activities = Set(config.selectedActivities)
         customActivities = (try? services.storage.loadPickerPreferences())?.customActivities ?? []
+        parentPIN = try? services.storage.loadParentPIN()
         selection = try? services.selection.loadSelection()
         // Only on first appear: coming back from the picker must not undo what was just arranged.
         if !pickerLoaded {

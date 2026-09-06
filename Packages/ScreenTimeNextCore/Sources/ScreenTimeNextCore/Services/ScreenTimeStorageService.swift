@@ -47,8 +47,14 @@ public protocol ScreenTimeStorageService: Sendable {
     func loadPickerPreferences() throws -> ParentPickerPreferences
     func save(_ preferences: ParentPickerPreferences) throws
 
+    /// D-031 — the parent gate. nil means no PIN is set and the gate falls back to press-and-hold.
+    func loadParentPIN() throws -> ParentPIN?
+    func save(_ pin: ParentPIN?) throws
+
     /// Forget the child's setup: profile, configuration, usage, session, protection state.
     /// Parent-initiated "start over" (and Task 017). Never touches anything outside
     /// ScreenTimeNext's own records, and deliberately KEEPS `ParentPickerPreferences` — see D-024.
+    /// It DOES clear the parent PIN: "start over" has to mean start over, and a forgotten PIN that
+    /// survived a reset would lock a parent out of their own device with no way back (D-031).
     func eraseAll() throws
 }

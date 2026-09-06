@@ -18,6 +18,8 @@ final class ChildTimerViewModel {
     /// state, so SwiftUI had no reason to redraw the chooser when the parent changed the activity
     /// list in Settings.
     private(set) var availableActivities: [TransitionActivity] = TransitionActivity.allCases
+    /// D-031 — nil means no PIN is set, and the gate falls back to press-and-hold.
+    private(set) var parentPIN: ParentPIN?
 
     private let controller: SessionController
     private let storage: any ScreenTimeStorageService
@@ -51,6 +53,7 @@ final class ChildTimerViewModel {
     private func reloadParentSettings() {
         childName = (try? storage.loadChildProfile())?.name ?? ""
         availableActivities = (try? controller.availableActivities()) ?? TransitionActivity.allCases
+        parentPIN = try? storage.loadParentPIN()
     }
 
     func disappeared() {

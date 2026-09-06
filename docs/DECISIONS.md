@@ -240,7 +240,7 @@ Phase 1 swap is a service change only.
 ---
 
 ## D-011 — Leaving the child timer: a press-and-hold "Parents" control
-**Date:** 2026-09-05 · **Status:** accepted
+**Date:** 2026-09-05 · **Status:** accepted · **Superseded by D-031**
 
 **Context.** Task 007 hid the back button during a session (§7.6: the child should not reach
 parent screens). In practice the parent had no way back either, which is the wrong trade.
@@ -912,6 +912,71 @@ actually after.
   counts only (§16).
 - Saving under an existing name replaces that set rather than making a second one with the same
   name, because two identical labels in a menu help nobody.
+
+## D-031 — The parent gate is a PIN (supersedes D-011)
+**Date:** 2026-09-06 · **Status:** accepted · **Supersedes:** D-011
+
+**Context.** D-011 gated the way out of the child timer behind a one-second press-and-hold. That
+was never a gate. A child who watches a parent do it once can repeat it, and what is behind it is
+the screen that grants more screen time — the single thing a child has the most reason to reach.
+
+**Decision.** A four-digit parent PIN. Tapping "Parents" opens a keypad; the dashboard is behind it.
+
+**The details that matter.**
+- **The PIN is never stored** — only a salted, iterated SHA-256 verifier, with a fresh random salt
+  per PIN so two families choosing 1234 do not share stored bytes. 120k rounds is imperceptible for
+  one entry and turns an offline sweep of all 10,000 PINs from instant into tedious.
+- **This is not strong security and must never be described as such.** A four-digit PIN has ten
+  thousand possibilities; no hashing changes that. It is sized for the actual threat — a child on
+  the family's own device, with no file access — and §17's "not tamper-proof" still stands.
+- **Wrong guesses cost time.** Three free, then a doubling delay capped at five minutes. The cap is
+  deliberate: the counter must inconvenience a guessing child without locking out a parent who
+  genuinely forgot. And only a CORRECT PIN clears the counter — if sitting out one wait reset it, a
+  child with an afternoon would get unlimited guesses in batches of three.
+- **A custom keypad, not a `TextField`.** The system keyboard brings autocorrect, a paste bar,
+  dictation and a predictive row onto a screen whose whole job is to be hard to leave. Twelve
+  buttons have no such doors.
+- **With no PIN set, press-and-hold still works.** A parent must never be shut out of their own
+  device by a feature they have not set up yet. Settings leads with the PIN row, and says plainly
+  what the absence of one means.
+- **"Start over" clears the PIN**, unlike the parent's preferences (D-024). A forgotten PIN that
+  survived a reset would be an unrecoverable lockout on the family's own iPad.
+- **The PIN is written the moment it is set**, not on Save — the D-022 rule. A gate a parent thinks
+  they set and did not is worse than no gate, because they stop watching.
+
+## D-032 — Remote parent control: what it would actually cost (not yet built)
+**Date:** 2026-09-06 · **Status:** proposed — deliberately not started
+
+**Context.** The wish: a parent, on their own iPhone, extends time or changes the categories on the
+child's iPad without touching it. This is the most requested feature in every app of this kind, and
+it is the one that changes what ScreenTimeNext *is*.
+
+**Why it is not a small feature.**
+1. **It breaks §16, which is currently a promise.** "No backend, no analytics, nothing leaves the
+   device" is enforced on every test run by `scripts/privacy-audit.sh`, which fails the build on the
+   sight of `URLSession`. Remote control needs a channel between two devices. That is not a rule to
+   quietly delete; it is the app's stated position, and reversing it is a product decision, not an
+   implementation detail.
+2. **CloudKit is the least-bad channel.** A private CloudKit database keeps data in the family's own
+   iCloud account rather than on a server we run: no accounts to build, no data we hold, nothing to
+   breach. The privacy claim would become "your data stays in your iCloud" instead of "nothing
+   leaves the device" — weaker, but still true and still unusual. A server of our own would mean
+   accounts, a privacy policy with real teeth, and a running cost per family, for no benefit
+   CloudKit does not give.
+3. **The tokens do not travel.** `FamilyActivitySelection` tokens are device-scoped and meaningless
+   elsewhere, so "change the categories from my phone" cannot be a remote picker. The parent's phone
+   can send an INSTRUCTION ("use the set called School nights"); the child's device resolves it
+   against its own stored selections. D-030's saved sets, which exist for a different reason, turn
+   out to be the mechanism that makes this possible at all.
+4. **The child's device has to be listening.** Push and CloudKit subscriptions can wake an app, but
+   nothing guarantees delivery while it is force-quit or offline. "Extend by 10 minutes" must
+   therefore be a request the child's device applies when it next runs, with the parent's phone
+   showing what has actually been applied rather than what was sent. A control that silently does
+   nothing is worse than no control.
+
+**Order of work when it is taken on.** Finish enforcement first (010, 011, 012) — remote control
+over an app that cannot yet hold a limit is a feature on top of nothing. Then D-030 sets should be
+addressable by name, then the CloudKit record and the §16 rewrite, then the parent app.
 
 <!-- Template for new entries:
 

@@ -16,6 +16,7 @@ public final class InMemoryScreenTimeStorageService: ScreenTimeStorageService, @
     private var window: SessionWindow?
     private var protection: ProtectionState = .unshielded
     private var pickerPreferences: ParentPickerPreferences = .default
+    private var parentPIN: ParentPIN?
     private var _failing = false
 
     public init() {}
@@ -74,6 +75,21 @@ public final class InMemoryScreenTimeStorageService: ScreenTimeStorageService, @
         try lock.withLock {
             try check()
             profile = nil; configuration = nil; usageByDay = [:]; window = nil; protection = .unshielded
+            parentPIN = nil                                  // D-031 — start over means start over
+        }
+    }
+
+    public func loadParentPIN() throws -> ParentPIN? {
+        try lock.withLock {
+            try check()
+            return parentPIN
+        }
+    }
+
+    public func save(_ pin: ParentPIN?) throws {
+        try lock.withLock {
+            try check()
+            parentPIN = pin
         }
     }
 

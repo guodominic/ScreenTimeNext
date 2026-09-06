@@ -15,6 +15,7 @@ struct ChildTimerView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var viewModel: ChildTimerViewModel
+    @State private var showPINPad = false
 
     init(services: ServiceContainer) {
         _viewModel = State(initialValue: ChildTimerViewModel(services: services))
@@ -58,10 +59,18 @@ struct ChildTimerView: View {
         .onReceive(NotificationCenter.default.publisher(for: .configurationDidChange)) { _ in
             viewModel.configurationChanged()
         }
+        .sheet(isPresented: $showPINPad) {
+            ParentPINView(mode: .unlock, storedPIN: viewModel.parentPIN) { _ in
+                dismiss()
+            }
+            .presentationDetents([.large])
+        }
         .navigationBarBackButtonHidden(true)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                ParentGateButton { dismiss() }   // D-011
+                ParentGateButton(hasPIN: viewModel.parentPIN != nil) {
+                    if viewModel.parentPIN != nil { showPINPad = true } else { dismiss() }
+                }
             }
         }
     }
@@ -204,27 +213,45 @@ struct ChildTimerView: View {
     }
 }
 
-/// A "Parents" control that opens on press-and-hold. A tap only shows the hint. (D-011)
+/// D-031 — the "Parents" control. A tap opens the PIN pad.
+///
+/// This replaces D-011's press-and-hold, which was never a gate: a child who watched once could
+/// repeat it, and the thing behind it grants more screen time. A PIN is something the child has to
+/// be told rather than something they can copy.
+///
+/// With no PIN set the button still works on a press-and-hold, because a parent must never be shut
+/// out of their own device by a security feature they have not set up yet.
 struct ParentGateButton: View {
+    let hasPIN: Bool
     let onUnlock: () -> Void
     @State private var showHint = false
 
     var body: some View {
-        Label(showHint ? "Hold to go back" : "Parents", systemImage: "lock.fill")
+        Label(label, systemImage: "lock.fill")
             .font(.subheadline)
             .foregroundStyle(.secondary)
             .padding(.horizontal, 10).padding(.vertical, 6)
             .background(Capsule().fill(.thinMaterial))
             .contentShape(Capsule())
             .onTapGesture {
-                showHint = true
-                Task {
-                    try? await Task.sleep(for: .seconds(2))
-                    showHint = false
+                if hasPIN {
+                    onUnlock()
+                } else {
+                    showHint = true
+                    Task {
+                        try? await Task.sleep(for: .seconds(2))
+                        showHint = false
+                    }
                 }
             }
-            .onLongPressGesture(minimumDuration: 1.0) { onUnlock() }
-            .accessibilityLabel("Parents. Press and hold to go back.")
+            .onLongPressGesture(minimumDuration: 1.0) { if !hasPIN { onUnlock() } }
+            .accessibilityLabel(hasPIN ? "Parents. Enter your PIN to go back."
+                                       : "Parents. Press and hold to go back.")
+    }
+
+    private var label: String {
+        if hasPIN { return "Parents" }
+        return showHint ? "Hold to go back" : "Parents"
     }
 }
 

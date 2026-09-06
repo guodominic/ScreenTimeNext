@@ -108,6 +108,7 @@ public final class FileStorageService: ScreenTimeStorageService, @unchecked Send
         case sessionWindow = "sessionWindow.json"
         case protectionState = "protectionState.json"
         case pickerPreferences = "pickerPreferences.json"
+        case parentPIN = "parentPIN.json"
     }
 
     private struct Manifest: Codable {
@@ -238,9 +239,19 @@ public final class FileStorageService: ScreenTimeStorageService, @unchecked Send
     /// child's setup, not the parent's own arrangement of the picker.
     public func eraseAll() throws {
         lock.withLock {
-            for file in [File.childProfile, .configuration, .dailyUsage, .sessionWindow, .protectionState] {
+            for file in [File.childProfile, .configuration, .dailyUsage, .sessionWindow, .protectionState, .parentPIN] {
                 remove(file)
             }
+        }
+    }
+
+    public func loadParentPIN() throws -> ParentPIN? {
+        lock.withLock { read(ParentPIN.self, from: .parentPIN) }
+    }
+
+    public func save(_ pin: ParentPIN?) throws {
+        try lock.withLock {
+            if let pin { try write(pin, to: .parentPIN) } else { remove(.parentPIN) }
         }
     }
 
