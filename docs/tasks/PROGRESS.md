@@ -146,3 +146,39 @@ but remember §22: that half alone is a prototype, not V1.
 | Real Screen Time enforcement | not started |
 
 Both must be complete. Neither alone is V1.
+
+---
+
+## v1.0 submitted to App Review — 2026-09-07
+
+**Status:** `1.0 Waiting for Review` in App Store Connect (Apple ID 6809499502).
+
+Shipped from Xcode Cloud build 4 (commit `176b39b`), built with **Xcode 26.6 (17F113)** — the public
+release toolchain. Metadata, 7 screenshots at 1320×2868 (6.9"), Support and Privacy Policy URLs
+(both served from this repo), App Privacy = *Data Not Collected*, price Free, iPhone only, manual
+release after approval.
+
+### Three things this submission taught us, in the order they bit
+
+1. **A build made with a beta Xcode is refused at submission, not at upload.** The archive built,
+   validated and uploaded cleanly, and was rejected only at "Add for Review". The machine that
+   ships the binary must run the public GM toolchain — which this Mac cannot, being on a macOS
+   beta, so the release build comes from Xcode Cloud (see D-073 and the workflow's `Archive - iOS`
+   action, Distribution Preparation = App Store Connect).
+2. **The distribution entitlement is granted to the ACCOUNT and enabled per App ID.** "Assigned" in
+   the Capability Requests list only means eligible; each of the four App IDs (app + three
+   extensions) needs `Family Controls (Distribution)` ticked on its own Identifier page. Until then
+   every profile is a development one, and Validate fails on all four bundle IDs at once. The
+   yellow "development only version of Family Controls" warnings in Xcode had been saying exactly
+   this for weeks.
+3. **Read the error the build system states, not the one its UI implies.** Xcode Cloud's web log
+   showed a green compile node under a parent that exited 65, and only the failure *email* named
+   the file and line. See D-073's second-pass note.
+
+### Still open
+
+* `docs/tasks/device-qa-checklist.md` — QA-02, QA-03, QA-04, QA-09, QA-10 have never been verified
+  on a device. Worth clearing while the submission is in review.
+* Localisation (~250–300 strings). The language picker saves a choice and says plainly that the app
+  is still English (D-068).
+* iPad. `TARGETED_DEVICE_FAMILY = "1"`; returns in 1.1 once someone has actually used it on one.
