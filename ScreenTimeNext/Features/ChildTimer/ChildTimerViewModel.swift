@@ -131,10 +131,19 @@ final class ChildTimerViewModel {
     /// when to ask it.
     private func enforceIfStateChanged() {
         guard snapshot.state != lastEnforcedState else { return }
+        let previous = lastEnforcedState
         lastEnforcedState = snapshot.state
         Enforcement.reconcile(storage: services.storage,
                               selection: services.selection,
                               shield: services.shield)
+        // D-047 — a session appearing or disappearing moves every alarm. State changes WITHIN a
+        // session (a warning arriving) do not: the alarms were set from the window's end, which
+        // has not moved, and re-registering them on every stage would reset them for nothing.
+        let sessionChanged = (previous == nil) || (previous == .idle) || (snapshot.state == .idle)
+            || (snapshot.state == .finished) || (previous == .finished)
+        if sessionChanged {
+            NotificationCenter.default.post(name: .sessionDidChange, object: nil)
+        }
     }
 
     private func run(_ operation: () throws -> ChildSessionSnapshot) {

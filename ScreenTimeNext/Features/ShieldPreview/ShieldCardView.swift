@@ -12,12 +12,24 @@
 //      spent    lavender   Pip is sleepy         opened later with the budget already gone
 //  The chosen activity still shapes the WORDS and the little badge; it no longer picks the colour.
 //
-//  This is a PREVIEW. The real shield (Phase 1) is drawn by the system from a `ShieldConfiguration`
-//  built out of the same `ShieldPresentation` values, so what is tuned here is what ships:
-//      icon → UIImage(systemName: presentation.symbolName)
-//      title / subtitle → ShieldConfiguration.Label
-//      primaryButtonLabel (+ background color) → the button the child presses
-//  Layout and typography are the system's, so treat small differences as expected.
+//  D-048 — WHAT THE SYSTEM ACTUALLY DRAWS, and why this file changed.
+//
+//  Dominic put the real shield next to this preview and they did not match. They could not have:
+//  the shield is drawn by iOS, and a `ShieldConfiguration` gives us exactly five things —
+//
+//      icon                          UIImage
+//      title / subtitle              ShieldConfiguration.Label (text + colour)
+//      primaryButtonLabel            + its background colour
+//      secondaryButtonLabel          + up to three submenu items (D-044, iOS 26.4+)
+//      backgroundBlurStyle / colour
+//
+//  — and NOTHING else. No mascot, no gradient, no layout, no typography, no animation. Everything
+//  this preview used to add was ours and could never appear on the real thing.
+//
+//  A preview that shows a parent something their child will never see is worse than no preview:
+//  it is the one screen in the app whose whole job is to be accurate. So this now mirrors the
+//  system's layout — icon, title, subtitle, buttons, stacked and centred on a blur — and Pip
+//  appears only where he really can: as the ICON, which IS a `UIImage` we supply.
 
 import SwiftUI
 import ScreenTimeNextCore
@@ -28,8 +40,9 @@ struct ShieldCardView: View {
 
     /// One flat colour for strokes and the mascot, even at the finish where the fill is a gradient.
     private var tint: Color { Theme.color(for: presentation.urgency) }
-    /// The fill: a gradient at the finish, the urgency colour everywhere else.
-    private var fill: AnyShapeStyle { Theme.style(for: presentation.urgency) }
+    /// D-048 — flat, because `primaryButtonBackgroundColor` is a single `UIColor`. The finish's
+    /// rainbow gradient lived here and could never have reached the real shield.
+    private var fill: Color { tint }
 
     /// A different face at every step, so the child reads the moment before reading the words.
     private var mood: MascotMood {
@@ -43,20 +56,19 @@ struct ShieldCardView: View {
     }
 
     var body: some View {
-        VStack(spacing: 20) {
+        // The system's shield is a centred column on a blur, with generous spacing and no
+        // decoration of its own. Matching that here is the point of this view.
+        VStack(spacing: 18) {
             badge
-                .bounceIn()
 
             Text(presentation.title)
                 .font(.system(.title2, design: .rounded).bold())
                 .multilineTextAlignment(.center)
-                .bounceIn(delay: 0.08)
 
             Text(presentation.subtitle)
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-                .bounceIn(delay: 0.14)
 
             Button(action: onPrimary) {
                 Text(presentation.primaryButtonLabel)
@@ -68,7 +80,6 @@ struct ShieldCardView: View {
             }
             .buttonStyle(.plain)
             .padding(.top, 4)
-            .bounceIn(delay: 0.2)
 
             // D-044 — the real shield puts these in a system submenu behind a second button. A
             // preview that hid them would let a parent sign off on a screen their child never
@@ -86,7 +97,6 @@ struct ShieldCardView: View {
                             .background(Capsule().fill(.thinMaterial))
                     }
                 }
-                .bounceIn(delay: 0.26)
             }
         }
         .padding(.horizontal, 32)
@@ -94,22 +104,14 @@ struct ShieldCardView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    /// Pip with the moment's symbol pinned to his shoulder.
+    /// D-048 — the icon, and only the icon.
+    ///
+    /// `ShieldConfiguration.icon` is a single `UIImage`, so this is exactly one image at one size:
+    /// no mascot beside it, no sparkles around it, no badge pinned to it. Pip is drawn INTO that
+    /// image rather than next to it, which is the one way he can appear on a real shield at all.
     private var badge: some View {
-        ZStack(alignment: .bottomTrailing) {
-            if presentation.urgency == .finished {
-                Sparkles(color: tint, count: 10)
-                    .frame(width: 150, height: 150)
-            }
-            Mascot(mood: mood, size: 104, tint: tint, animated: false)
-            Image(systemName: presentation.symbolName)
-                .font(.system(size: 22, weight: .bold))
-                .foregroundStyle(.white)
-                .frame(width: 44, height: 44)
-                .background(Circle().fill(fill))
-                .overlay(Circle().stroke(.white, lineWidth: 2.5))
-                .offset(x: 6, y: 2)
-        }
+        Mascot(mood: mood, size: 96, tint: tint, animated: false)
+            .frame(width: 96, height: 96)
     }
 }
 

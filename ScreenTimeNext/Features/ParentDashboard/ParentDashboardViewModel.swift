@@ -154,10 +154,14 @@ final class ParentDashboardViewModel {
 
     /// Task 012 — one rule, one place (`Enforcement`). Every parent action that can change how much
     /// time is left ends here.
+    ///
+    /// D-047 — and tells the coordinator, because the same actions move every wall-clock alarm:
+    /// a session that now ends ten minutes later needs its reminders ten minutes later too.
     private func enforce() {
         Enforcement.reconcile(storage: services.storage,
                               selection: services.selection,
                               shield: services.shield)
+        NotificationCenter.default.post(name: .sessionDidChange, object: nil)
     }
 
     var canExtend: Bool { session.window != nil }

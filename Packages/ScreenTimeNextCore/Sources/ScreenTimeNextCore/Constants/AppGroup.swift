@@ -39,17 +39,26 @@ public enum MonitoringName {
     public static let dailyActivity = "screentimenext.daily"
     public static let budgetThreshold = "screentimenext.budgetReached"
 
-    /// D-043 — one event per reminder, so the system wakes us BEFORE the end as well as at it.
+    /// D-047 — one ACTIVITY per wall-clock moment in a session, replacing D-043's usage thresholds.
     ///
-    /// The seconds-before value is in the name because the extension gets nothing but a name back,
-    /// and it needs to know a reminder from the end without opening storage first.
-    private static let warningPrefix = "screentimenext.warning."
+    /// The name is all the extension gets back, so it has to carry which moment this is.
+    private static let sessionWarningPrefix = "screentimenext.session.warn."
 
-    public static func warningThreshold(secondsBefore: Int) -> String {
-        warningPrefix + String(secondsBefore)
+    /// The moment the session runs out.
+    public static let sessionEnd = "screentimenext.session.end"
+
+    /// Reminder `index`, earliest first — the same order as `warningOffsetsSeconds`.
+    public static func sessionWarning(index: Int) -> String {
+        sessionWarningPrefix + String(index)
     }
 
-    public static func isWarningThreshold(_ rawName: String) -> Bool {
-        rawName.hasPrefix(warningPrefix)
+    public static func isSessionWarning(_ rawName: String) -> Bool {
+        rawName.hasPrefix(sessionWarningPrefix)
+    }
+
+    /// Everything a session registers, for clearing it in one call. Generous on purpose: a name
+    /// left behind counts against the 20-activity limit forever (D-037).
+    public static var allSessionActivities: [String] {
+        [sessionEnd] + (0..<8).map { sessionWarning(index: $0) }
     }
 }

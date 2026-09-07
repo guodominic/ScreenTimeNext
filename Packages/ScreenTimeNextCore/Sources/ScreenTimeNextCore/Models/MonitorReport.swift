@@ -23,6 +23,14 @@ public struct MonitorReport: Codable, Equatable, Sendable {
         case thresholdReached
         case warningBeforeIntervalEnds
         case warningBeforeThreshold
+
+        // D-049 — what the child was actually SHOWN. The shield is drawn in a third process that
+        // nothing else can see into, so "the reminder fired" and "the child saw the reminder" were
+        // two different claims and we could only check the first. Now both are on the dashboard.
+        case shieldShownReminder
+        case shieldShownChooser
+        case shieldShownFinished
+        case shieldShownSpent
     }
 
     public let event: Event

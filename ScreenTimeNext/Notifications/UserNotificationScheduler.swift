@@ -100,6 +100,9 @@ extension Notification.Name {
 
     /// D-019 — the parent saved Settings. Anything showing parent-owned values re-reads them.
     static let configurationDidChange = Notification.Name("screentimenext.configurationDidChange")
+
+    /// D-047 — a session started, ended or was extended, so every wall-clock alarm moved.
+    static let sessionDidChange = Notification.Name("screentimenext.sessionDidChange")
 }
 
 /// D-018 — tapping a reminder must land on the timer, including on a cold launch.

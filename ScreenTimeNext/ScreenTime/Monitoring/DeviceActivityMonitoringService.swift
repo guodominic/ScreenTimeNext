@@ -58,9 +58,8 @@ final class DeviceActivityMonitoringService: ScreenTimeMonitoringService, @unche
     func startMonitoring(budgetSeconds: Int,
                          warningOffsetsSeconds: [Int],
                          selection: SelectionSnapshot) async throws {
-        let events = try makeEvents(budgetSeconds: budgetSeconds,
-                                    warningOffsetsSeconds: warningOffsetsSeconds,
-                                    selection: selection)
+        _ = warningOffsetsSeconds       // D-047 — reminders are schedules now, not thresholds
+        let events = try makeEvents(budgetSeconds: budgetSeconds, selection: selection)
         let schedule = DeviceActivitySchedule(intervalStart: Self.intervalStart,
                                               intervalEnd: Self.intervalEnd,
                                               repeats: true)
@@ -84,9 +83,7 @@ final class DeviceActivityMonitoringService: ScreenTimeMonitoringService, @unche
     func restartMonitoring(budgetSeconds: Int,
                            warningOffsetsSeconds: [Int],
                            selection: SelectionSnapshot) async throws {
-        let wanted = try makeEvents(budgetSeconds: budgetSeconds,
-                                    warningOffsetsSeconds: warningOffsetsSeconds,
-                                    selection: selection)
+        let wanted = try makeEvents(budgetSeconds: budgetSeconds, selection: selection)
         if center.activities.contains(.daily), Self.sameRegistration(center.events(for: .daily), wanted) {
             return
         }
@@ -98,27 +95,17 @@ final class DeviceActivityMonitoringService: ScreenTimeMonitoringService, @unche
 
     // MARK: Building the event
 
-    /// D-043 — the budget's own threshold, plus one per reminder.
+    /// D-047 — the DAILY budget's threshold, and nothing else.
     ///
-    /// A reminder that only sends a notification is a reminder a child can swipe away without ever
-    /// looking up. These extra thresholds are what let the system wake us INSIDE the app they are
-    /// using, a few minutes before the end, so the heads-up lands where the screen time is
-    /// happening. Well inside the 20-activity platform limit: this is still one activity (D-037).
+    /// D-043 also registered a threshold per reminder here. That was wrong twice over, and the
+    /// device test showed both: a threshold measures USAGE, not the clock, so it fires whenever the
+    /// child happens to have used that much — and `includesPastActivity` meant "that much today",
+    /// so a session started after a day's use tripped every reminder the instant it began. And an
+    /// event fires at most ONCE per interval, so even correctly timed, the first session of the day
+    /// would spend all of them. The session's moments are schedules now (`scheduleSessionAlarms`).
     private func makeEvents(budgetSeconds: Int,
-                            warningOffsetsSeconds: [Int],
                             selection: SelectionSnapshot) throws -> [DeviceActivityEvent.Name: DeviceActivityEvent] {
-        var events: [DeviceActivityEvent.Name: DeviceActivityEvent] = [
-            .budgetReached: try makeEvent(budgetSeconds: budgetSeconds, selection: selection)
-        ]
-        for offset in warningOffsetsSeconds {
-            // A reminder longer than the budget has no moment to fire in, and one at zero seconds
-            // before the end is the end. Both are dropped rather than registered as noise.
-            let atSeconds = budgetSeconds - offset
-            guard atSeconds >= 60, offset > 0 else { continue }
-            let name = DeviceActivityEvent.Name(MonitoringName.warningThreshold(secondsBefore: offset))
-            events[name] = try makeEvent(budgetSeconds: atSeconds, selection: selection)
-        }
-        return events
+        [.budgetReached: try makeEvent(budgetSeconds: budgetSeconds, selection: selection)]
     }
 
     private func makeEvent(budgetSeconds: Int, selection: SelectionSnapshot) throws -> DeviceActivityEvent {
@@ -155,6 +142,57 @@ final class DeviceActivityMonitoringService: ScreenTimeMonitoringService, @unche
                 && event.webDomains == other.webDomains
                 && event.threshold == other.threshold
         }
+    }
+
+    // MARK: D-047 — this session's moments, on the clock
+
+    /// A schedule interval must be at least 15 minutes (`MonitoringError.intervalTooShort`, D-037).
+    /// The interval's START is therefore pushed back that far — often into the past, which is fine:
+    /// the interval is simply already running when we register it, and what we care about is that
+    /// it ENDS at the right moment.
+    private static let minimumIntervalSeconds: TimeInterval = 16 * 60
+
+    func scheduleSessionAlarms(endsAt: Date, warningOffsetsSeconds: [Int]) async throws {
+        await clearSessionAlarms()
+
+        var moments: [(name: String, at: Date)] = [(MonitoringName.sessionEnd, endsAt)]
+        for (index, offset) in warningOffsetsSeconds.enumerated() where offset > 0 {
+            moments.append((MonitoringName.sessionWarning(index: index),
+                            endsAt.addingTimeInterval(-TimeInterval(offset))))
+        }
+
+        let now = Date()
+        for moment in moments {
+            // A moment already past has nothing to wake us for. Registering it would either fire
+            // immediately or sit until tomorrow — the bug this whole decision exists to undo.
+            guard moment.at > now else { continue }
+            let schedule = DeviceActivitySchedule(
+                intervalStart: Self.components(of: moment.at.addingTimeInterval(-Self.minimumIntervalSeconds)),
+                intervalEnd: Self.components(of: moment.at),
+                // One session, one firing. A repeating schedule would wake us at this time every
+                // day, long after the session it belonged to was over.
+                repeats: false
+            )
+            do {
+                // No events: this activity is a clock, not an accountant. That also means it needs
+                // no tokens, so a reminder works even while the selection is being changed.
+                try center.startMonitoring(DeviceActivityName(moment.name), during: schedule, events: [:])
+            } catch let error as DeviceActivityCenter.MonitoringError {
+                throw Self.mapped(error)
+            } catch {
+                throw ScreenTimeMonitoringError.unknown(String(describing: error))
+            }
+        }
+    }
+
+    func clearSessionAlarms() async {
+        center.stopMonitoring(MonitoringName.allSessionActivities.map { DeviceActivityName($0) })
+    }
+
+    /// Hour, minute AND second: a session ends at whatever second it started plus its budget, and
+    /// dropping the seconds would make "time's up" arrive up to a minute late.
+    private static func components(of date: Date) -> DateComponents {
+        Calendar.current.dateComponents([.hour, .minute, .second], from: date)
     }
 
     static func mapped(_ error: DeviceActivityCenter.MonitoringError) -> ScreenTimeMonitoringError {

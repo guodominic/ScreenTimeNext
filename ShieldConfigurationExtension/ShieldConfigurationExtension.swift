@@ -65,7 +65,20 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
         let moment = ShieldMomentResolver.moment(window: (try? storage.loadSessionWindow()) ?? nil,
                                                  configuration: (try? storage.loadConfiguration()) ?? .default,
                                                  availableActivities: Self.activities(storage: storage))
+        // D-049 — leave a note saying which of the three the child got. This process is invisible
+        // from everywhere else, so without it "the reminder fired" and "the child saw the chooser"
+        // are two claims and only the first can be checked.
+        MonitorJournal()?.record(Self.journalEvent(for: moment), activity: MonitoringName.sessionEnd)
         return render(ShieldPresentation.make(for: moment, childName: childName))
+    }
+
+    private static func journalEvent(for moment: ShieldMoment) -> MonitorReport.Event {
+        switch moment {
+        case .reminder:      return .shieldShownReminder
+        case .chooseNext:    return .shieldShownChooser
+        case .finished:      return .shieldShownFinished
+        case .spentForToday: return .shieldShownSpent
+        }
     }
 
     /// What the child may choose from: the parent's picks, in the parent's order (D-039). Both

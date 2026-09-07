@@ -27,34 +27,44 @@ class DeviceActivityMonitorExtension: DeviceActivityMonitor {
 
     override func intervalDidStart(for activity: DeviceActivityName) {
         super.intervalDidStart(for: activity)
+        // A session alarm's interval starting means nothing — it is the END we care about, and its
+        // start is 16 minutes earlier only because the platform requires a minimum length.
+        guard activity.rawValue == MonitoringName.dailyActivity else { return }
         // A new day's window opened. The threshold's accrual starts over with it, so yesterday's
         // shield has to come down — this is the callback that gives a child their morning back.
         journal?.record(.intervalDidStart, activity: activity.rawValue)
         Enforcement.reconcileFromAppGroup()
     }
 
+    /// D-047 — this is now the callback that matters most.
+    ///
+    /// A session's moments are schedules that END at them, so "3 minutes left" and "time's up"
+    /// both arrive here, on the clock, with the app not running. The daily 00:00–23:59 window ends
+    /// here too, which is why the name is checked rather than assumed.
     override func intervalDidEnd(for activity: DeviceActivityName) {
         super.intervalDidEnd(for: activity)
-        journal?.record(.intervalDidEnd, activity: activity.rawValue)
-    }
+        let name = activity.rawValue
 
-    /// Two kinds of threshold arrive here (D-043), told apart by name because a name is all the
-    /// system gives us and opening storage to answer "which one was that" would be work done in a
-    /// process that may be killed the moment it returns.
-    override func eventDidReachThreshold(_ event: DeviceActivityEvent.Name, activity: DeviceActivityName) {
-        super.eventDidReachThreshold(event, activity: activity)
+        if name == MonitoringName.sessionEnd {
+            journal?.record(.thresholdReached, activity: name)
+            Enforcement.reconcileFromAppGroup()
+            return
+        }
 
-        if MonitoringName.isWarningThreshold(event.rawValue) {
-            // A reminder. The child is very likely INSIDE a covered app right now — that is why the
-            // usage accrued — so this is the moment the heads-up is worth something. Raise the
-            // shield directly: the rule would remove it, because there is still time left.
-            journal?.record(.warningBeforeThreshold, activity: activity.rawValue)
+        if MonitoringName.isSessionWarning(name) {
+            // Still time left, so the rule would take this straight back down — raise it directly.
+            journal?.record(.warningBeforeThreshold, activity: name)
             Enforcement.raiseReminderShieldFromAppGroup()
             return
         }
 
-        // The one that ends it: today's budget is spent, and this is very likely the only process
-        // of ours that is running.
+        journal?.record(.intervalDidEnd, activity: name)
+    }
+
+    /// D-047 — only ONE threshold survives: the daily budget. Reminders moved to `intervalDidEnd`
+    /// above, because a threshold measures usage and a reminder is a time.
+    override func eventDidReachThreshold(_ event: DeviceActivityEvent.Name, activity: DeviceActivityName) {
+        super.eventDidReachThreshold(event, activity: activity)
         journal?.record(.thresholdReached, activity: activity.rawValue)
         Enforcement.reconcileFromAppGroup()
     }

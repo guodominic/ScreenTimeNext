@@ -18,6 +18,7 @@ final class MonitoringCoordinator {
     private let selection: any ScreenTimeSelectionService
     private let shield: any ScreenTimeShieldService
     private var observer: NSObjectProtocol?
+    private var sessionObserver: NSObjectProtocol?
 
     /// The last failure, kept so the dashboard can say enforcement is not armed rather than
     /// leaving a parent to assume it is.
@@ -35,6 +36,7 @@ final class MonitoringCoordinator {
 
     deinit {
         if let observer { NotificationCenter.default.removeObserver(observer) }
+        if let sessionObserver { NotificationCenter.default.removeObserver(sessionObserver) }
     }
 
     func start() {
@@ -43,7 +45,31 @@ final class MonitoringCoordinator {
                                                           queue: .main) { [weak self] _ in
             Task { @MainActor in await self?.synchronize() }
         }
+        // D-047 — a session starting, ending or being extended moves every alarm, so it needs its
+        // own signal: a parent's settings and a child's session change for different reasons.
+        sessionObserver = NotificationCenter.default.addObserver(forName: .sessionDidChange,
+                                                                 object: nil,
+                                                                 queue: .main) { [weak self] _ in
+            Task { @MainActor in await self?.synchronize() }
+        }
         Task { await synchronize() }
+    }
+
+    /// D-047 — set the wake-ups for the session that is running, or clear them if none is.
+    ///
+    /// Called from the same place as everything else, so there is one moment where the device is
+    /// made to match the records rather than several that can disagree.
+    private func synchronizeSessionAlarms() async {
+        let configuration = (try? storage.loadConfiguration()) ?? .default
+        guard let window = (try? storage.loadSessionWindow()) ?? nil,
+              window.remainingSeconds(at: Date()) > 0 else {
+            await monitoring.clearSessionAlarms()
+            return
+        }
+        // Only the reminders that fit this window: one longer than the session has no moment to
+        // fire in, and `effectiveWarningOffsets` is the one place that judgement lives.
+        let offsets = configuration.effectiveWarningOffsets(forWindowSeconds: window.totalSeconds)
+        try? await monitoring.scheduleSessionAlarms(endsAt: window.endsAt, warningOffsetsSeconds: offsets)
     }
 
     /// Make the registration AND the shield match what the parent has set. Safe to call as often
@@ -53,6 +79,7 @@ final class MonitoringCoordinator {
         // Task 012 — the shield first. If the app was closed through midnight, or a parent changed
         // the budget from under a spent day, this is the moment a child gets their device back.
         Enforcement.reconcile(storage: storage, selection: selection, shield: shield)
+        await synchronizeSessionAlarms()
 
         guard let snapshot = try? selection.loadSelection(), !snapshot.summary.isEmpty else {
             // Nothing picked — nothing to watch, and a registration over nothing would fire never

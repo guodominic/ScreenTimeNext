@@ -56,8 +56,33 @@ public final class MockScreenTimeMonitoringService: ScreenTimeMonitoringService,
                                   selection: selection)
     }
 
+    // MARK: D-047 — session alarms
+
+    public struct SessionAlarms: Equatable, Sendable {
+        public let endsAt: Date
+        public let warningOffsetsSeconds: [Int]
+    }
+
+    private var _alarms: SessionAlarms?
+    private var _alarmClearCount = 0
+
+    public func scheduleSessionAlarms(endsAt: Date, warningOffsetsSeconds: [Int]) async throws {
+        lock.withLock {
+            _alarms = SessionAlarms(endsAt: endsAt, warningOffsetsSeconds: warningOffsetsSeconds)
+        }
+    }
+
+    public func clearSessionAlarms() async {
+        lock.withLock {
+            _alarms = nil
+            _alarmClearCount += 1
+        }
+    }
+
     // MARK: Test controls
 
+    public var sessionAlarms: SessionAlarms? { lock.withLock { _alarms } }
+    public var alarmClearCount: Int { lock.withLock { _alarmClearCount } }
     public var registrations: [Registration] { lock.withLock { _registrations } }
     public var stopCount: Int { lock.withLock { _stopCount } }
     public func failNextStart(with error: ScreenTimeMonitoringError) { lock.withLock { _failNext = error } }

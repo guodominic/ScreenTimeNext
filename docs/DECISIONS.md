@@ -1518,6 +1518,111 @@ who would rather type.
   instruction for a screen that is not on screen.
 - A failed match still says so, on the keypad, where the next attempt happens.
 
+## D-047 — A session's moments are wall-clock schedules, not usage thresholds
+**Date:** 2026-09-07 · **Status:** accepted · **supersedes D-043**
+
+**Context.** The first real session with reminders on produced four symptoms, and they turned out
+to be one mistake:
+
+- opening YouTube seconds after starting a 15-minute session showed a shield reading "5 minutes
+  left", with the first reminder set to 3 minutes and no time elapsed;
+- the 3-minute notification fired with no shield;
+- the 1-minute notification fired with no shield;
+- when the time ran out YouTube still opened, and the finished shield only appeared after opening
+  ScreenTimeNext and going back.
+
+**What was wrong.** D-043 registered a `DeviceActivityEvent` threshold per reminder. A threshold
+measures **usage**, and this app's timer is a **clock**. Three consequences, all of them observed:
+
+1. `includesPastActivity: true` (correct for a daily budget, D-037) makes a threshold count usage
+   since **midnight**. A session started after any earlier use is already past its reminder
+   thresholds, so they fire the instant monitoring registers — the shield at second one. The "5
+   minutes left" came from the session window, which had barely started; the two numbers had
+   nothing to do with each other, which is exactly what Dominic saw.
+2. **An event fires at most once per interval**, and our interval is a day. The first session
+   spends every reminder; every later session that day gets none.
+3. A child who puts the iPad down accrues no usage while the clock keeps running, so even
+   correctly armed, a usage threshold cannot mean "three minutes before 8:15pm".
+
+**Decision.** Each moment in a session gets its own `DeviceActivitySchedule` that simply **ends at
+that moment**, with `repeats: false` and **no events at all** — the callback is the clock reaching a
+time, so it needs no tokens and cannot be confused by usage. `intervalDidEnd` is now the callback
+that matters: `screentimenext.session.end` reconciles (the shield goes up), `session.warn.N` raises
+the reminder shield.
+
+A schedule interval must be at least 15 minutes (D-037), so the interval's START is pushed 16
+minutes before its end — usually into the past. That is fine and is the point: an interval already
+running is a normal state, and all we care about is when it ENDS. It also means a 2-minute session
+gets a working end alarm, which a usage threshold never could.
+
+The daily budget keeps its threshold, because that one genuinely is a usage question.
+
+**Consequences.**
+- Alarms are re-set whenever the session changes — start, extend, end — through a new
+  `.sessionDidChange` notification. A parent's settings and a child's session change for different
+  reasons and now have different signals.
+- Stale alarms are cleared before new ones are set: a name left behind counts against the
+  20-activity limit forever, and would fire a shield over a child who has their device back.
+- Seconds are included in the schedule's `DateComponents`; dropping them would make "time's up"
+  arrive up to a minute late.
+- **The lesson:** the API's unit was not the product's unit. "Fires when they have used 12 minutes"
+  and "fires at 8:12pm" are different sentences, and I built three features on the assumption that
+  they were the same one.
+
+## D-048 — The shield preview shows what iOS actually draws
+**Date:** 2026-09-07 · **Status:** accepted · corrects D-012's preview
+
+**Context.** Dominic put the real shield beside the dashboard's preview and said they look nothing
+alike. They cannot look alike, and that was my error, not a bug: **iOS draws the shield.** A
+`ShieldConfiguration` gives us exactly five things — an icon, a title, a subtitle, a primary button
+with a background colour, and a secondary button with up to three submenu items — and nothing else.
+No mascot beside the text, no gradient, no layout, no typography, no animation.
+
+The preview had all of those. It was the most polished screen in the app and every polished part of
+it was unshippable.
+
+**Decision.** The preview mirrors the system's layout: one centred column on a blur — icon, title,
+subtitle, buttons — with no decoration of its own. Pip appears only where he genuinely can: **as
+the icon**, because `ShieldConfiguration.icon` is a `UIImage` and we supply it. The primary button's
+fill is flat, because `primaryButtonBackgroundColor` is a single `UIColor`; the finish's rainbow
+gradient lived in the preview and could never have reached a child.
+
+**Consequences.**
+- This screen's whole job is to be accurate — it exists so a parent can show their child what will
+  happen. A preview that flatters the design at the cost of being wrong is worse than none.
+- Rendering Pip into the icon for the REAL shield (via `ImageRenderer`) is now the obvious next
+  step, and the preview finally says truthfully what that would look like.
+
+## D-049 — Name the options on the shield, and record what the child was shown
+**Date:** 2026-09-07 · **Status:** accepted · fixes D-044's chooser
+
+**Context.** Dominic reported that the transition screen appeared with no way to choose what's next.
+
+**What the docs say, checked rather than assumed.** `secondaryButtonSubmenuItems` is a **menu**, not
+a list on the screen: *"The submenu appears when tapping the secondary button."* So the three
+activities were there — behind a button — and a child looking at the shield saw a time and two
+buttons with no sign that anything could be chosen. Options a child cannot see are options a child
+does not have.
+
+**Decision.** Name them in the subtitle: *"LEGO, Outside or Snack — which one? Tap 'What's next?'
+to pick, then keep playing."* The button is now the short label the sentence points at. The choice
+still lives in the system menu, because that is the only list a shield can show, but the child
+learns it exists from the screen itself.
+
+**The second half, and the more important one.** The shield is drawn in a **third process** —
+neither the app nor the monitor extension — and nothing could see into it. "The reminder fired" and
+"the child saw the chooser" were two different claims and only the first was checkable, which is
+why this took a round trip to diagnose at all.
+
+The shield configuration extension now records which of the three it rendered, into the same
+journal (§16-safe: a moment name and a time, never a token or an app). The dashboard reads it back
+as "Your child saw: pick what's next". A process we cannot observe is a process we can only guess
+about, and this session has already shown what guessing costs.
+
+**Consequences.** If the subtitle turns out not to have been the problem, the journal now says so
+directly instead of costing another round of speculation — which is the reason to build it either
+way.
+
 <!-- Template for new entries:
 
 ## D-NNN — <short imperative title>

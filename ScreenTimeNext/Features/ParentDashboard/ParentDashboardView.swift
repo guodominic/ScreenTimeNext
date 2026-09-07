@@ -294,9 +294,14 @@ struct ParentDashboardView: View {
         switch event {
         case .intervalDidStart:           return "A new day started"
         case .intervalDidEnd:             return "The day ended"
-        case .thresholdReached:           return "Today's budget ran out"
+        case .thresholdReached:           return "Time ran out"
         case .warningBeforeIntervalEnds:  return "The day is nearly over"
-        case .warningBeforeThreshold:     return "The budget is nearly spent"
+        case .warningBeforeThreshold:     return "A reminder was raised"
+        // D-049 — what the child actually saw, as opposed to what fired.
+        case .shieldShownReminder:        return "Your child saw: a reminder"
+        case .shieldShownChooser:         return "Your child saw: pick what's next"
+        case .shieldShownFinished:        return "Your child saw: time's up"
+        case .shieldShownSpent:           return "Your child saw: all done for today"
         }
     }
 
@@ -307,6 +312,10 @@ struct ParentDashboardView: View {
         case .intervalDidStart:           return "sunrise.fill"
         case .intervalDidEnd:             return "moon.fill"
         case .warningBeforeIntervalEnds:  return "clock.badge.exclamationmark"
+        case .shieldShownReminder:        return "hand.raised.fill"
+        case .shieldShownChooser:         return "hand.tap.fill"
+        case .shieldShownFinished:        return "hands.clap.fill"
+        case .shieldShownSpent:           return "moon.stars.fill"
         }
     }
 

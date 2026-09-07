@@ -111,6 +111,17 @@ public struct ShieldPresentation: Hashable, Sendable {
         self.urgency = urgency
     }
 
+    /// "LEGO, Outside or Snack" — the child's own options, in the parent's order.
+    static func list(_ options: [TransitionActivity]) -> String {
+        let names = options.map(\.displayName)
+        switch names.count {
+        case 0:  return ""
+        case 1:  return names[0]
+        case 2:  return "\(names[0]) or \(names[1])"
+        default: return names.dropLast().joined(separator: ", ") + " or " + (names.last ?? "")
+        }
+    }
+
     /// The one place shield copy is written. Child-facing: warm, concrete, names what comes next,
     /// never punitive, never technical (§7).
     ///
@@ -145,9 +156,13 @@ public struct ShieldPresentation: Hashable, Sendable {
             let left = minutes == 1 ? "1 minute left" : "\(minutes) minutes left"
             return ShieldPresentation(
                 title: "\(left)\(addressed)",
+                // D-049 — the options are NAMED here, because the system hides them behind the
+                // secondary button until it is tapped: `secondaryButtonSubmenuItems` is a menu, not
+                // a list on the screen. A child saw a time and two buttons and no sign there was
+                // anything to choose, which is the same as there being nothing.
                 subtitle: options.isEmpty
                     ? "Time to start finishing up what you're doing."
-                    : "What would you like to do after? Pick one and keep going.",
+                    : "\(Self.list(options)) — which one? Tap “What's next?” to pick, then keep playing.",
                 symbolName: "hand.tap.fill",
                 // §17 — the primary button never buys more time. Choosing is the way onward, which
                 // is the point: the child decides what comes next while the screen time is still
@@ -156,7 +171,7 @@ public struct ShieldPresentation: Hashable, Sendable {
                 primaryButtonContinues: false,
                 activity: nil,
                 urgency: urgency ?? .fromMinutesLeft(minutes),
-                secondaryButtonLabel: options.isEmpty ? nil : "Pick what's next",
+                secondaryButtonLabel: options.isEmpty ? nil : "What's next?",
                 submenuItems: options.map(\.displayName)
             )
 
