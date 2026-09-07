@@ -108,6 +108,7 @@
 		1825284A304E254000E14321 /* Exceptions for "ScreenTimeNext" folder in "DeviceActivityMonitorExtension" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				ScreenTime/Monitoring/SessionAlarmScheduler.swift,
 				ScreenTime/Selection/AppGroupSelectionService.swift,
 				ScreenTime/Selection/FamilyActivitySelectionCoding.swift,
 				ScreenTime/Shielding/Enforcement.swift,

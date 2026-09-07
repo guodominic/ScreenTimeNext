@@ -74,4 +74,52 @@ public final class MonitorJournal: @unchecked Sendable {
     public func clear() {
         defaults.removeObject(forKey: key)
     }
+
+    // MARK: D-050 — the clock stops while a transition screen is up
+
+    private var pausedAtKey: String { "screentimenext.shieldRaisedAt" }
+
+    /// Longest pause we will give back. A child who walks away with the shield up has not been
+    /// robbed of screen time, and crediting an unbounded pause would leave a session that was
+    /// interrupted at 8pm still running at midnight — not what anyone meant by "fifteen minutes".
+    public static let maximumPauseSeconds = 10 * 60
+
+    /// Called when a shield goes up. Idempotent: a shield raised twice was still only raised once,
+    /// and overwriting would restart the clock the child is owed.
+    public func markShieldRaised(at date: Date = Date()) {
+        guard defaults.object(forKey: pausedAtKey) == nil else { return }
+        defaults.set(date.timeIntervalSince1970, forKey: pausedAtKey)
+    }
+
+    /// Called when the child dismisses it. Returns the seconds to give back, capped, and forgets
+    /// the mark so the next shield starts its own.
+    public func claimPausedSeconds(at date: Date = Date()) -> Int {
+        guard let raisedAt = defaults.object(forKey: pausedAtKey) as? Double else { return 0 }
+        defaults.removeObject(forKey: pausedAtKey)
+        let elapsed = Int(date.timeIntervalSince1970 - raisedAt)
+        guard elapsed > 0 else { return 0 }
+        return min(elapsed, Self.maximumPauseSeconds)
+    }
+
+    /// A session ended, so any unclaimed mark belongs to nothing.
+    public func forgetShieldRaised() {
+        defaults.removeObject(forKey: pausedAtKey)
+    }
+
+    /// D-050 — give back the time a transition screen was up, and say how much.
+    ///
+    /// Deliberately framework-free and deliberately NOT responsible for the session's alarms: this
+    /// runs in the shield action extension, which has no `DeviceActivity` of its own. The alarms
+    /// are left pointing at the old, earlier end — and that is safe, because the end alarm firing
+    /// early finds time remaining and re-arms itself from the new end (D-050). A wrong-but-early
+    /// alarm is self-correcting; a missing one is not.
+    @discardableResult
+    public func creditPause(to storage: any ScreenTimeStorageService, at now: Date = Date()) -> Int {
+        let seconds = claimPausedSeconds(at: now)
+        guard seconds > 0,
+              let window = try? storage.loadSessionWindow(),
+              window.remainingSeconds(at: now) > 0 else { return 0 }
+        try? storage.save(window.paused(bySeconds: seconds))
+        return seconds
+    }
 }

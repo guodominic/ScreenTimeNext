@@ -48,6 +48,8 @@ struct ScreenTimeNextApp: App {
             RootView()
                 .services(container)
                 .task {
+                    // D-051 — Pip's faces, so the shield extension has something to draw.
+                    ShieldIconRenderer.renderIfNeeded()
                     guard monitoring == nil else { return }
                     let coordinator = MonitoringCoordinator(monitoring: container.monitoring,
                                                             storage: container.storage,

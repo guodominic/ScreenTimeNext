@@ -72,6 +72,17 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
         return render(ShieldPresentation.make(for: moment, childName: childName))
     }
 
+    /// D-051 — Pip, in this moment's colour, rendered by the app into the App Group.
+    ///
+    /// The SF Symbol stays as the fallback rather than being replaced: an icon that fails to load
+    /// must not leave a child looking at a shield with a hole in it.
+    private static func icon(for p: ShieldPresentation) -> UIImage? {
+        if let data = ShieldIconStore.imageData(for: p.urgency), let pip = UIImage(data: data) {
+            return pip
+        }
+        return UIImage(systemName: p.symbolName)
+    }
+
     private static func journalEvent(for moment: ShieldMoment) -> MonitorReport.Event {
         switch moment {
         case .reminder:      return .shieldShownReminder
@@ -107,7 +118,7 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
             return ShieldConfiguration(
                 backgroundBlurStyle: .systemUltraThinMaterial,
                 backgroundColor: nil,
-                icon: UIImage(systemName: p.symbolName),
+                icon: Self.icon(for: p),
                 title: ShieldConfiguration.Label(text: p.title, color: .label),
                 subtitle: ShieldConfiguration.Label(text: p.subtitle, color: .secondaryLabel),
                 primaryButtonLabel: ShieldConfiguration.Label(text: p.primaryButtonLabel, color: .white),
@@ -122,7 +133,7 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
             // is what makes this read as a pause rather than as the device breaking.
             backgroundBlurStyle: .systemUltraThinMaterial,
             backgroundColor: nil,
-            icon: UIImage(systemName: p.symbolName),
+            icon: Self.icon(for: p),
             title: ShieldConfiguration.Label(text: p.title, color: .label),
             subtitle: ShieldConfiguration.Label(text: p.subtitle, color: .secondaryLabel),
             primaryButtonLabel: ShieldConfiguration.Label(text: p.primaryButtonLabel, color: .white),

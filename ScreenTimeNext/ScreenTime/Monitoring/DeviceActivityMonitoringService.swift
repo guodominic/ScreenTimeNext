@@ -144,55 +144,14 @@ final class DeviceActivityMonitoringService: ScreenTimeMonitoringService, @unche
         }
     }
 
-    // MARK: D-047 — this session's moments, on the clock
-
-    /// A schedule interval must be at least 15 minutes (`MonitoringError.intervalTooShort`, D-037).
-    /// The interval's START is therefore pushed back that far — often into the past, which is fine:
-    /// the interval is simply already running when we register it, and what we care about is that
-    /// it ENDS at the right moment.
-    private static let minimumIntervalSeconds: TimeInterval = 16 * 60
+    // MARK: D-047 — this session's moments, on the clock (see `SessionAlarmScheduler`)
 
     func scheduleSessionAlarms(endsAt: Date, warningOffsetsSeconds: [Int]) async throws {
-        await clearSessionAlarms()
-
-        var moments: [(name: String, at: Date)] = [(MonitoringName.sessionEnd, endsAt)]
-        for (index, offset) in warningOffsetsSeconds.enumerated() where offset > 0 {
-            moments.append((MonitoringName.sessionWarning(index: index),
-                            endsAt.addingTimeInterval(-TimeInterval(offset))))
-        }
-
-        let now = Date()
-        for moment in moments {
-            // A moment already past has nothing to wake us for. Registering it would either fire
-            // immediately or sit until tomorrow — the bug this whole decision exists to undo.
-            guard moment.at > now else { continue }
-            let schedule = DeviceActivitySchedule(
-                intervalStart: Self.components(of: moment.at.addingTimeInterval(-Self.minimumIntervalSeconds)),
-                intervalEnd: Self.components(of: moment.at),
-                // One session, one firing. A repeating schedule would wake us at this time every
-                // day, long after the session it belonged to was over.
-                repeats: false
-            )
-            do {
-                // No events: this activity is a clock, not an accountant. That also means it needs
-                // no tokens, so a reminder works even while the selection is being changed.
-                try center.startMonitoring(DeviceActivityName(moment.name), during: schedule, events: [:])
-            } catch let error as DeviceActivityCenter.MonitoringError {
-                throw Self.mapped(error)
-            } catch {
-                throw ScreenTimeMonitoringError.unknown(String(describing: error))
-            }
-        }
+        try SessionAlarmScheduler.schedule(endsAt: endsAt, warningOffsetsSeconds: warningOffsetsSeconds)
     }
 
     func clearSessionAlarms() async {
-        center.stopMonitoring(MonitoringName.allSessionActivities.map { DeviceActivityName($0) })
-    }
-
-    /// Hour, minute AND second: a session ends at whatever second it started plus its budget, and
-    /// dropping the seconds would make "time's up" arrive up to a minute late.
-    private static func components(of date: Date) -> DateComponents {
-        Calendar.current.dateComponents([.hour, .minute, .second], from: date)
+        SessionAlarmScheduler.clear(center: center)
     }
 
     static func mapped(_ error: DeviceActivityCenter.MonitoringError) -> ScreenTimeMonitoringError {

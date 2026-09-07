@@ -17,6 +17,7 @@
 //  shield up" has exactly one answer in this codebase rather than one per process.
 
 import DeviceActivity
+import Foundation
 import ScreenTimeNextCore
 
 class DeviceActivityMonitorExtension: DeviceActivityMonitor {
@@ -46,6 +47,16 @@ class DeviceActivityMonitorExtension: DeviceActivityMonitor {
         let name = activity.rawValue
 
         if name == MonitoringName.sessionEnd {
+            // D-050 — a transition screen may have paused the clock after this alarm was set, in a
+            // process with no way to move it. So the end arriving is a question, not an answer:
+            // if there is time left, this alarm is early and re-arms itself from the new end.
+            let storage = try? FileStorageService.shared()
+            if let window = (try? storage?.loadSessionWindow()) ?? nil,
+               window.remainingSeconds(at: Date()) > 0 {
+                journal?.record(.intervalDidEnd, activity: name)
+                Enforcement.rearmSessionAlarmsFromAppGroup()
+                return
+            }
             journal?.record(.thresholdReached, activity: name)
             Enforcement.reconcileFromAppGroup()
             return

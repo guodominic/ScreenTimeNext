@@ -27,11 +27,20 @@ public struct SessionWindow: Codable, Equatable, Sendable {
     /// makes `grantedSeconds` zero — the honest answer when we cannot know.
     public private(set) var budgetSecondsAtStart: Int
 
+    /// D-050 — seconds the clock was stopped while a transition screen was up.
+    ///
+    /// Kept apart from `budgetSecondsAtStart` and from a parent's extension so all three stay
+    /// answerable separately: what the budget paid for, what a parent granted, and what the child
+    /// was not charged for because they could not use the device.
+    public private(set) var pausedSeconds: Int
+
     public init(startedAt: Date, endsAt: Date, chosenActivity: TransitionActivity? = nil,
-                budgetSecondsAtStart: Int? = nil) {
+                budgetSecondsAtStart: Int? = nil,
+                pausedSeconds: Int = 0) {
         self.startedAt = startedAt
         self.endsAt = endsAt
         self.chosenActivity = chosenActivity
+        self.pausedSeconds = max(0, pausedSeconds)
         self.budgetSecondsAtStart = budgetSecondsAtStart
             ?? max(0, Int(endsAt.timeIntervalSince(startedAt).rounded(.down)))
     }
@@ -41,12 +50,13 @@ public struct SessionWindow: Codable, Equatable, Sendable {
         self.endsAt = startedAt.addingTimeInterval(TimeInterval(budgetSeconds))
         self.chosenActivity = chosenActivity
         self.budgetSecondsAtStart = max(0, budgetSeconds)
+        self.pausedSeconds = 0
     }
 
     // MARK: Codable — tolerant of windows written before `budgetSecondsAtStart` existed
 
     private enum CodingKeys: String, CodingKey {
-        case startedAt, endsAt, chosenActivity, budgetSecondsAtStart
+        case startedAt, endsAt, chosenActivity, budgetSecondsAtStart, pausedSeconds
     }
 
     public init(from decoder: Decoder) throws {
@@ -58,6 +68,8 @@ public struct SessionWindow: Codable, Equatable, Sendable {
         self.chosenActivity = try c.decodeIfPresent(TransitionActivity.self, forKey: .chosenActivity)
         self.budgetSecondsAtStart = try c.decodeIfPresent(Int.self, forKey: .budgetSecondsAtStart)
             ?? max(0, Int(ends.timeIntervalSince(started).rounded(.down)))
+        // D-050 — a window written before pausing existed was never paused.
+        self.pausedSeconds = try c.decodeIfPresent(Int.self, forKey: .pausedSeconds) ?? 0
     }
 
     /// Total length of the window in seconds.
@@ -77,8 +89,23 @@ public struct SessionWindow: Codable, Equatable, Sendable {
         remainingSeconds(at: now) == 0
     }
 
-    /// Seconds a parent has granted beyond what the budget paid for (§15).
-    public var grantedSeconds: Int { max(0, totalSeconds - budgetSecondsAtStart) }
+    /// Seconds a parent has granted beyond what the budget paid for (§15). Paused time is not a
+    /// grant — the child was never able to spend it — so it comes back out.
+    public var grantedSeconds: Int { max(0, totalSeconds - budgetSecondsAtStart - pausedSeconds) }
+
+    /// D-050 — the clock stopped while the child could not use the device, so give the time back.
+    ///
+    /// `seconds` is capped by the caller: crediting an unbounded pause would let a session that was
+    /// interrupted at 8pm still be running at midnight, which is not what any parent meant by
+    /// "fifteen minutes".
+    public func paused(bySeconds seconds: Int) -> SessionWindow {
+        guard seconds > 0 else { return self }
+        return SessionWindow(startedAt: startedAt,
+                             endsAt: endsAt.addingTimeInterval(TimeInterval(seconds)),
+                             chosenActivity: chosenActivity,
+                             budgetSecondsAtStart: budgetSecondsAtStart,
+                             pausedSeconds: pausedSeconds + seconds)
+    }
 
     /// Grant a parent extension (PRD §6.16, §15). Returns a new window; does not mutate in place.
     /// `budgetSecondsAtStart` is carried over untouched — that is what makes the extra time
@@ -87,6 +114,7 @@ public struct SessionWindow: Codable, Equatable, Sendable {
         SessionWindow(startedAt: startedAt,
                       endsAt: endsAt.addingTimeInterval(TimeInterval(seconds)),
                       chosenActivity: chosenActivity,
-                      budgetSecondsAtStart: budgetSecondsAtStart)
+                      budgetSecondsAtStart: budgetSecondsAtStart,
+                      pausedSeconds: pausedSeconds)
     }
 }

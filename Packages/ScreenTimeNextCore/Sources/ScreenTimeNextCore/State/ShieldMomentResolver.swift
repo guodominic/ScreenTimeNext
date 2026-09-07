@@ -76,13 +76,23 @@ public enum ShieldMomentResolver {
             return .reminder(minutesLeft: minutesLeft, activity: window.chosenActivity)
         }
 
-        // Ask only once. A child who has already chosen gets the plain reminder: re-asking would
-        // read as "that wasn't good enough", and it costs them a tap for nothing.
-        if WarningStateEngine.isChooser(warningAt: index, count: offsets.count),
-           window.chosenActivity == nil,
+        // D-050 — ask from the FIRST reminder, and keep asking until they answer.
+        //
+        // D-044 asked only on the last one, so a child who wanted to decide early could not, and a
+        // child who missed that single screen was never asked at all. Asking early is also the
+        // gentler version: the choice arrives while there is still time to enjoy making it.
+        //
+        // A child who has already chosen gets the plain reminder — re-asking reads as "that wasn't
+        // good enough" and costs a tap for nothing.
+        if window.chosenActivity == nil,
            supportsChooserMenu,
            !chooserOptions(availableActivities).isEmpty {
-            return .chooseNext(minutesLeft: minutesLeft, options: chooserOptions(availableActivities))
+            return .chooseNext(minutesLeft: minutesLeft,
+                               options: chooserOptions(availableActivities),
+                               // The last ask is the one that insists: after it, the next screen
+                               // the child sees is the end.
+                               mustChoose: WarningStateEngine.isChooser(warningAt: index,
+                                                                       count: offsets.count))
         }
         return .reminder(minutesLeft: minutesLeft, activity: window.chosenActivity)
     }

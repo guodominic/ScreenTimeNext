@@ -1623,6 +1623,60 @@ about, and this session has already shown what guessing costs.
 directly instead of costing another round of speculation — which is the reason to build it either
 way.
 
+## D-050 — The clock stops while a transition screen is up, and the last ask insists
+**Date:** 2026-09-07 · **Status:** accepted · extends D-044/D-049
+
+**Three changes Dominic asked for, and the reasoning that shaped each.**
+
+**1. The shield pauses the timer.** A child who cannot use the device is not spending screen time,
+so charging them for our own interruption is simply wrong. `SessionWindow` gains `pausedSeconds`,
+kept apart from `budgetSecondsAtStart` and from a parent's extension so all three stay answerable
+separately: what the budget paid for, what a parent granted, and what the child was never charged
+for.
+
+**Capped at ten minutes.** An uncapped pause would let a session interrupted at 8pm still be
+running at midnight, which is not what any parent meant by "fifteen minutes". A child who walks away
+with the shield up has not been robbed of anything.
+
+**Where it happens is the interesting part.** The shield action extension has no `DeviceActivity`,
+so it can move the window but not the alarms. Rather than link four more files into it, the end
+alarm now *asks a question instead of assuming an answer*: when it fires and finds time remaining,
+it re-arms itself from the new end. An alarm that is early is self-correcting; a missing one ends a
+session in silence.
+
+**2. The chooser appears from the FIRST reminder.** D-044 asked only on the last one, so a child who
+wanted to decide early could not, and one who missed that single screen was never asked. Asking
+early is also the gentler version: the choice arrives while there is still time to enjoy making it.
+A child who has already chosen gets a plain reminder — re-asking reads as "that wasn't good enough".
+
+**3. The last ask has no "Not yet".** Its primary button says *"Pick one first 👆"* and does
+nothing, so the submenu is the only way back into the app. There is still a real way out — the Home
+Screen — and that is not ours to block. What we refuse is a way to carry on *without deciding*.
+
+## D-051 — Pip on the real shield, rendered by the app
+**Date:** 2026-09-07 · **Status:** accepted · completes D-048
+
+**Context.** D-048 established that iOS draws the shield and gives us five slots. One of them is
+`icon`, and it is a `UIImage` — which means the picture is genuinely ours, even though nothing
+around it is.
+
+**The obstacle.** The shield is drawn in an extension with none of our SwiftUI views and a few
+milliseconds to answer. `ImageRenderer` needs a real view, and rendering one there would be both
+impossible and too slow.
+
+**Decision.** The APP renders Pip — once per `ShieldUrgency`, in that moment's colour and with that
+moment's expression — into the App Group as PNGs. The shield extension loads a file. Nothing is
+rendered twice, nothing is rendered in a process that cannot afford it, and the mascot a parent sees
+in the preview is byte-for-byte the one their child meets.
+
+Re-rendered only when a hand-bumped `version` changes or a file is missing: producing five identical
+images on every launch is work for nothing. The SF Symbol stays as the fallback rather than being
+deleted — an icon that fails to load must not leave a child looking at a shield with a hole in it.
+
+**Consequences.** The colour and face already differ per moment (D-018), so this is what makes that
+design finally reach the child: green and playing at the first reminder, red and excited at the
+last, cheering at the finish.
+
 <!-- Template for new entries:
 
 ## D-NNN — <short imperative title>

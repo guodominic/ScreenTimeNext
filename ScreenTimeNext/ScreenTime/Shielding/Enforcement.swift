@@ -78,6 +78,25 @@ enum Enforcement {
               let picked = (try? selectionService.loadSelection()) ?? nil,
               !picked.summary.isEmpty else { return }
         try? ManagedSettingsShieldService(storage: storage).applyShield(for: picked)
+        // D-050 — the clock stops here. The child cannot use the device while this is up, so
+        // charging them for the time would be charging them for our own interruption.
+        MonitorJournal()?.markShieldRaised()
+    }
+
+    /// D-050 — re-arm this session's alarms from whatever the window says now.
+    ///
+    /// Called when the end alarm fires and finds time left, which means a transition screen paused
+    /// the clock after the alarms were set. Only processes with `DeviceActivity` can do this, which
+    /// is why the credit itself lives in the package and this does not.
+    static func rearmSessionAlarmsFromAppGroup(now: Date = Date()) {
+        guard let storage = try? FileStorageService.shared(),
+              let window = (try? storage.loadSessionWindow()) ?? nil,
+              window.remainingSeconds(at: now) > 0 else { return }
+        let configuration = (try? storage.loadConfiguration()) ?? .default
+        try? SessionAlarmScheduler.schedule(
+            endsAt: window.endsAt,
+            warningOffsetsSeconds: configuration.effectiveWarningOffsets(forWindowSeconds: window.totalSeconds),
+            now: now)
     }
 
     /// The same rule, wired to the App Group for a caller that has no service container — i.e. an

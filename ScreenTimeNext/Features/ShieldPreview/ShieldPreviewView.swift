@@ -20,13 +20,18 @@ struct ShieldPreviewView: View {
     @State private var immersive = false
     /// Which reminder in the sequence — this is what drives the colour, not the clock (D-018).
     @State private var urgency: ShieldUrgency = .calm
+    /// D-050 — the last ask insists. Previewable, because a parent should see the screen that has
+    /// no way past it before their child meets it.
+    @State private var mustChoose = false
 
     private var moment: ShieldMoment {
         switch momentIndex {
         case 0: return .reminder(minutesLeft: minutes, activity: activity)
         // D-044 — the second of the three shields a child meets. Previewable, because a parent
         // should be able to see the one that ASKS before their child does.
-        case 1: return .chooseNext(minutesLeft: minutes, options: ShieldMomentResolver.chooserOptions(activities))
+        case 1: return .chooseNext(minutesLeft: minutes,
+                                   options: ShieldMomentResolver.chooserOptions(activities),
+                                   mustChoose: mustChoose)
         case 2: return .finished(activity: activity)
         default: return .spentForToday
         }
@@ -95,6 +100,13 @@ struct ShieldPreviewView: View {
                     }
                     .pickerStyle(.segmented)
                     Stepper("Minutes left: \(minutes)", value: $minutes, in: 1...15)
+                }
+
+                // D-050 — the last ask has no way past it. A parent should meet that screen
+                // before their child does.
+                if momentIndex == 1 {
+                    Toggle("Last ask — must choose to carry on", isOn: $mustChoose)
+                        .font(.footnote)
                 }
 
                 // The chooser builds its own list from the parent's activities, and "Later today"

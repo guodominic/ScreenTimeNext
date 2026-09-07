@@ -71,6 +71,7 @@ class ShieldActionExtension: ShieldActionDelegate {
             // choose still has their minutes, and taking them away for declining a menu would be a
             // punishment for a UI decision. So they continue, and are asked again next time.
             guard shouldContinue() else { return .close }
+            resumeClock()          // D-050 — pay back the time the shield was up, first
             liftShield()
             return .defer          // dismiss the shield and return the child to what they were doing
 
@@ -110,6 +111,7 @@ class ShieldActionExtension: ShieldActionDelegate {
             // written to the window, which is what the app and the Live Activity read from.
             _ = try? SessionController(storage: storage).choose(activity)
         }
+        resumeClock()              // D-050 — deciding took time; it was not their screen time
         guard shouldContinue() else { return .close }
         liftShield()
         return .defer
@@ -128,6 +130,16 @@ class ShieldActionExtension: ShieldActionDelegate {
     ///
     /// The typed-website filter (D-033) is deliberately NOT lifted: those are sites a parent blocked
     /// outright, not part of the budget, and a reminder is not permission to visit them.
+    /// D-050 — hand back the seconds the shield was up before letting the child carry on.
+    ///
+    /// This process has no `DeviceActivity`, so it moves the window and leaves the alarms where
+    /// they are. The end alarm then fires early, finds time left, and re-arms itself from the new
+    /// end. An early alarm is self-correcting; a missing one would end the session in silence.
+    private func resumeClock() {
+        guard let storage = try? FileStorageService.shared() else { return }
+        MonitorJournal()?.creditPause(to: storage)
+    }
+
     private func liftShield() {
         let store = ManagedSettingsStore(named: ManagedSettingsStore.Name("screentimenext"))
         store.shield.applications = nil

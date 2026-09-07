@@ -16,9 +16,12 @@ import Foundation
 public enum ShieldMoment: Hashable, Sendable {
     /// A reminder mid-session. The button lifts our shield so the remaining minutes continue.
     case reminder(minutesLeft: Int, activity: TransitionActivity?)
-    /// D-044 — the reminder that asks. Same shield, plus a menu of what to do after; picking one
-    /// IS the "OK", and it lifts the shield for the minutes that remain.
-    case chooseNext(minutesLeft: Int, options: [TransitionActivity])
+    /// D-044 / D-050 — the reminder that asks. Same shield, plus a menu of what to do after;
+    /// picking one IS the "OK", and it lifts the shield for the minutes that remain.
+    ///
+    /// `mustChoose` is the LAST reminder with nothing chosen yet: there is no "not yet" left,
+    /// because after this one there is no more asking — the next screen is the end.
+    case chooseNext(minutesLeft: Int, options: [TransitionActivity], mustChoose: Bool)
     /// The session just ended. The button sends the child to the Home Screen; it never lifts.
     case finished(activity: TransitionActivity?)
     /// A protected app opened later in the day with the budget already spent.
@@ -152,7 +155,7 @@ public struct ShieldPresentation: Hashable, Sendable {
                 urgency: urgency ?? .fromMinutesLeft(minutes)
             )
 
-        case let .chooseNext(minutes, options):
+        case let .chooseNext(minutes, options, mustChoose):
             let left = minutes == 1 ? "1 minute left" : "\(minutes) minutes left"
             return ShieldPresentation(
                 title: "\(left)\(addressed)",
@@ -162,12 +165,19 @@ public struct ShieldPresentation: Hashable, Sendable {
                 // anything to choose, which is the same as there being nothing.
                 subtitle: options.isEmpty
                     ? "Time to start finishing up what you're doing."
-                    : "\(Self.list(options)) — which one? Tap “What's next?” to pick, then keep playing.",
+                    : mustChoose
+                        ? "\(Self.list(options)) — pick one to keep playing. Tap “What's next?”."
+                        : "\(Self.list(options)) — which one? Tap “What's next?” to pick, then keep playing.",
                 symbolName: "hand.tap.fill",
                 // §17 — the primary button never buys more time. Choosing is the way onward, which
                 // is the point: the child decides what comes next while the screen time is still
                 // theirs, not once it has already been taken away.
-                primaryButtonLabel: "Not yet",
+                //
+                // D-050 — on the LAST ask there is no "not yet": the button says what to do and
+                // does nothing else, so the menu is the only way back into the app. The child can
+                // always leave for the Home Screen, which is a real choice and not our business to
+                // prevent — what we refuse is a way to carry on WITHOUT deciding.
+                primaryButtonLabel: mustChoose ? "Pick one first 👆" : "Not yet",
                 primaryButtonContinues: false,
                 activity: nil,
                 urgency: urgency ?? .fromMinutesLeft(minutes),
