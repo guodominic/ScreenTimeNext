@@ -74,7 +74,7 @@ final class PersistedPicksTests: XCTestCase {
         try storage.save(ParentPickerPreferences(
             savedSelections: [SavedSelection(name: "Weekend", snapshot: snapshot(categories: 1))],
             blockedWebsites: ["youtube.com"],
-            activityOrder: ["outside", "lego"]))
+            activityOrder: ["outside", "cleanUp"]))
 
         try storage.eraseAll()
 
@@ -84,7 +84,7 @@ final class PersistedPicksTests: XCTestCase {
         let kept = try storage.loadPickerPreferences()
         XCTAssertEqual(kept.blockedWebsites, ["youtube.com"], "but the sites they typed stay")
         XCTAssertEqual(kept.savedSelections.map(\.name), ["Weekend"], "and the sets they named")
-        XCTAssertEqual(kept.activityOrder, ["outside", "lego"], "and the order they dragged")
+        XCTAssertEqual(kept.activityOrder, ["outside", "cleanUp"], "and the order they dragged")
     }
 
     // MARK: The Live Activity does not outlive its session

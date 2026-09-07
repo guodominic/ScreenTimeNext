@@ -89,10 +89,13 @@ public enum ShieldMomentResolver {
            !chooserOptions(availableActivities).isEmpty {
             return .chooseNext(minutesLeft: minutesLeft,
                                options: chooserOptions(availableActivities),
-                               // The last ask is the one that insists: after it, the next screen
-                               // the child sees is the end.
-                               mustChoose: WarningStateEngine.isChooser(warningAt: index,
-                                                                       count: offsets.count))
+                               // D-053 — the FIRST ask is an invitation; every one after it
+                               // insists. A child who let the first screen go by has already had
+                               // the gentle version, and the point of asking early was never to
+                               // make the question optional.
+                               mustChoose: index > 0
+                                   || WarningStateEngine.isChooser(warningAt: index,
+                                                                   count: offsets.count))
         }
         return .reminder(minutesLeft: minutesLeft, activity: window.chosenActivity)
     }

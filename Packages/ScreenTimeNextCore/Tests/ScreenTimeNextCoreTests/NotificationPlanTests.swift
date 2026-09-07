@@ -38,13 +38,13 @@ final class NotificationPlanTests: XCTestCase {
     }
 
     func testChosenActivityAppearsInLaterCopy() {
-        let window = SessionWindow(startedAt: start, budgetSeconds: 1200, chosenActivity: .lego)
+        let window = SessionWindow(startedAt: start, budgetSeconds: 1200, chosenActivity: .cleanUp)
         let plan = NotificationPlan.make(for: window, configuration: .default, childName: "Ivy", now: start)
         // Two reminders and the finish: indices 0, 1, 2. `plan[3]` used to be the finish and is
         // now off the end — the second thing that crashed the run when the third dial went away.
         XCTAssertEqual(plan.count, 3)
-        XCTAssertTrue(plan[1].body.contains("LEGO"), "the last reminder names what was chosen")
-        XCTAssertTrue(plan[2].body.contains("Let's go build!"), "and so does the finish")
+        XCTAssertTrue(plan[1].body.contains(TransitionActivity.cleanUp.displayName), "the last reminder names what was chosen")
+        XCTAssertTrue(plan[2].body.contains(TransitionActivity.cleanUp.invitation), "and so does the finish")
     }
 
     /// A window shorter than some reminders: only the ones that fit exist, re-indexed from 0,
@@ -96,9 +96,9 @@ final class NotificationPlanTests: XCTestCase {
         let clock = start
         let (controller, _) = try makeController(scheduler) { clock }
         try controller.start()
-        try controller.choose(.reading)
+        try controller.choose(.mealTime)
         XCTAssertEqual(scheduler.plans.count, 2)
-        XCTAssertTrue(scheduler.latestPlan?.last?.body.contains("Reading") ?? false)
+        XCTAssertTrue(scheduler.latestPlan?.last?.body.contains(TransitionActivity.mealTime.displayName) ?? false)
     }
 
     func testSettingsChangeReschedulesAndRolloverCancels() throws {

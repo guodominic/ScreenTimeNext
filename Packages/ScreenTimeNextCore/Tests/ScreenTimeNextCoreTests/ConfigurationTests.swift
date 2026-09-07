@@ -32,7 +32,7 @@ final class ConfigurationTests: XCTestCase {
     func testRoundTrip() throws {
         var c = ScreenTimeConfiguration.default
         c.warningOffsetsSeconds = [420, 60]
-        c.selectedActivities = [.lego]
+        c.selectedActivities = [.cleanUp]
         let data = try JSONEncoder().encode(c)
         XCTAssertEqual(try JSONDecoder().decode(ScreenTimeConfiguration.self, from: data), c)
     }
@@ -40,12 +40,12 @@ final class ConfigurationTests: XCTestCase {
     /// A store written before D-013 (toggle shape) still decodes.
     func testLegacyTogglesDecodeToOffsets() throws {
         let legacy = """
-        {"dailyBudgetSeconds":1800,"warning10Enabled":true,"warning5Enabled":false,"warning1Enabled":true,"selectedActivities":["reading"]}
+        {"dailyBudgetSeconds":1800,"warning10Enabled":true,"warning5Enabled":false,"warning1Enabled":true,"selectedActivities":["mealTime"]}
         """
         let c = try JSONDecoder().decode(ScreenTimeConfiguration.self, from: Data(legacy.utf8))
         XCTAssertEqual(c.dailyBudgetSeconds, 1800)
         XCTAssertEqual(c.warningOffsetsSeconds, [600, 60])
-        XCTAssertEqual(c.selectedActivities, [.reading])
+        XCTAssertEqual(c.selectedActivities, [.mealTime])
     }
 
     func testEffectiveOffsetsAreStrictlyShorterThanTheWindow() {

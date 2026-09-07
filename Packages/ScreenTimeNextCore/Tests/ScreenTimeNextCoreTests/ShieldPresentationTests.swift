@@ -10,12 +10,12 @@ import XCTest
 final class ShieldPresentationTests: XCTestCase {
 
     func testReminderWithActivityNamesWhatComesNext() {
-        let p = ShieldPresentation.make(for: .reminder(minutesLeft: 5, activity: .lego), childName: "Ivy")
+        let p = ShieldPresentation.make(for: .reminder(minutesLeft: 5, activity: .cleanUp), childName: "Ivy")
         XCTAssertEqual(p.title, "5 minutes left, Ivy")
-        XCTAssertEqual(p.subtitle, "You picked LEGO for after. Finish up, then let's go build!")
+        XCTAssertEqual(p.subtitle, "You picked Clean up for after. Finish up, then let's tidy up!")
         XCTAssertEqual(p.primaryButtonLabel, "OK, 5 more minutes")
         XCTAssertTrue(p.primaryButtonContinues)
-        XCTAssertEqual(p.symbolName, TransitionActivity.lego.symbolName)
+        XCTAssertEqual(p.symbolName, TransitionActivity.cleanUp.symbolName)
     }
 
     func testReminderWithoutActivity() {
@@ -27,7 +27,7 @@ final class ShieldPresentationTests: XCTestCase {
 
     /// §17 — the ending must never offer a way to keep going.
     func testFinishedAndSpentNeverContinue() {
-        for moment in [ShieldMoment.finished(activity: .reading), .finished(activity: nil), .spentForToday] {
+        for moment in [ShieldMoment.finished(activity: .mealTime), .finished(activity: nil), .spentForToday] {
             let p = ShieldPresentation.make(for: moment, childName: "Ivy")
             XCTAssertFalse(p.primaryButtonContinues, "\(moment) must not offer a bypass")
         }

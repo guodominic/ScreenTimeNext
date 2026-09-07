@@ -29,7 +29,7 @@ final class ParentRecordPersistenceTests: XCTestCase {
     func testSavingTheParentsRecordLeavesTheConfigurationAlone() throws {
         let config = ScreenTimeConfiguration(dailyBudgetSeconds: 25 * 60,
                                              warningOffsetsSeconds: [480, 120],
-                                             selectedActivities: [.lego, .outside])
+                                             selectedActivities: [.cleanUp, .outside])
         try storage.save(config)
 
         try storage.save(ParentPickerPreferences(blockedWebsites: ["youtube.com"]))
@@ -38,7 +38,7 @@ final class ParentRecordPersistenceTests: XCTestCase {
 
         let after = try storage.loadConfiguration()
         XCTAssertEqual(after.dailyBudgetSeconds, 25 * 60, "budget untouched")
-        XCTAssertEqual(after.selectedActivities, [.lego, .outside], "activities untouched")
+        XCTAssertEqual(after.selectedActivities, [.cleanUp, .outside], "activities untouched")
         XCTAssertEqual(after.warningOffsetsSeconds, [480, 120], "reminders untouched")
     }
 

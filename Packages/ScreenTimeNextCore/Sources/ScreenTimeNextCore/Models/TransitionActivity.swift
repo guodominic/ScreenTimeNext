@@ -39,37 +39,45 @@ public struct TransitionActivity: Codable, Hashable, Identifiable, Sendable {
     public static func == (lhs: TransitionActivity, rhs: TransitionActivity) -> Bool { lhs.id == rhs.id }
     public func hash(into hasher: inout Hasher) { hasher.combine(id) }
 
-    // MARK: The built-in eight
+    // MARK: The built-in five (D-052, revised D-053)
+    //
+    // Was eight, chosen by us. These are the five Dominic's family actually uses, and the list is
+    // now short enough that a parent can read it at a glance and long enough that the shield's
+    // three-item menu (D-044) is a real choice rather than the whole list.
+    //
+    // The ids of the three that survived are UNCHANGED, so a session that stored "outside" still
+    // resolves to Outside. A window that stored one of the removed ids ("lego") decodes through
+    // the tolerant path in `init(from:)` as a readable placeholder rather than being lost — a
+    // child's choice belongs to them even after we stop offering it.
 
-    public static let lego = TransitionActivity(id: "lego", displayName: "LEGO",
-                                                invitation: "Let's go build!",
-                                                symbolName: "square.stack.3d.up.fill")
-    public static let drawing = TransitionActivity(id: "drawing", displayName: "Drawing",
-                                                   invitation: "Let's go draw!",
-                                                   symbolName: "paintpalette.fill")
-    public static let reading = TransitionActivity(id: "reading", displayName: "Reading",
-                                                   invitation: "Grab a book!",
-                                                   symbolName: "book.fill")
-    public static let outside = TransitionActivity(id: "outside", displayName: "Outside",
-                                                   invitation: "Let's head outside!",
-                                                   symbolName: "sun.max.fill")
-    public static let snack = TransitionActivity(id: "snack", displayName: "Snack",
-                                                 invitation: "Snack time!",
-                                                 symbolName: "carrot.fill")
-    public static let bath = TransitionActivity(id: "bath", displayName: "Bath",
-                                                invitation: "Bath time!",
-                                                symbolName: "drop.fill")
-    public static let homework = TransitionActivity(id: "homework", displayName: "Homework",
-                                                    invitation: "Let's get it done!",
-                                                    symbolName: "pencil.and.list.clipboard")
     public static let familyTime = TransitionActivity(id: "familyTime", displayName: "Family Time",
                                                       invitation: "Let's find the family!",
                                                       symbolName: "figure.2.and.child.holdinghands")
+    public static let outside = TransitionActivity(id: "outside", displayName: "Outside",
+                                                   invitation: "Let's head outside!",
+                                                   symbolName: "sun.max.fill")
+    /// D-053 — replaced Sleep. "Free time" is the honest name for the commonest answer: not a
+    /// scheduled thing, just anything that is not a screen. It also gives a child who does not
+    /// want to commit to a specific plan something real to pick, which matters now that the last
+    /// transition screen insists on an answer.
+    public static let freeTime = TransitionActivity(id: "freeTime", displayName: "Free time",
+                                                    invitation: "Go do whatever you like!",
+                                                    symbolName: "sparkles")
+    public static let cleanUp = TransitionActivity(id: "cleanUp", displayName: "Clean up",
+                                                   invitation: "Let's tidy up!",
+                                                   symbolName: "shippingbox.fill")
+    public static let mealTime = TransitionActivity(id: "mealTime", displayName: "Meal time",
+                                                    invitation: "Time to eat!",
+                                                    symbolName: "fork.knife")
 
     /// The built-ins, in their canonical order. Deliberately still called `allCases`: it is what
     /// every caller means by it, and the built-in set is still a fixed list.
+    ///
+    /// The order is not cosmetic. A system shield can show at most THREE choices (D-044), and it
+    /// takes them off the front of this list — so the first three here ARE what a child is offered
+    /// on the transition screen until a parent reorders them.
     public static let allCases: [TransitionActivity] = [
-        .lego, .drawing, .reading, .outside, .snack, .bath, .homework, .familyTime
+        .familyTime, .outside, .freeTime, .cleanUp, .mealTime
     ]
 
     /// The built-in with this id, if any. Replaces the old `init(rawValue:)`; a custom activity

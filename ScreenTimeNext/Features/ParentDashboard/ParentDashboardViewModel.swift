@@ -27,11 +27,11 @@ final class ParentDashboardViewModel {
     /// Task 004 — a request in flight, and whatever went wrong last time. Both are parent-facing.
     private(set) var isRequestingAuthorization = false
     private(set) var authorizationError: String?
-    /// Task 010 — whether iOS currently holds our daily schedule, and the last thing the monitor
-    /// extension had to say. The extension runs while the app is closed (PRD §14), so this is the
-    /// only way a parent — or we — can tell that the machinery is actually running.
-    private(set) var monitoringIsRegistered = false
-    private(set) var lastMonitorReport: MonitorReport?
+    /// D-052 — the dashboard no longer SHOWS the monitor's check-ins; a parent should not have to
+    /// read our diagnostics to trust the app. The journal is still written (it costs nothing and it
+    /// is what settled two bugs this week), just not surfaced.
+    /// D-053 — the slide's position: true when every restriction is off for today.
+    private(set) var restrictionsAreCleared = false
 
     private let services: ServiceContainer
     private let controller: SessionController
@@ -63,9 +63,7 @@ final class ParentDashboardViewModel {
         Task {
             notificationsDenied = await services.notifications.isPermissionDenied
             authorization = await services.authorization.status
-            monitoringIsRegistered = await services.monitoring.isMonitoring
         }
-        lastMonitorReport = MonitorJournal()?.entries().last
         let storage = services.storage
         profile = try? storage.loadChildProfile()
         configuration = (try? storage.loadConfiguration()) ?? .default
@@ -75,6 +73,7 @@ final class ParentDashboardViewModel {
         selection = try? services.selection.loadSelection()
         selectionSummary = selection?.summary ?? .empty
         protectionState = (try? storage.loadProtectionState()) ?? .unshielded
+        restrictionsAreCleared = ((try? storage.loadPickerPreferences()) ?? .default).restrictionsAreCleared()
         refreshSession()
     }
 
@@ -141,9 +140,10 @@ final class ParentDashboardViewModel {
         refreshSession()
     }
 
-    /// Task 013 (session half, D-010) + Task 012.
-    func extend(minutes: Int) {
-        guard (try? controller.extend(bySeconds: minutes * 60)) != nil else { return }
+    /// D-052 — add or take back minutes. Adding counts from now when the session has already run
+    /// out, which is the only way "+3" can mean three minutes to a child.
+    func adjust(minutes: Int) {
+        guard minutes != 0, (try? controller.adjust(bySeconds: minutes * 60)) != nil else { return }
         // The extension gave the budget back, so the shield comes down on the ordinary rule rather
         // than by being told to. `temporarilyExtended` is written after, because it is a note about
         // HOW the device came to be unshielded, not a second opinion about whether it is.
@@ -157,6 +157,22 @@ final class ParentDashboardViewModel {
     ///
     /// D-047 — and tells the coordinator, because the same actions move every wall-clock alarm:
     /// a session that now ends ten minutes later needs its reminders ten minutes later too.
+    // MARK: D-052 / D-053 — the restriction slide
+
+    /// Clear every restriction for the rest of today, or put them back exactly as they were.
+    ///
+    /// "Put them back" needs nothing stored: the restriction is the parent's CURRENT selection,
+    /// which `Enforcement.reconcile` re-reads every time. So sliding back always restores the
+    /// latest set, not a snapshot of whatever was in force when it was cleared — which is what a
+    /// parent who edited their apps in between would expect.
+    func setRestrictionsCleared(_ cleared: Bool) {
+        guard var preferences = try? services.storage.loadPickerPreferences() else { return }
+        preferences.restrictionsClearedOn = cleared ? Date() : nil
+        try? services.storage.save(preferences)
+        restrictionsAreCleared = cleared
+        enforce()
+    }
+
     private func enforce() {
         Enforcement.reconcile(storage: services.storage,
                               selection: services.selection,
@@ -165,6 +181,34 @@ final class ParentDashboardViewModel {
     }
 
     var canExtend: Bool { session.window != nil }
+
+    // MARK: D-053 — what's next, SHOWN here and chosen in Settings
+
+    /// What the child will actually be offered, in the order they will see it.
+    ///
+    /// D-053 — the dashboard shows this and no longer edits it. Ticking boxes is configuration a
+    /// parent does once; putting it on the screen they open every evening made the dashboard read
+    /// like a settings page, and put a tappable control next to the ring where a mis-tap costs
+    /// something. Which activities are offered is back in Settings, beside the list they belong to.
+    ///
+    /// Empty picks mean "no preference", which offers everything (D-009) — so that is what is
+    /// shown, rather than an empty row that looks like a mistake.
+    var offeredActivities: [TransitionActivity] {
+        let picked = configuration.selectedActivities
+        guard picked.isEmpty else { return picked }
+        return ((try? services.storage.loadPickerPreferences()) ?? .default).allActivities
+    }
+
+    /// True when the parent has picked none, so the list above is a default rather than a choice.
+    var offersEverything: Bool { configuration.selectedActivities.isEmpty }
+
+    /// D-044 — a system shield can show at most three. Which three is worth saying out loud,
+    /// because reordering in Settings is the only way to change it.
+    var shieldChoiceCount: Int { min(ShieldMomentResolver.maxChooserOptions, offeredActivities.count) }
+
+    /// D-052 — only once the budget is gone. While a session runs nothing is shielded, so there is
+    /// nothing for this to release.
+    var canClearRestrictions: Bool { restrictionsAreCleared || remainingTodaySeconds == 0 }
 
     // MARK: Presentation helpers
 

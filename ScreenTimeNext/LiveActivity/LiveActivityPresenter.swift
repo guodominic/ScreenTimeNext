@@ -25,15 +25,24 @@ nonisolated final class LiveActivityPresenter: SessionPresenting, @unchecked Sen
         )
         // ActivityKit asserts "Call must be made on main thread" — hop to the main actor.
         Task { @MainActor in
-            if let current = Activity<ScreenTimeActivityAttributes>.activities.first {
+            // D-053 — `finish` ends the activity, and `end` is ONE-WAY: the card lingers in
+            // `activities` for ten more minutes but no longer accepts updates. Updating it there
+            // is a silent no-op, which is exactly what a parent saw when they added three minutes
+            // to a finished session and the Dynamic Island went on saying nothing. So: only an
+            // `.active` activity is updated; anything else is retired and replaced.
+            let live = Activity<ScreenTimeActivityAttributes>.activities
+            if let current = live.first(where: { $0.activityState == .active }) {
                 await current.update(ActivityContent(state: content, staleDate: state.endsAt))
-            } else {
-                _ = try? Activity.request(
-                    attributes: ScreenTimeActivityAttributes(childName: state.childName),
-                    content: ActivityContent(state: content, staleDate: state.endsAt),
-                    pushType: nil
-                )
+                return
             }
+            for stale in live {
+                await stale.end(nil, dismissalPolicy: .immediate)
+            }
+            _ = try? Activity.request(
+                attributes: ScreenTimeActivityAttributes(childName: state.childName),
+                content: ActivityContent(state: content, staleDate: state.endsAt),
+                pushType: nil
+            )
         }
     }
 

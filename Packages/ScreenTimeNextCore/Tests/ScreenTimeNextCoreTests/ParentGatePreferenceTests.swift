@@ -28,12 +28,13 @@ final class ParentGatePreferenceTests: XCTestCase {
     func testTheChoiceSurvivesStartOver() throws {
         let storage = InMemoryScreenTimeStorageService()
         try storage.save(ScreenTimeConfiguration.default)
+        try storage.save(ParentPIN.make("1111"))
         try storage.save(ParentPickerPreferences(gate: ParentGatePreference(usesBiometrics: true)))
 
         try storage.eraseAll()
 
         XCTAssertTrue(try storage.loadPickerPreferences().gate.usesBiometrics)
-        XCTAssertNil(try storage.loadParentPIN(), "the PIN still goes, though (D-031)")
+        XCTAssertNotNil(try storage.loadParentPIN(), "D-054 — and so does the PIN it is a shortcut past")
     }
 
     /// A record written before D-045 has no gate at all, and must read as OFF rather than as a

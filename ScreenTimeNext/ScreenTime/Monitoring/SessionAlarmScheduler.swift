@@ -18,13 +18,19 @@ import ScreenTimeNextCore
 
 enum SessionAlarmScheduler {
 
+    // Every member is explicitly `nonisolated`. This file is compiled into TWO targets that
+    // disagree about the default: the app sets `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`, the
+    // monitor extension does not. Without this, the same code is main-actor here and free there —
+    // and the extension calls it from a `DeviceActivityMonitor` callback that is not on the main
+    // thread. That is precisely the shape of the D-041 crash. Nothing here touches UI.
+
     /// A schedule interval must be at least 15 minutes (`MonitoringError.intervalTooShort`, D-037),
     /// so the START is pushed this far back — usually into the past, which is fine: an interval
     /// already running is a normal state and only its END is what we are waiting for.
-    static let minimumIntervalSeconds: TimeInterval = 16 * 60
+    nonisolated static let minimumIntervalSeconds: TimeInterval = 16 * 60
 
     /// Replace every alarm for the session ending at `endsAt`.
-    static func schedule(endsAt: Date, warningOffsetsSeconds: [Int], now: Date = Date()) throws {
+    nonisolated static func schedule(endsAt: Date, warningOffsetsSeconds: [Int], now: Date = Date()) throws {
         let center = DeviceActivityCenter()
         clear(center: center)
 
@@ -52,17 +58,17 @@ enum SessionAlarmScheduler {
         }
     }
 
-    static func clear(center: DeviceActivityCenter = DeviceActivityCenter()) {
+    nonisolated static func clear(center: DeviceActivityCenter = DeviceActivityCenter()) {
         center.stopMonitoring(MonitoringName.allSessionActivities.map { DeviceActivityName($0) })
     }
 
     /// Hour, minute AND second: a session ends at whatever second it started plus its budget, and
     /// dropping the seconds would make "time's up" arrive up to a minute late.
-    private static func components(of date: Date) -> DateComponents {
+    private nonisolated static func components(of date: Date) -> DateComponents {
         Calendar.current.dateComponents([.hour, .minute, .second], from: date)
     }
 
-    static func mapped(_ error: DeviceActivityCenter.MonitoringError) -> ScreenTimeMonitoringError {
+    nonisolated static func mapped(_ error: DeviceActivityCenter.MonitoringError) -> ScreenTimeMonitoringError {
         switch error {
         case .unauthorized:      return .notAuthorized
         case .excessiveActivities: return .limitExceeded

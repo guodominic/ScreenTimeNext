@@ -33,6 +33,9 @@ struct SettingsView: View {
     @State private var showPINEditor = false
     @State private var activityOrder: [String] = []
     @State private var isReorderingActivities = false
+    /// D-054 — the enforcement log, read on appear and on demand.
+    @State private var journal: [MonitorReport] = []
+    @State private var showJournal = false
 
     /// D-033 — the parent's own order, built by the same rule as the category list: their
     /// arrangement first, anything it has never heard of appended, so a stale order cannot hide a
@@ -122,6 +125,11 @@ struct SettingsView: View {
                 Text("Two reminders, each a full-screen message inside whatever app your child is using. The first is a heads-up; the second asks them to pick what's next. Each must be shorter than the budget (up to \(ScreenTimeConfiguration.maxWarningOffset(forBudgetSeconds: budgetMinutes * 60) / 60) min); Off skips it. The end always interrupts, and is not a dial.")
             }
 
+            // D-053 — choosing WHICH activities are offered lives here again. D-052 moved the
+            // ticks to the dashboard on the theory that it was a weekly decision; it is not, and a
+            // tappable list beside the ring turned the evening screen into a settings page. The
+            // dashboard shows the answer; this is where it is decided, beside the same rows a
+            // parent renames and reorders.
             Section {
                 ForEach(orderedActivities) { activity in
                     activityRow(activity)
@@ -133,8 +141,6 @@ struct SettingsView: View {
                         .foregroundStyle(Theme.mint)
                 }
                 .moveDisabled(true)
-                // D-039 — only offered once something is missing, and it is the whole reason a
-                // removed built-in is hidden rather than gone.
                 if activityPreferences.hasHiddenBuiltIns {
                     Button { restoreBuiltIns() } label: {
                         Label("Bring back the ones I removed", systemImage: "arrow.uturn.backward")
@@ -144,17 +150,18 @@ struct SettingsView: View {
                 }
             } header: {
                 HStack {
-                    Text("What's next")
+                    Text("Edit the what's-next list")
                     Spacer()
                     Button(isReorderingActivities ? "Done" : "Reorder") { isReorderingActivities.toggle() }
                         .font(.caption.weight(.bold))
                         .textCase(nil)
                 }
             } footer: {
-                // D-029 — "all eight" stopped being true the moment a parent could add a ninth.
+                // The order is load-bearing, not cosmetic: a system shield shows three (D-044) and
+                // takes them off the front of this list.
                 Text(activities.isEmpty
-                     ? "None picked — everything here will be offered. Swipe any row to rename or remove it; Reorder to arrange them."
-                     : "\(activities.count) picked. Swipe any row to rename or remove it; Reorder to arrange them.")
+                     ? "Nothing ticked, so your child is offered all of them. Swipe a row to rename or remove it; Reorder to arrange them — the first three are what the transition screen can show."
+                     : "\(activities.count) ticked. Swipe a row to rename or remove it; Reorder to arrange them — the first three ticked are what the transition screen can show.")
             }
 
             Section {
@@ -180,6 +187,8 @@ struct SettingsView: View {
             } header: {
                 Text("Protected content")
             }
+
+            enforcementLogSection
 
             if let errorText {
                 Section { Text(errorText).foregroundStyle(.red) }
@@ -225,19 +234,92 @@ struct SettingsView: View {
         }
     }
 
-    @ViewBuilder
-    private func activityRow(_ activity: TransitionActivity) -> some View {
-        Button {
-            if activities.contains(activity) { activities.remove(activity) } else { activities.insert(activity) }
-        } label: {
-            HStack {
-                Label(activity.displayName, systemImage: activity.symbolName)
-                    .foregroundStyle(Theme.color(for: activity))
-                    .fontWeight(.medium)
-                Spacer()
-                if activities.contains(activity) {
-                    Image(systemName: "checkmark.circle.fill").foregroundStyle(Theme.color(for: activity))
+    /// D-054 — what the invisible processes actually did, in order.
+    ///
+    /// D-052 deleted this from the dashboard, and that was right — a parent has no use for it. But
+    /// deleting it outright was wrong: the monitor, the shield's configuration and the shield's
+    /// action all run in their own processes with no console, no breakpoint and no way to ask them
+    /// anything afterwards. `MonitorJournal` is the only evidence that exists about them, and the
+    /// first time a shield misbehaved after the panel was gone the answer was unreachable.
+    ///
+    /// So it lives here instead: collapsed by default, out of a parent's way, one tap from mine.
+    /// The three `shieldShown…` lines are the ones that matter — they say which of the three
+    /// screens the child was actually given, which is otherwise a claim rather than a fact. A line
+    /// missing entirely means iOS never asked us and drew its own "Restricted" screen.
+    private var enforcementLogSection: some View {
+        Section {
+            DisclosureGroup(isExpanded: $showJournal) {
+                if journal.isEmpty {
+                    Text("Nothing recorded yet.")
+                        .font(.caption).foregroundStyle(.secondary)
+                } else {
+                    // Newest first: the question is always "what just happened?".
+                    ForEach(Array(journal.reversed().enumerated()), id: \.offset) { _, entry in
+                        HStack(alignment: .firstTextBaseline) {
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(Self.describe(entry.event))
+                                    .font(.caption.weight(.semibold))
+                                Text(Self.shortName(entry.activity))
+                                    .font(.caption2).foregroundStyle(.secondary)
+                            }
+                            Spacer(minLength: 8)
+                            Text(entry.at, format: .dateTime.hour().minute().second())
+                                .font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+                        }
+                    }
+                    Button("Clear the log", role: .destructive) {
+                        MonitorJournal()?.clear()
+                        journal = []
+                    }
+                    .font(.caption)
                 }
+            } label: {
+                Label("Enforcement log", systemImage: "stethoscope")
+                    .font(.subheadline.weight(.semibold))
+            }
+            .onChange(of: showJournal) { _, open in if open { journal = MonitorJournal()?.entries() ?? [] } }
+        } footer: {
+            Text("A record of what the background processes did. Useful when a transition screen behaves oddly — nothing here leaves the device.")
+        }
+    }
+
+    private static func describe(_ event: MonitorReport.Event) -> String {
+        switch event {
+        case .intervalDidStart:         return "A new day's window opened"
+        case .intervalDidEnd:           return "An alarm ended early — re-armed"
+        case .thresholdReached:         return "Time's up"
+        case .warningBeforeIntervalEnds: return "System warning before an interval ended"
+        case .warningBeforeThreshold:   return "Reminder alarm — shield raised"
+        case .shieldShownReminder:      return "Child saw: minutes left"
+        case .shieldShownChooser:       return "Child saw: pick what's next"
+        case .shieldShownFinished:      return "Child saw: screen time finished"
+        case .shieldShownSpent:         return "Child saw: today's time is gone"
+        }
+    }
+
+    /// The activity names are ours and long; the tail is the part that identifies the moment.
+    private static func shortName(_ activity: String) -> String {
+        activity.replacingOccurrences(of: "screentimenext.", with: "")
+    }
+
+    @ViewBuilder
+    /// D-053 — the tick is back. Tapping the row offers or withdraws the activity; swiping it
+    /// renames or removes it from the family's list altogether. Two different verbs, and keeping
+    /// them on one row is fine because the gestures are not the same gesture.
+    private func activityRow(_ activity: TransitionActivity) -> some View {
+        let isOffered = activities.contains(activity)
+        HStack {
+            Label(activity.displayName, systemImage: activity.symbolName)
+                .foregroundStyle(Theme.color(for: activity))
+                .fontWeight(.medium)
+            Spacer()
+            Image(systemName: isOffered ? "checkmark.circle.fill" : "circle")
+                .foregroundStyle(isOffered ? Theme.color(for: activity) : Color.secondary.opacity(0.4))
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            withAnimation(.snappy(duration: 0.18)) {
+                if isOffered { activities.remove(activity) } else { activities.insert(activity) }
             }
         }
         // D-039 — every row, ours included. "What my child does after screen time" is the one

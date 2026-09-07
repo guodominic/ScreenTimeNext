@@ -33,6 +33,16 @@ public struct ScreenTimeActivityAttributes: ActivityAttributes {
             self.stateName = stateName
         }
 
+        /// D-053 — what the widget hands to `Text(timerInterval:)` and `ProgressView(timerInterval:)`.
+        ///
+        /// A `ClosedRange` TRAPS when its lower bound is above its upper bound, and a trap in a
+        /// widget extension is not an error message — it is a Dynamic Island with nothing in it.
+        /// A parent taking time back can push `endsAt` to any moment, so the range is clamped here
+        /// once rather than trusted five times in the layout.
+        public var timerRange: ClosedRange<Date> {
+            startedAt...max(startedAt, endsAt)
+        }
+
         public var chosenActivity: TransitionActivity? {
             guard let id = chosenActivityRaw else { return nil }
             if let name = chosenActivityName, let symbol = chosenActivitySymbol {

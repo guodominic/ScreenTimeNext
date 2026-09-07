@@ -14,18 +14,35 @@ next** transitions with less conflict — and that enforcement has to be real fo
 
 ## V1 scope
 - Family Controls authorization
-- `FamilyActivityPicker` content selection
-- Daily budget (default 60 min)
-- 10 / 5 / 1-minute transition warnings
-- Child-selected next activity
-- DeviceActivity monitoring
-- ManagedSettings shielding
-- Parent temporary extension (+10 / +20 / Allow Once)
+- `FamilyActivityPicker` content selection — apps, categories and typed websites
+- A session budget of 1–90 minutes, set a minute at a time (default 15)
+- Two configurable reminders before the end (default 5 and 1 minute)
+- Child-selected next activity, offered on the transition screen itself
+- DeviceActivity wall-clock monitoring, with the app closed
+- ManagedSettings shielding, with a transition screen of our own at each moment
+- Parent adjustment of a running session — add or take back minutes (default 3), counted from now
+- A slide that clears every restriction for the rest of the day, and puts them back
+- Parent gate: a PIN, optionally unlocked with Face ID
+- Live Activity / Dynamic Island countdown
 - Local persistence via App Group
 - **No backend**
 
 Out of scope in V1: multi-child, cross-device, cloud accounts, Android, AI recommendations, social
 features, ads, complex scheduling, subscriptions. See `docs/prd/01-vision-and-goals.md` §4.
+
+## What a child actually sees
+
+The shield is the product, so it is worth saying plainly what it does. When a covered app is opened
+during a session, iOS draws a screen we configure — up to three times:
+
+1. **A reminder.** "5 minutes left." A button acknowledges it and returns them to the app.
+2. **The ask.** "Which one?" — a menu of what the parent put on the list. Choosing returns them to
+   the app; on the second ask, choosing is the only way back in.
+3. **The end.** The button closes, and does not let them back in. §17 — a child can never grant
+   themselves more time; more time comes from a parent, on the parent's device.
+
+The clock stops while a transition screen is up: a child is not charged screen time for our own
+interruption.
 
 ## Repository layout
 
@@ -46,8 +63,14 @@ PRIVACY.md                privacy policy (DRAFT until Task 018)
 ScreenTimeNext.xcodeproj  Xcode project
 ScreenTimeNext/           app target (SwiftUI + Screen Time adapters)
 Packages/ScreenTimeNextCore/  framework-free core package + its tests
-DeviceActivityMonitorExtension/  extension target (Phase 1)
+DeviceActivityMonitorExtension/   wakes on the clock and raises the shield
+ShieldConfigurationExtension/     draws the transition screen
+ShieldActionExtension/            decides what its buttons do
+ScreenTimeNextWidgets/            Live Activity / Dynamic Island
 ```
+
+Four processes, three of which the app never sees running. `docs/DECISIONS.md` is where the
+reasoning lives; `MonitorJournal` (Settings ▸ Enforcement log) is the only evidence they leave.
 
 ## Run it on your own iPhone or iPad (preview build)
 
@@ -65,8 +88,9 @@ a Mac with Xcode 26 or newer and a free Apple ID:
 
 Free-account limits: the app expires after 7 days (re-run from Xcode), and one Apple ID can install
 on at most 3 devices. The preview has no Screen Time enforcement — it is the transition experience
-only (timer, reminders, "what's next", Live Activity). Enforcement arrives with the Family Controls
-entitlement.
+only (timer, reminders, "what's next", Live Activity). Enforcement needs the Family Controls
+entitlement, which a free account cannot carry; the **development** entitlement comes with a paid
+membership and is enough to run the whole thing on your own device.
 
 ## Getting started (contributors)
 1. Read `CLAUDE.md`.

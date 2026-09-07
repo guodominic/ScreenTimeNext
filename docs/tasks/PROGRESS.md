@@ -71,6 +71,34 @@ default; batching is acceptable for mock-backed experience tasks when errors are
 - Theme pass (Theme.swift, cards, rings, colorful activity tiles); Start over moved to the dashboard.
 - Time Sensitive notifications: flagged in code; effective only with the capability (B-004).
 
+## 2026-09-07 — Dominic's second device round (D-052 … D-054)
+
+Everything here came from using the app on a phone, which is the only place any of it was findable.
+
+- **D-052** the dashboard stops being a settings page: the shield preview (it lied — D-048) and the
+  Enforcement panel are gone; Extend counts from NOW and can take time back; a switch clears every
+  restriction for the rest of the day.
+- **D-053** three separate causes of "the timer is wrong after adding minutes", all of them a
+  remembered answer outliving the fact under it: the `.finished` state latch (per-controller, so the
+  dashboard's recovery never reached the timer), `Activity.end` being one-way (updates to a finished
+  Live Activity are a silent no-op), and `ClosedRange` trapping in the widget (a crash there is a
+  blank Dynamic Island, not an error). Plus: what's-next moved BACK to Settings, Sleep became Free
+  time, and the second transition screen now insists on a choice.
+- **D-054** the parent PIN survives Start over (it is the parent's credential, not the child's
+  setup — and D-036 made every reset demand a new one), and the enforcement log returns, in
+  Settings. Removing an invisible process's only instrument cost a day.
+
+**Still unverified on a device**, which is now the whole critical path:
+`docs/tasks/device-qa-checklist.md` has QA-02, 03, 04, 09 and 10 written out as steps, plus the
+regression checks for the three fixes above. QA-09 and QA-10 are the ones that decide whether Task
+012 can be called done.
+
+**Open and unexplained:** after choosing an activity on the first transition screen, the second one
+showed a "Restricted" screen instead of the last countdown. Traced through the monitor, the
+resolver and both shield extensions without finding a cause; "Restricted" is Apple's own wording,
+which would mean our configuration extension was not consulted at all. The enforcement log (D-054)
+is what settles it — one reproduction, then read it.
+
 ## Critical path
 
 ```text

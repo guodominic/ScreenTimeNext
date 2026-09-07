@@ -235,11 +235,17 @@ public final class FileStorageService: ScreenTimeStorageService, @unchecked Send
         try lock.withLock { try write(state, to: .protectionState) }
     }
 
-    /// D-024 — `pickerPreferences` is absent from this list on purpose: "Start over" erases the
-    /// child's setup, not the parent's own arrangement of the picker.
+    /// D-024 / D-054 — `pickerPreferences` AND `parentPIN` are absent from this list on purpose.
+    /// "Start over" erases the child's setup, not the parent's own things.
+    ///
+    /// The PIN used to be erased here (D-031, "start over means start over"). That was wrong, and
+    /// it showed up as a real complaint: D-036 demands a PIN before the timer opens, so every Start
+    /// over made a parent set one again. A PIN is not part of a child's configuration — it is the
+    /// parent's own credential, the same kind of thing as the picker arrangement beside it, and
+    /// changing it is one row in Settings for anyone who actually wants to.
     public func eraseAll() throws {
         lock.withLock {
-            for file in [File.childProfile, .configuration, .dailyUsage, .sessionWindow, .protectionState, .parentPIN] {
+            for file in [File.childProfile, .configuration, .dailyUsage, .sessionWindow, .protectionState] {
                 remove(file)
             }
         }

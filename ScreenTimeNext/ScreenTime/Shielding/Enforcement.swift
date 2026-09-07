@@ -37,6 +37,13 @@ enum Enforcement {
                           selection: any ScreenTimeSelectionService,
                           shield: any ScreenTimeShieldService,
                           now: Date = Date()) -> ProtectionState {
+        // D-052 — the parent gave the rest of the day away. Nothing else needs consulting.
+        let preferences = (try? storage.loadPickerPreferences()) ?? .default
+        guard !preferences.restrictionsAreCleared(on: now) else {
+            try? shield.removeShield()
+            return .unshielded
+        }
+
         let controller = SessionController(storage: storage, now: { now })
         let remaining = (try? controller.remainingBudgetSeconds()) ?? 0
 

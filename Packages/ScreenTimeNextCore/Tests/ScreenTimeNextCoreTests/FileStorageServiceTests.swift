@@ -39,7 +39,7 @@ final class FileStorageServiceTests: XCTestCase {
         var config = ScreenTimeConfiguration.default
         config.dailyBudgetSeconds = 2700
         config.warningOffsetsSeconds = [600, 300]
-        config.selectedActivities = [.lego, .outside]
+        config.selectedActivities = [.cleanUp, .outside]
         try first.save(config)
         let start = Date(timeIntervalSince1970: 1_700_000_000)
         try first.save(SessionWindow(startedAt: start, budgetSeconds: 2700))

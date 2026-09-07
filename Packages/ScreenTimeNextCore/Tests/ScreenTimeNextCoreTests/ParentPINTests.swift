@@ -55,16 +55,21 @@ final class ParentPINTests: XCTestCase {
         XCTAssertNil(try storage.loadParentPIN(), "turning it off must actually remove it")
     }
 
-    /// D-031 — unlike the parent's own preferences, the PIN goes. A forgotten PIN that survived a
-    /// reset would lock a parent out of their own device with no way back.
-    func testStartOverClearsThePIN() throws {
+    /// D-054 — the PIN survives Start over, reversing D-031.
+    ///
+    /// D-031 kept it in the erase list to protect a parent who had forgotten their PIN. That
+    /// protection was never real: Start over sits BEHIND the gate, so a parent who can reach it
+    /// already knows the PIN. What the rule did instead was make every Start over demand a new one,
+    /// because D-036 will not open the timer without it — which is what a parent reported.
+    func testStartOverKeepsThePINAndThePreferences() throws {
         let storage = InMemoryScreenTimeStorageService()
         try storage.save(ParentPIN.make("1111"))
         try storage.save(ParentPickerPreferences(blockedWebsites: ["youtube.com"]))
 
         try storage.eraseAll()
 
-        XCTAssertNil(try storage.loadParentPIN())
+        XCTAssertNotNil(try storage.loadParentPIN(), "set once, remembered — it is the parent's, not the child's setup")
+        XCTAssertTrue(try XCTUnwrap(try storage.loadParentPIN()).matches("1111"), "and unchanged")
         XCTAssertEqual(try storage.loadPickerPreferences().blockedWebsites, ["youtube.com"], "preferences still stay")
     }
 

@@ -140,9 +140,9 @@ final class LiveSettingsChangeTests: XCTestCase {
         XCTAssertEqual(try controller.availableActivities(), TransitionActivity.allCases)
 
         var config = try storage.loadConfiguration()
-        config.selectedActivities = [.lego, .outside]
+        config.selectedActivities = [.cleanUp, .outside]
         try storage.save(config)
-        XCTAssertEqual(try controller.availableActivities(), [.lego, .outside])
+        XCTAssertEqual(try controller.availableActivities(), [.cleanUp, .outside])
     }
 
     // MARK: Nothing running

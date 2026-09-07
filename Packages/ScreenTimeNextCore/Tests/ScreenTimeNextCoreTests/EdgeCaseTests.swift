@@ -47,7 +47,7 @@ final class EdgeCaseTests: XCTestCase {
     func testDeviceRestartMidSessionKeepsEverything() throws {
         let (a, _) = try boot()
         try a.start()
-        try a.choose(.reading)
+        try a.choose(.mealTime)
         clock.advance(500)
 
         let (b, storageB) = try boot()   // "restart"
@@ -55,7 +55,7 @@ final class EdgeCaseTests: XCTestCase {
         XCTAssertEqual(try storageB.loadConfiguration().dailyBudgetSeconds, 1200)
         XCTAssertEqual(try storageB.loadChildProfile()?.name, "Ivy")
         XCTAssertEqual(snap.remainingSeconds, 700)
-        XCTAssertEqual(snap.chosenActivity, .reading)
+        XCTAssertEqual(snap.chosenActivity, .mealTime)
         XCTAssertEqual(snap.state, .active)
     }
 
@@ -152,9 +152,9 @@ final class EdgeCaseTests: XCTestCase {
         let (c, storage) = try boot()
         try c.start()
         var config = try storage.loadConfiguration()
-        config.selectedActivities = [.bath]
+        config.selectedActivities = [.freeTime]
         try storage.save(config)
-        XCTAssertEqual(try c.availableActivities(), [.bath])
+        XCTAssertEqual(try c.availableActivities(), [.freeTime])
     }
 
     // MARK: QA-14 — authorization revoked (Phase 0 scope)

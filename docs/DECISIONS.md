@@ -1677,6 +1677,136 @@ deleted — an icon that fails to load must not leave a child looking at a shiel
 design finally reach the child: green and playing at the first reminder, red and excited at the
 last, cheering at the finish.
 
+## D-052 — The dashboard becomes the parent's one screen
+**Date:** 2026-09-07 · **Status:** accepted · supersedes part of D-039, narrows D-029
+
+**Context.** The dashboard had grown two panels that existed for us rather than for the parent:
+*Preview the transition screen* and *Enforcement*. The preview was the one D-048 already convicted
+of lying — it drew a screen we do not control. Enforcement printed the monitor's internal state,
+which was a debugging aid I needed while the extensions were invisible, not something a parent has
+any use for. Meanwhile the thing a parent actually reaches for mid-session — what's next — lived two
+taps deep in Settings.
+
+**Decision.** Five changes, all pulling the same way: the dashboard is where a parent acts, and
+Settings is where they configure.
+
+**1. The preview and Enforcement panels are gone.** `ShieldPreview/` is deleted; the only survivor
+is `ShieldIconRenderer`, moved to `ScreenTime/Shielding/` where the thing it feeds lives.
+
+**2. What's next moves to the dashboard**, as tappable toggles over the family's list. Settings
+keeps only the editing a parent does once — add, rename, remove, reorder.
+
+**3. The built-in eight become five**: Family Time, Outside, Clean up, Meal time, Sleep. Eight was
+our guess; five is the list Dominic's family uses. Short enough to read at a glance, and still more
+than the shield's three-item menu can show, so the menu stays a choice rather than the whole list.
+The three surviving ids are unchanged; a window that stored a retired id decodes as a readable
+placeholder rather than losing the child's choice.
+
+**4. Extend counts from now, not from the expired end, and can subtract.** Default 3 minutes.
+`SessionController.adjust(bySeconds:)` adds to `max(now, endsAt)`, so "+3" ten minutes after time
+ran out means three minutes from this moment — which is what a parent standing there means. The
+same control takes time back. Never below `now`: a session cannot end in the past.
+
+**5. Free time is a switch, not a button, and it is dead while the clock runs.** It clears every
+restriction for the rest of the day, and it is greyed out until the budget is spent — so it can
+only ever be a decision made at the end, never a way to skip the middle.
+
+**Consequences.** `ScreenTimeConfiguration.selectedActivities` and every stored `TransitionActivity`
+keep working untouched; only the offered list shrank. Reversing (3) means restoring the statics —
+the ids were never reused, so nothing would collide. (4) makes `endsAt` the single source of truth
+for "when does this end", which the wall-clock alarms of D-050 already assumed.
+
+## D-053 — The ratchet let go of a window that had moved
+**Date:** 2026-09-07 · **Status:** accepted · fixes D-052, revises D-050
+
+**Context.** Device test: a parent adds three minutes to a finished session. The child's timer goes
+on saying Time's Up, and the Dynamic Island shows either the wrong number or nothing at all.
+
+**Three separate causes, all of them the same mistake — trusting a remembered answer over the fact
+it was derived from.**
+
+**1. The state latch (`SessionController`).** `WarningStateEngine.next` is a ratchet: it refuses to
+move a session backward, which is what stops clock jitter flipping a child between "5 minutes left"
+and "1 minute left". `.finished` is the top of that ratchet. But moving the window's END is not
+jitter, and every `SessionController` keeps its OWN latch in memory — the dashboard's and the
+timer's are different objects over one storage, so the dashboard recovering told the timer nothing.
+Fixed by remembering the `endsAt` each latch was derived from: when the end moves, re-derive from
+scratch. The ratchet still holds second to second, and lets go the moment the fact under it changes.
+This covers the paused clock (D-050) for free, which moves the end for the same reason.
+
+**2. `Activity.end` is one-way (`LiveActivityPresenter`).** D-021 ends the Live Activity when the
+session finishes and lets iOS retire the card ten minutes later. During those ten minutes the
+activity is still in `Activity.activities` — and `update()` on it is a **silent no-op**. So adding
+time updated a card that had stopped listening. Now only an `.active` activity is updated; anything
+else is retired immediately and replaced with a fresh one.
+
+**3. `ClosedRange` traps (`ScreenTimeActivityAttributes`).** The widget renders
+`Text(timerInterval: startedAt...endsAt)`. A range whose lower bound is above its upper bound is a
+crash, and a crash in a widget extension is not an error message — it is a Dynamic Island with
+nothing in it. `timerRange` clamps it once, in the state, rather than being trusted five times in
+the layout. `adjust` also refuses to move `endsAt` before now, so both ends of that are closed.
+
+**Also decided, from the same round of device use:**
+
+**What's next goes back to Settings.** D-052 moved the ticks to the dashboard. That was wrong twice:
+choosing which activities are offered is configuration done once, not a weekly decision, and a
+tappable list beside the ring turned the evening screen into a settings page. The dashboard now
+SHOWS the answer — the offered list, in order, with the first three marked as the ones a system
+shield can fit — and Settings owns the choosing, beside the same rows a parent renames and reorders.
+
+**Sleep becomes Free time**, and the built-in order is Family Time, Outside, Free time, Clean up,
+Meal time. The order is not cosmetic: a shield shows three and takes them off the front. Free time
+also gives a child who does not want to commit to a specific plan something true to pick, which
+matters more now that the last transition screen insists on an answer.
+
+**The second transition screen insists.** `mustChoose` was "is this the last reminder". It is now
+"is this anything but the first". The first ask is an invitation; a child who let it go by has
+already had the gentle version.
+
+**Free time became a slide, and lost the name.** "Free time" is an activity now, so the control that
+clears every restriction is labelled by what is true: *App restriction applied* in orange, *App
+restriction removed* in green, with the destination colour and words revealed under the thumb as it
+travels. Slide rather than switch because one stray tap should not unblock a child's whole device —
+the deliberate drag IS the confirmation, which is why there is no sheet behind it.
+
+**Consequences.** `lastWindowEnd` makes `SessionController` state derivable from storage alone,
+which is what let two controllers stop disagreeing; any future in-memory latch has to answer the
+same question. `timerRange` is now the only thing the widget may pass to a timer view.
+
+## D-054 — The PIN is the parent's, and the enforcement log comes back
+**Date:** 2026-09-07 · **Status:** accepted · reverses D-031's erase rule, partly reverses D-052
+
+**1. "Start over" no longer erases the parent PIN.**
+
+D-031 put the PIN in `eraseAll()` on the reasoning that a forgotten PIN surviving a reset would
+lock a parent out with no way back. That protection was never real: **Start over sits behind the
+gate**, so a parent who can reach it already knows the PIN. What the rule actually did was collide
+with D-036 — which will not open the timer without a PIN — so every Start over demanded a new one.
+A parent reported exactly that. The PIN now sits on the same side of the line as
+`pickerPreferences`: the parent's own things, not the child's setup. Changing it is one row in
+Settings for anyone who wants to.
+
+**2. The enforcement log returns, in Settings.**
+
+D-052 deleted the dashboard's Enforcement panel, and deleting it from the dashboard was right — a
+parent has no use for the monitor's internal state. Deleting it outright was wrong, and the cost
+arrived within a day: a transition screen misbehaved and the only evidence about it was
+unreachable.
+
+The monitor extension, the shield's configuration extension and the shield's action extension each
+run in their own process, woken for a moment, with no console, no breakpoint, and no way to be
+asked anything afterwards. `MonitorJournal` is the only record that exists — in particular the four
+`shieldShown…` events, which are the difference between "the reminder fired" and "the child saw the
+reminder", and whose ABSENCE is itself the finding: no line means iOS never asked us and drew its
+own "Restricted" screen instead.
+
+So the readout lives in Settings now, collapsed behind a disclosure. Out of a parent's way, one tap
+from the person debugging it.
+
+**The general rule this is the second instance of.** An invisible process cannot be reasoned about,
+only instrumented — and its instrument is part of the feature, not scaffolding to tidy away once it
+works. Removing one is removing the ability to answer the next question.
+
 <!-- Template for new entries:
 
 ## D-NNN — <short imperative title>

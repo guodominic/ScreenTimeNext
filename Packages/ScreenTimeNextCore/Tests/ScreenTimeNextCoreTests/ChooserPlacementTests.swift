@@ -53,7 +53,7 @@ final class ChooserPlacementTests: XCTestCase {
         XCTAssertEqual(snap.state, .finalWarning)
         XCTAssertTrue(snap.isChoosingMoment)
 
-        try controller.choose(.lego)
+        try controller.choose(.cleanUp)
         XCTAssertFalse(try controller.tick().isChoosingMoment, "chosen — stop asking")
     }
 }

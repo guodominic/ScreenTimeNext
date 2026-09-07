@@ -69,13 +69,12 @@ public final class InMemoryScreenTimeStorageService: ScreenTimeStorageService, @
         try lock.withLock { try check(); protection = state }
     }
 
-    /// D-024 — `pickerPreferences` deliberately survives: "Start over" erases the child's setup,
-    /// not the parent's own arrangement of the picker.
+    /// D-024 / D-054 — `pickerPreferences` and `parentPIN` deliberately survive: "Start over"
+    /// erases the child's setup, not the parent's own things.
     public func eraseAll() throws {
         try lock.withLock {
             try check()
             profile = nil; configuration = nil; usageByDay = [:]; window = nil; protection = .unshielded
-            parentPIN = nil                                  // D-031 — start over means start over
         }
     }
 

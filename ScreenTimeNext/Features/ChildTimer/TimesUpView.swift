@@ -80,8 +80,8 @@ struct TimesUpView: View {
     }
 }
 
-#Preview("Chose LEGO") {
-    TimesUpView(childName: "Ivy", chosenActivity: .lego, budgetSpentEarlier: false)
+#Preview("Chose Outside") {
+    TimesUpView(childName: "Ivy", chosenActivity: .outside, budgetSpentEarlier: false)
 }
 
 #Preview("No choice") {

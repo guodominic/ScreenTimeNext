@@ -14,10 +14,20 @@ final class CustomActivityTests: XCTestCase {
     /// Everything written while this was an enum encoded as a bare string. Sessions, windows and
     /// configurations on real devices are full of them.
     func testABareStringStillDecodesToTheBuiltIn() throws {
-        let decoded = try JSONDecoder().decode(TransitionActivity.self, from: Data("\"lego\"".utf8))
-        XCTAssertEqual(decoded, TransitionActivity.lego)
-        XCTAssertEqual(decoded.displayName, "LEGO")
+        let decoded = try JSONDecoder().decode(TransitionActivity.self, from: Data("\"cleanUp\"".utf8))
+        XCTAssertEqual(decoded, TransitionActivity.cleanUp)
+        XCTAssertEqual(decoded.displayName, "Clean up")
         XCTAssertFalse(decoded.isCustom)
+    }
+
+    /// D-052 — three built-ins were retired. A session that already stored one keeps it as a
+    /// readable placeholder: the child picked that, and we do not get to erase the choice just
+    /// because we stopped offering it.
+    func testARetiredBuiltInSurvivesAsAPlaceholder() throws {
+        let decoded = try JSONDecoder().decode(TransitionActivity.self, from: Data("\"lego\"".utf8))
+        XCTAssertEqual(decoded.id, "lego")
+        XCTAssertEqual(decoded.displayName, "Lego")
+        XCTAssertNil(TransitionActivity.builtIn(id: "lego"), "but it is no longer offered")
     }
 
     /// An id nobody recognises — a custom activity the parent later deleted, say — must not throw.
@@ -30,15 +40,15 @@ final class CustomActivityTests: XCTestCase {
     }
 
     func testAConfigurationOfBareStringsStillDecodes() throws {
-        let json = #"{"dailyBudgetSeconds":900,"warningOffsetsSeconds":[60],"selectedActivities":["lego","outside"]}"#
+        let json = #"{"dailyBudgetSeconds":900,"warningOffsetsSeconds":[60],"selectedActivities":["cleanUp","outside"]}"#
         let config = try JSONDecoder().decode(ScreenTimeConfiguration.self, from: Data(json.utf8))
-        XCTAssertEqual(config.selectedActivities, [.lego, .outside])
+        XCTAssertEqual(config.selectedActivities, [.cleanUp, .outside])
     }
 
     func testASessionWindowOfBareStringsStillDecodes() throws {
-        let json = #"{"startedAt":0,"endsAt":900,"chosenActivity":"reading"}"#
+        let json = #"{"startedAt":0,"endsAt":900,"chosenActivity":"mealTime"}"#
         let window = try JSONDecoder().decode(SessionWindow.self, from: Data(json.utf8))
-        XCTAssertEqual(window.chosenActivity, TransitionActivity.reading)
+        XCTAssertEqual(window.chosenActivity, TransitionActivity.mealTime)
     }
 
     // MARK: Round trips
@@ -55,10 +65,10 @@ final class CustomActivityTests: XCTestCase {
     /// A built-in is re-resolved from its id rather than trusted from disk, so improving its copy
     /// in a later version reaches families who already have it saved.
     func testABuiltInIsReResolvedRatherThanRestoredFromDisk() throws {
-        let stale = #"{"id":"lego","displayName":"Old Name","invitation":"Old!","symbolName":"star.fill","isCustom":false}"#
+        let stale = #"{"id":"cleanUp","displayName":"Old Name","invitation":"Old!","symbolName":"star.fill","isCustom":false}"#
         let decoded = try JSONDecoder().decode(TransitionActivity.self, from: Data(stale.utf8))
-        XCTAssertEqual(decoded.displayName, "LEGO", "the shipped copy wins")
-        XCTAssertEqual(decoded.symbolName, TransitionActivity.lego.symbolName)
+        XCTAssertEqual(decoded.displayName, "Clean up", "the shipped copy wins")
+        XCTAssertEqual(decoded.symbolName, TransitionActivity.cleanUp.symbolName)
     }
 
     // MARK: Identity
@@ -88,7 +98,7 @@ final class CustomActivityTests: XCTestCase {
     func testBuiltInLookupReplacesTheOldRawValueInit() {
         XCTAssertEqual(TransitionActivity.builtIn(id: "outside"), TransitionActivity.outside)
         XCTAssertNil(TransitionActivity.builtIn(id: "custom.whatever"))
-        XCTAssertEqual(TransitionActivity.allCases.count, 8)
+        XCTAssertEqual(TransitionActivity.allCases.count, 5, "D-052 — the built-in five")
     }
 
     // MARK: The parent's own list
@@ -104,7 +114,7 @@ final class CustomActivityTests: XCTestCase {
                                                from: try JSONEncoder().encode(prefs))
         XCTAssertEqual(decoded.customActivities, [piano])
         XCTAssertEqual(decoded.savedSelections.first?.name, "School nights")
-        XCTAssertEqual(decoded.allActivities.count, 9)
+        XCTAssertEqual(decoded.allActivities.count, TransitionActivity.allCases.count + 1)
         XCTAssertEqual(decoded.allActivities.last, piano)
     }
 
@@ -182,18 +192,18 @@ final class BlockedWebsiteTests: XCTestCase {
     func testActivitiesFollowTheParentsOrder() {
         let piano = TransitionActivity.custom(displayName: "Piano", symbolName: "music.note")
         let prefs = ParentPickerPreferences(customActivities: [piano],
-                                            activityOrder: [piano.id, "outside", "lego"])
+                                            activityOrder: [piano.id, "outside", "cleanUp"])
         let ordered = prefs.allActivities
-        XCTAssertEqual(ordered.prefix(3).map(\.id), [piano.id, "outside", "lego"])
-        XCTAssertEqual(ordered.count, 9, "and nothing is lost")
+        XCTAssertEqual(ordered.prefix(3).map(\.id), [piano.id, "outside", "cleanUp"])
+        XCTAssertEqual(ordered.count, TransitionActivity.allCases.count + 1, "and nothing is lost")
     }
 
     /// A saved order written before an activity existed — or after one was deleted — must never
     /// hide a row.
     func testAStaleOrderCannotHideAnActivity() {
-        let prefs = ParentPickerPreferences(activityOrder: ["reading", "deleted.thing"])
+        let prefs = ParentPickerPreferences(activityOrder: ["mealTime", "deleted.thing"])
         let ordered = prefs.allActivities
-        XCTAssertEqual(ordered.first?.id, "reading")
+        XCTAssertEqual(ordered.first?.id, "mealTime")
         XCTAssertEqual(ordered.count, TransitionActivity.allCases.count)
         XCTAssertEqual(Set(ordered.map(\.id)), Set(TransitionActivity.allCases.map(\.id)))
     }
@@ -204,39 +214,39 @@ final class BlockedWebsiteTests: XCTestCase {
     }
 
     func testOrderAndWebsitesRoundTrip() throws {
-        var prefs = ParentPickerPreferences(activityOrder: ["outside", "lego"])
+        var prefs = ParentPickerPreferences(activityOrder: ["outside", "cleanUp"])
         prefs.addWebsite("example.com")
         let decoded = try JSONDecoder().decode(ParentPickerPreferences.self,
                                                from: try JSONEncoder().encode(prefs))
-        XCTAssertEqual(decoded.activityOrder, ["outside", "lego"])
+        XCTAssertEqual(decoded.activityOrder, ["outside", "cleanUp"])
         XCTAssertEqual(decoded.blockedWebsites, ["example.com"])
     }
 
     // MARK: Removing built-ins (D-039)
 
     func testAHiddenBuiltInIsNotOffered() {
-        let prefs = ParentPickerPreferences(hiddenActivityIDs: ["bath", "homework"])
+        let prefs = ParentPickerPreferences(hiddenActivityIDs: ["freeTime", "outside"])
         let ids = prefs.allActivities.map(\.id)
-        XCTAssertFalse(ids.contains("bath"))
-        XCTAssertFalse(ids.contains("homework"))
+        XCTAssertFalse(ids.contains("freeTime"))
+        XCTAssertFalse(ids.contains("outside"))
         XCTAssertEqual(prefs.allActivities.count, TransitionActivity.allCases.count - 2)
         XCTAssertTrue(prefs.hasHiddenBuiltIns, "so Settings can offer them back")
     }
 
     /// Hidden, not deleted — the whole reason removal is reversible in one tap.
     func testClearingTheHiddenListBringsTheBuiltInsBack() {
-        var prefs = ParentPickerPreferences(hiddenActivityIDs: ["bath"])
+        var prefs = ParentPickerPreferences(hiddenActivityIDs: ["freeTime"])
         prefs.hiddenActivityIDs = []
         XCTAssertEqual(prefs.allActivities.count, TransitionActivity.allCases.count)
         XCTAssertFalse(prefs.hasHiddenBuiltIns)
     }
 
     func testHidingSurvivesARoundTrip() throws {
-        let prefs = ParentPickerPreferences(hiddenActivityIDs: ["snack"])
+        let prefs = ParentPickerPreferences(hiddenActivityIDs: ["familyTime"])
         let decoded = try JSONDecoder().decode(ParentPickerPreferences.self,
                                                from: try JSONEncoder().encode(prefs))
-        XCTAssertEqual(decoded.hiddenActivityIDs, ["snack"])
-        XCTAssertFalse(decoded.allActivities.map(\.id).contains("snack"))
+        XCTAssertEqual(decoded.hiddenActivityIDs, ["familyTime"])
+        XCTAssertFalse(decoded.allActivities.map(\.id).contains("familyTime"))
     }
 
     /// A record written before D-039 has no hidden list at all, and must decode as "nothing
@@ -260,7 +270,7 @@ final class BlockedWebsiteTests: XCTestCase {
 
     func testRemovalIsAllowedWhileMoreThanOneRemains() {
         let prefs = ParentPickerPreferences()
-        XCTAssertTrue(prefs.canRemoveActivity("bath"))
+        XCTAssertTrue(prefs.canRemoveActivity("freeTime"))
     }
 
     /// A parent's own activity counts toward "something is left", so the built-ins can all go.

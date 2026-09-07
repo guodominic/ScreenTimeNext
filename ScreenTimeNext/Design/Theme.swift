@@ -77,14 +77,15 @@ nonisolated enum Theme {
     /// means a custom activity keeps its colour when others are added or removed around it.
     static func color(for activity: TransitionActivity) -> Color {
         switch activity.id {
-        case "lego":       return coral
-        case "drawing":    return lavender
-        case "reading":    return sky
-        case "outside":    return mint
-        case "snack":      return sun
-        case "bath":       return Color(red: 0.40, green: 0.80, blue: 0.95)
-        case "homework":   return peach
+        // D-052 / D-053 — the built-in five, each with a hand-picked hue. Orange and green are
+        // deliberately not here: those two now MEAN something on this screen (the restriction
+        // slide), and an activity tile borrowing them would blur a signal that has to stay loud.
+        // A retired id ("lego") and anything a parent adds fall through to the palette below.
         case "familyTime": return Color(red: 0.95, green: 0.55, blue: 0.75)
+        case "outside":    return mint
+        case "freeTime":   return sun
+        case "cleanUp":    return sky
+        case "mealTime":   return coral
         default:           return customPalette[stableIndex(of: activity.id, count: customPalette.count)]
         }
     }

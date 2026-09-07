@@ -17,7 +17,6 @@ struct ParentDashboardView: View {
     @State private var viewModel: ParentDashboardViewModel
     @State private var confirmReset = false
     @State private var showExtend = false
-    @State private var showShieldPreview = false
     @State private var showCoveredContent = false
     let onOpenTimer: () -> Void
     let onReset: () -> Void
@@ -39,8 +38,8 @@ struct ParentDashboardView: View {
                 if viewModel.authorization != .approved { screenTimeAccessSection }
                 if viewModel.notificationsDenied { notificationAlertSection }
                 contentSection
-                enforcementSection
                 whatsNextSection
+                restrictionSection
                 dangerSection
             }
             .listSectionSpacing(14)
@@ -64,15 +63,9 @@ struct ParentDashboardView: View {
             .onReceive(NotificationCenter.default.publisher(for: .configurationDidChange)) { _ in
                 viewModel.reload()
             }
-            .sheet(isPresented: $showShieldPreview) {
-                ShieldPreviewView(childName: name,
-                                  activities: viewModel.configuration.selectedActivities.isEmpty
-                                      ? TransitionActivity.allCases
-                                      : viewModel.configuration.selectedActivities)
-            }
             .sheet(isPresented: $showExtend) {
                 ExtendTimeSheet(childName: name) { minutes in
-                    viewModel.extend(minutes: minutes)
+                    viewModel.adjust(minutes: minutes)
                 }
                 .presentationDetents([.medium, .large])
             }
@@ -148,7 +141,7 @@ struct ParentDashboardView: View {
                 }
                 if viewModel.canExtend {
                     Button { showExtend = true } label: {
-                        heroChip("Extend", "plus")
+                        heroChip("Time", "plusminus")
                     }
                     .buttonStyle(.plain)
                 }
@@ -230,107 +223,75 @@ struct ParentDashboardView: View {
                     CoveredContentSheet(snapshot: snapshot)
                 }
             }
-            Button { showShieldPreview = true } label: {
-                HStack(spacing: 12) {
-                    IconChip(symbol: "sparkles", color: Theme.coral)
-                    Text("Preview the transition screen").fontWeight(.semibold).foregroundStyle(Theme.coral)
-                }
-            }
         } header: {
             Text("Protected content")
         } footer: {
-            Text("With Screen Time access, a full-screen message appears inside the app being used — at each reminder, and when time is up. Preview it above; enforcement itself arrives with that access.")
+            Text("A full-screen message appears inside the app your child is using — at each reminder, and when time is up.")
         }
     }
 
-    /// Task 010 — the one thing a parent cannot find out any other way: whether iOS is actually
-    /// watching. The monitor extension runs while the app is closed, so "it looked fine when I
-    /// last opened it" is not evidence, and a dashboard that stayed quiet about this would let a
-    /// family believe a budget was being enforced when nothing was registered at all.
+    /// D-053 — a read-out, not a control.
     ///
-    /// §16 — a check-in is a callback name and a time. Never which app tripped it.
-    @ViewBuilder
-    private var enforcementSection: some View {
+    /// D-052 put the ticks here, and that was wrong twice over: choosing which activities are
+    /// offered is configuration a parent does once, and a tappable list sitting next to the ring
+    /// made the screen a parent opens every evening read like a settings page. What belongs here
+    /// is the answer to "what will my child be asked?" — so that is all it shows now. Editing is
+    /// back in Settings, next to the list it edits.
+    private var whatsNextSection: some View {
         Section {
-            HStack(spacing: 12) {
-                IconChip(symbol: viewModel.monitoringIsRegistered ? "eye.fill" : "eye.slash",
-                         color: viewModel.monitoringIsRegistered ? Theme.grass : Theme.peach)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(viewModel.monitoringIsRegistered ? "Watching today's budget" : "Not watching yet")
-                        .fontWeight(.semibold)
-                    Text(viewModel.monitoringIsRegistered
-                         ? "iOS keeps count even when this app is closed."
-                         : "Pick what's covered above, and this switches on.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer(minLength: 0)
-            }
-            if let report = viewModel.lastMonitorReport {
-                // Two lines, not one sentence. The first version read "Last check-in the budget ran
-                // out · Sep 6 at 18:03" — every word true, and unreadable, because the label ran
-                // straight into the event with nothing between them. Dominic looked at a working
-                // check-in and could not tell it had worked, which is the same as it not working.
+            let offered = viewModel.offeredActivities
+            // The order is the answer: a system shield can show three (D-044), and it takes them
+            // off the front. Marking the cut-off is the only way a parent can tell, from here,
+            // that reordering in Settings changes what their child sees.
+            ForEach(Array(offered.enumerated()), id: \.element.id) { index, activity in
                 HStack(spacing: 12) {
-                    IconChip(symbol: Self.symbol(for: report.event), color: Theme.sky, size: 30)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(Self.describe(report.event))
-                            .font(.subheadline.weight(.semibold))
-                        Text("Last check-in · \(report.at.formatted(date: .abbreviated, time: .shortened))")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
+                    IconChip(symbol: activity.symbolName, color: Theme.color(for: activity), size: 30)
+                    Text(activity.displayName).fontWeight(.medium)
                     Spacer(minLength: 0)
+                    if index < viewModel.shieldChoiceCount {
+                        Text("On the shield")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(Theme.color(for: activity))
+                            .padding(.horizontal, 8).padding(.vertical, 3)
+                            .background(Capsule().fill(Theme.color(for: activity).opacity(0.14)))
+                    }
                 }
             }
         } header: {
-            Text("Enforcement")
-        }
-    }
-
-    /// Apple's callback names, in words a parent can read. Written as standalone headings rather
-    /// than sentence fragments, because that is what they have to work as on their own line.
-    private static func describe(_ event: MonitorReport.Event) -> String {
-        switch event {
-        case .intervalDidStart:           return "A new day started"
-        case .intervalDidEnd:             return "The day ended"
-        case .thresholdReached:           return "Time ran out"
-        case .warningBeforeIntervalEnds:  return "The day is nearly over"
-        case .warningBeforeThreshold:     return "A reminder was raised"
-        // D-049 — what the child actually saw, as opposed to what fired.
-        case .shieldShownReminder:        return "Your child saw: a reminder"
-        case .shieldShownChooser:         return "Your child saw: pick what's next"
-        case .shieldShownFinished:        return "Your child saw: time's up"
-        case .shieldShownSpent:           return "Your child saw: all done for today"
-        }
-    }
-
-    private static func symbol(for event: MonitorReport.Event) -> String {
-        switch event {
-        case .thresholdReached:           return "hourglass.bottomhalf.filled"
-        case .warningBeforeThreshold:     return "exclamationmark.triangle.fill"
-        case .intervalDidStart:           return "sunrise.fill"
-        case .intervalDidEnd:             return "moon.fill"
-        case .warningBeforeIntervalEnds:  return "clock.badge.exclamationmark"
-        case .shieldShownReminder:        return "hand.raised.fill"
-        case .shieldShownChooser:         return "hand.tap.fill"
-        case .shieldShownFinished:        return "hands.clap.fill"
-        case .shieldShownSpent:           return "moon.stars.fill"
-        }
-    }
-
-    private var whatsNextSection: some View {
-        Section("What's next") {
-            if viewModel.configuration.selectedActivities.isEmpty {
-                Text("All activities offered").foregroundStyle(.secondary)
-            } else {
-                ForEach(viewModel.configuration.selectedActivities) { activity in
-                    HStack(spacing: 12) {
-                        IconChip(symbol: activity.symbolName, color: Theme.color(for: activity), size: 30)
-                        Text(activity.displayName).fontWeight(.medium)
-                    }
+            HStack {
+                Text("What's next")
+                Spacer()
+                NavigationLink {
+                    SettingsView(services: services, onSaved: { viewModel.reload() })
+                } label: {
+                    Text("Edit").font(.caption.weight(.bold)).textCase(nil)
                 }
             }
+        } footer: {
+            Text(viewModel.offersEverything
+                 ? "Nothing picked yet, so your child is offered all of these. Choose in Settings."
+                 : "Your child sees the first \(viewModel.shieldChoiceCount) on the transition screen, in this order.")
+        }
+    }
+
+    /// D-053 — the slide that clears every restriction for the rest of today, and puts them back.
+    ///
+    /// Disabled while time remains, because there is nothing to clear then: the apps are already
+    /// open. A control that appears to do something it is not doing is worse than a missing one.
+    private var restrictionSection: some View {
+        Section {
+            RestrictionSlide(isCleared: viewModel.restrictionsAreCleared,
+                             isEnabled: viewModel.canClearRestrictions) { cleared in
+                viewModel.setRestrictionsCleared(cleared)
+            }
+            .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
+            .listRowBackground(Color.clear)
+        } footer: {
+            Text(viewModel.canClearRestrictions
+                 // It ends by itself, which is the point: a parent who says yes to a film night
+                 // should not have to remember to say no again in the morning.
+                 ? "Slide to unblock every app for the rest of today. Restrictions come back by themselves at midnight, or slide again to bring them back now."
+                 : "Available once today's time has run out — nothing is blocked while the timer is running.")
         }
     }
 
@@ -389,30 +350,59 @@ struct ParentDashboardView: View {
     }
 }
 
-/// D-013 / D-034: extension minutes on the same dial as everywhere else — 1 to 90, one minute
-/// at a time.
+/// D-052 — add time OR take it back, on the same dial as everywhere else (1–90, D-034).
+///
+/// Two changes from the old "Extend" sheet, both from watching it used:
+///   · the default is 3 minutes, not 10. "Two more minutes and then dinner" is the sentence a
+///     parent actually says; ten was a number they had to dial down from every time.
+///   · time can come off as well as on. A parent who gave twenty minutes and then remembered
+///     bedtime had no way back except ending the session outright.
 struct ExtendTimeSheet: View {
     @Environment(\.dismiss) private var dismiss
     let childName: String
+    /// Positive adds, negative takes back.
     let onExtend: (Int) -> Void
-    @State private var minutes = 10
+
+    @State private var minutes = 3
+    @State private var isAdding = true
+
+    private var tint: Color { isAdding ? Theme.lavender : Theme.peach }
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 20) {
-                Mascot(mood: .cheering, size: 84, tint: Theme.lavender)
-                Text(childName.isEmpty ? "More time" : "Give \(childName) more time")
-                    .font(.system(.title2, design: .rounded).bold())
-                // D-020/D-034 — the same dial as everywhere else: 1–90, one minute at a time.
-                MinuteDial.budget($minutes, color: Theme.lavender)
-                Text("Extra minutes are beyond today's budget.")
-                    .font(.footnote).foregroundStyle(.secondary)
-                Button { onExtend(minutes); dismiss() } label: { Text("Add \(minutes) minutes") }
-                    .buttonStyle(PillButtonStyle(color: Theme.lavender))
-                    .padding(.horizontal, 24)
-                    .readableWidth(460)
+                Mascot(mood: isAdding ? .cheering : .thinking, size: 84, tint: tint)
+
+                Picker("", selection: $isAdding) {
+                    Text("Add time").tag(true)
+                    Text("Take back").tag(false)
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal, 24)
+                .readableWidth(460)
+
+                MinuteDial.budget($minutes, color: tint)
+
+                Text(isAdding
+                     ? "Added from now, so it means the same whether the timer is still running or already finished."
+                     : "Taken off the end. The session never rewinds past this moment.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
+
+                Button {
+                    onExtend(isAdding ? minutes : -minutes)
+                    dismiss()
+                } label: {
+                    Text(isAdding ? "Add \(minutes) minutes" : "Take back \(minutes) minutes")
+                }
+                .buttonStyle(PillButtonStyle(color: tint))
+                .padding(.horizontal, 24)
+                .readableWidth(460)
             }
             .padding(.top, 20)
+            .navigationTitle(childName.isEmpty ? "Change time" : "Change \(childName)'s time")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
@@ -429,7 +419,7 @@ private func dashboardPreviewStorage() -> InMemoryScreenTimeStorageService {
     let s = InMemoryScreenTimeStorageService()
     try? s.save(ChildProfile(name: "Ivy"))
     var c = ScreenTimeConfiguration.default
-    c.selectedActivities = [.lego, .reading, .outside]
+    c.selectedActivities = [.familyTime, .outside, .cleanUp]
     try? s.save(c)
     return s
 }

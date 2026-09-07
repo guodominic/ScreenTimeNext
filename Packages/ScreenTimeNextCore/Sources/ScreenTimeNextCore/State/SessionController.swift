@@ -53,6 +53,18 @@ public final class SessionController: @unchecked Sendable {
 
     /// Monotonic within a session (never steps back on jitter); reset by start/rollover/end.
     private var lastState: ScreenTimeState = .idle
+    /// D-053 — the `endsAt` that `lastState` was derived from.
+    ///
+    /// `WarningStateEngine.next` is a ratchet: it refuses to walk a session backward, which is what
+    /// stops clock jitter flipping a child between "1 minute left" and "5 minutes left". But
+    /// `.finished` is the top of that ratchet, and a parent adding three minutes moves the END —
+    /// so the previous state describes a window that no longer exists. Left alone, the child's
+    /// screen and the Live Activity both stayed on Time's Up for a session with minutes on it,
+    /// because each `SessionController` holds its own latch and the dashboard's is not the timer's.
+    ///
+    /// Remembering which end the latch belongs to is what makes it safe: the ratchet still holds
+    /// second to second, and lets go the moment the fact underneath it changes.
+    private var lastWindowEnd: Date?
 
     public init(storage: any ScreenTimeStorageService,
                 notifications: (any NotificationScheduling)? = nil,
@@ -223,6 +235,37 @@ public final class SessionController: @unchecked Sendable {
         }
     }
 
+    /// D-052 — a parent adds or removes minutes.
+    ///
+    /// Positive seconds count from NOW, not from a `endsAt` that may already be in the past: an
+    /// expired session extended by three minutes has to give the child three minutes, and
+    /// `endsAt + 3min` on a window that ended ten minutes ago gives them nothing at all — which is
+    /// exactly what Dominic saw. While a session is still running, "now" is behind `endsAt` and the
+    /// time is added on top, as before.
+    ///
+    /// Negative seconds take time back and never leave the end before now — a parent trimming a
+    /// session ends it, they do not rewind it.
+    @discardableResult
+    public func adjust(bySeconds seconds: Int) throws -> ChildSessionSnapshot? {
+        try lock.withLock {
+            guard let window = try storage.loadSessionWindow() else { return nil }
+            let current = now()
+            let base = seconds > 0 ? max(current, window.endsAt) : window.endsAt
+            let proposed = base.addingTimeInterval(TimeInterval(seconds))
+            let adjusted = SessionWindow(startedAt: window.startedAt,
+                                         endsAt: max(current, proposed),
+                                         chosenActivity: window.chosenActivity,
+                                         budgetSecondsAtStart: window.budgetSecondsAtStart,
+                                         pausedSeconds: window.pausedSeconds)
+            try storage.save(adjusted)
+            lastWindowEnd = adjusted.endsAt
+            lastState = WarningStateEngine.start(remainingSeconds: adjusted.remainingSeconds(at: current),
+                                                 warningOffsets: try offsetsLocked(for: adjusted))
+            try scheduleNotificationsLocked(for: adjusted)
+            return try snapshotLocked(for: adjusted, at: current)
+        }
+    }
+
     /// A parent ends the session early. Records the time actually used and returns to idle.
     @discardableResult
     public func endEarly() throws -> ChildSessionSnapshot {
@@ -309,9 +352,13 @@ public final class SessionController: @unchecked Sendable {
         let remaining = window.remainingSeconds(at: current)
         let offsets = try offsetsLocked(for: window)
         let previous = lastState
+        // D-053 — the window's end moved (a parent added or took back time, or a transition screen
+        // paused the clock). Re-derive rather than ratchet: see `lastWindowEnd`.
+        let endMoved = lastWindowEnd != nil && lastWindowEnd != window.endsAt
+        lastWindowEnd = window.endsAt
         // A controller that did not open this window (dashboard, root routing, relaunch) must adopt
         // it rather than stay idle — this was the "Session: Not started" bug.
-        if lastState == .idle {
+        if lastState == .idle || endMoved {
             lastState = WarningStateEngine.start(remainingSeconds: remaining, warningOffsets: offsets)
         } else {
             lastState = WarningStateEngine.next(current: lastState, remainingSeconds: remaining, warningOffsets: offsets)

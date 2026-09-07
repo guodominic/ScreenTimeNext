@@ -63,8 +63,8 @@ final class OnboardingDraftTests: XCTestCase {
 
     func testActivitiesAreStoredInCanonicalOrder() {
         var draft = OnboardingDraft()
-        draft.selectedActivities = [.familyTime, .lego, .reading]
-        XCTAssertEqual(draft.configuration.selectedActivities, [.lego, .reading, .familyTime])
+        draft.selectedActivities = [.familyTime, .cleanUp, .mealTime]
+        XCTAssertEqual(draft.configuration.selectedActivities, [.familyTime, .cleanUp, .mealTime])
     }
 
     func testCommitWritesProfileConfigurationAndSelection() throws {
@@ -76,7 +76,7 @@ final class OnboardingDraftTests: XCTestCase {
         draft.childName = "Athan"
         draft.dailyBudgetSeconds = 1800
         draft.warningMinutes = [10, 0, 1]   // middle reminder off
-        draft.selectedActivities = [.drawing]
+        draft.selectedActivities = [.freeTime]
         draft.selection = MockScreenTimeSelectionService.sampleSnapshot()
 
         try draft.commit(using: services)
@@ -85,7 +85,7 @@ final class OnboardingDraftTests: XCTestCase {
         let config = try storage.loadConfiguration()
         XCTAssertEqual(config.dailyBudgetSeconds, 1800)
         XCTAssertEqual(config.warningOffsetsSeconds, [600, 60])
-        XCTAssertEqual(config.selectedActivities, [.drawing])
+        XCTAssertEqual(config.selectedActivities, [.freeTime])
         XCTAssertEqual(try selection.loadSelection(), draft.selection)
     }
 

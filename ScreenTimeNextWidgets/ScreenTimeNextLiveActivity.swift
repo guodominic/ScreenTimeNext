@@ -33,7 +33,7 @@ struct ScreenTimeNextLiveActivity: Widget {
                         if isFinished(context) {
                             Text("Done").font(.system(.title3, design: .rounded).bold())
                         } else {
-                            Text(timerInterval: context.state.startedAt...context.state.endsAt, countsDown: true)
+                            Text(timerInterval: context.state.timerRange, countsDown: true)
                                 .font(.system(.title2, design: .rounded).bold())
                                 .monospacedDigit()
                         }
@@ -58,14 +58,14 @@ struct ScreenTimeNextLiveActivity: Widget {
                         size: 20,
                         tint: color(for: context.state.stateName))
             } compactTrailing: {
-                Text(timerInterval: context.state.startedAt...context.state.endsAt, countsDown: true)
+                Text(timerInterval: context.state.timerRange, countsDown: true)
                     .font(.caption.bold())
                     .monospacedDigit()
                     .frame(width: 46)
             } minimal: {
                 // The ring still carries the countdown; Pip sits inside it so the mark is the app's.
                 ZStack {
-                    ProgressView(timerInterval: context.state.startedAt...context.state.endsAt, countsDown: true) {
+                    ProgressView(timerInterval: context.state.timerRange, countsDown: true) {
                         EmptyView()
                     } currentValueLabel: {
                         EmptyView()
@@ -104,7 +104,7 @@ private struct LockScreenView: View {
                         .font(.system(size: 30, weight: .bold))
                         .foregroundStyle(color(for: context.state.stateName))
                 } else {
-                    Text(timerInterval: context.state.startedAt...context.state.endsAt, countsDown: true)
+                    Text(timerInterval: context.state.timerRange, countsDown: true)
                         .font(.system(size: 30, weight: .bold, design: .rounded))
                         .monospacedDigit()
                 }

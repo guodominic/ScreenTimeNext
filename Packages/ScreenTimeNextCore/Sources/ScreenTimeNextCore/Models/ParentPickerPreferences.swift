@@ -42,6 +42,12 @@ public struct ParentPickerPreferences: Codable, Equatable, Sendable {
     /// row.
     public var activityOrder: [String]
 
+    /// D-052 — the day a parent slid every restriction off, or nil.
+    ///
+    /// Stored as a DATE rather than a flag so it expires by itself at midnight: this is an evening
+    /// a parent decided to let go of, not a setting they have to remember to switch back.
+    public var restrictionsClearedOn: Date?
+
     /// D-045 — whether the parent gate accepts Face ID as a shortcut past the PIN. Off unless the
     /// parent turned it on; see `ParentUnlockService` for why that default is the whole decision.
     public var gate: ParentGatePreference
@@ -64,8 +70,10 @@ public struct ParentPickerPreferences: Codable, Equatable, Sendable {
                 blockedWebsites: [String] = [],
                 activityOrder: [String] = [],
                 hiddenActivityIDs: [String] = [],
-                gate: ParentGatePreference = .default) {
+                gate: ParentGatePreference = .default,
+                restrictionsClearedOn: Date? = nil) {
         self.gate = gate
+        self.restrictionsClearedOn = restrictionsClearedOn
         self.customActivities = customActivities
         self.savedSelections = savedSelections
         self.blockedWebsites = Self.tidied(blockedWebsites)
@@ -142,11 +150,17 @@ public struct ParentPickerPreferences: Codable, Equatable, Sendable {
         allActivities.contains { $0.id != id }
     }
 
+    /// D-052 — true only for the day it was cleared. Yesterday's free evening is over.
+    public func restrictionsAreCleared(on day: Date = Date(), calendar: Calendar = .current) -> Bool {
+        guard let granted = restrictionsClearedOn else { return false }
+        return calendar.isDate(granted, inSameDayAs: day)
+    }
+
     public static let `default` = ParentPickerPreferences()
 
     private enum CodingKeys: String, CodingKey {
         case customActivities, savedSelections
-        case blockedWebsites, activityOrder, hiddenActivityIDs, gate
+        case blockedWebsites, activityOrder, hiddenActivityIDs, gate, restrictionsClearedOn
     }
 
     public init(from decoder: Decoder) throws {
@@ -157,7 +171,8 @@ public struct ParentPickerPreferences: Codable, Equatable, Sendable {
             blockedWebsites: try c.decodeIfPresent([String].self, forKey: .blockedWebsites) ?? [],
             activityOrder: try c.decodeIfPresent([String].self, forKey: .activityOrder) ?? [],
             hiddenActivityIDs: try c.decodeIfPresent([String].self, forKey: .hiddenActivityIDs) ?? [],
-            gate: try c.decodeIfPresent(ParentGatePreference.self, forKey: .gate) ?? .default
+            gate: try c.decodeIfPresent(ParentGatePreference.self, forKey: .gate) ?? .default,
+            restrictionsClearedOn: try c.decodeIfPresent(Date.self, forKey: .restrictionsClearedOn)
         )
     }
 }

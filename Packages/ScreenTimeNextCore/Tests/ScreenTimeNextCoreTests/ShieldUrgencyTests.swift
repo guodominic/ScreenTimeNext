@@ -65,7 +65,7 @@ final class ShieldUrgencyTests: XCTestCase {
 
     func testExplicitUrgencyBeatsTheClock() {
         // 10 minutes left would read .calm on its own; the caller knows this is the last reminder.
-        let p = ShieldPresentation.make(for: .reminder(minutesLeft: 10, activity: .lego),
+        let p = ShieldPresentation.make(for: .reminder(minutesLeft: 10, activity: .cleanUp),
                                         childName: "Ivy", urgency: .last)
         XCTAssertEqual(p.urgency, .last)
     }

@@ -25,16 +25,16 @@ final class WhatsNextTests: XCTestCase {
         controller = SessionController(storage: storage, now: { c.now })
         var config = ScreenTimeConfiguration.default
         config.dailyBudgetSeconds = 900
-        config.selectedActivities = [.lego, .reading]
+        config.selectedActivities = [.cleanUp, .mealTime]
         try storage.save(config)
     }
 
     func testAvailableActivitiesAreTheParentsPicks() throws {
-        XCTAssertEqual(try controller.availableActivities(), [.lego, .reading])
+        XCTAssertEqual(try controller.availableActivities(), [.cleanUp, .mealTime])
     }
 
     /// D-009 — empty parent set offers the whole fixed set.
-    func testEmptyParentSetOffersAllEight() throws {
+    func testEmptyParentSetOffersEveryBuiltIn() throws {
         var config = try storage.loadConfiguration()
         config.selectedActivities = []
         try storage.save(config)
@@ -44,22 +44,22 @@ final class WhatsNextTests: XCTestCase {
     func testChoiceIsPersistedOnTheWindowAndSurvivesRelaunch() throws {
         try controller.start()
         clock.advance(400)   // 500 left → warning10
-        let snap = try controller.choose(.lego)
-        XCTAssertEqual(snap.chosenActivity, .lego)
-        XCTAssertEqual(try storage.loadSessionWindow()?.chosenActivity, .lego)
+        let snap = try controller.choose(.cleanUp)
+        XCTAssertEqual(snap.chosenActivity, .cleanUp)
+        XCTAssertEqual(try storage.loadSessionWindow()?.chosenActivity, .cleanUp)
 
         let c = clock!
         let relaunched = SessionController(storage: storage, now: { c.now })
-        XCTAssertEqual(try relaunched.restore().chosenActivity, .lego)
+        XCTAssertEqual(try relaunched.restore().chosenActivity, .cleanUp)
     }
 
     func testChoiceCarriesThroughToFinishedAndClearsOnNextStart() throws {
         try controller.start()
-        try controller.choose(.reading)
+        try controller.choose(.mealTime)
         clock.advance(900)
         let done = try controller.tick()
         XCTAssertEqual(done.state, .finished)
-        XCTAssertEqual(done.chosenActivity, .reading, "Time's Up can name it")
+        XCTAssertEqual(done.chosenActivity, .mealTime, "Time's Up can name it")
         // Next day, next session: no leftover choice.
         clock.advance(24 * 3600)
         let next = try controller.start()
@@ -67,7 +67,7 @@ final class WhatsNextTests: XCTestCase {
     }
 
     func testChoosingWithoutASessionIsANoOp() throws {
-        let snap = try controller.choose(.snack)
+        let snap = try controller.choose(.familyTime)
         XCTAssertEqual(snap.state, .idle)
         XCTAssertNil(snap.chosenActivity)
         XCTAssertNil(try storage.loadSessionWindow())
@@ -75,13 +75,13 @@ final class WhatsNextTests: XCTestCase {
 
     func testChoiceCanBeChanged() throws {
         try controller.start()
-        try controller.choose(.lego)
-        XCTAssertEqual(try controller.choose(.reading).chosenActivity, .reading)
+        try controller.choose(.cleanUp)
+        XCTAssertEqual(try controller.choose(.mealTime).chosenActivity, .mealTime)
     }
 
     func testExtensionKeepsTheChoice() {
-        let w = SessionWindow(startedAt: Date(), budgetSeconds: 60, chosenActivity: .bath)
-        XCTAssertEqual(w.extended(bySeconds: 600).chosenActivity, .bath)
+        let w = SessionWindow(startedAt: Date(), budgetSeconds: 60, chosenActivity: .freeTime)
+        XCTAssertEqual(w.extended(bySeconds: 600).chosenActivity, .freeTime)
     }
 
     func testEveryActivityHasChildFacingCopy() {
