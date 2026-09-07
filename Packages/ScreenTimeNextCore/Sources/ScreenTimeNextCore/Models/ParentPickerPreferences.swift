@@ -42,6 +42,22 @@ public struct ParentPickerPreferences: Codable, Equatable, Sendable {
     /// row.
     public var activityOrder: [String]
 
+    /// D-064 — block ALL web browsing when time is up, in every browser, with no tokens.
+    ///
+    /// This is the one thing a parent asks for that Apple's picker cannot give them. Browsers are
+    /// spread across categories — Safari sits under System, the rest under Utilities — so covering
+    /// "browsers" by ticking categories means also covering the calculator and the compass, and
+    /// there is no way to construct a token for one app (B-005).
+    ///
+    /// `webContent.blockedByFilter` is a different surface entirely: it takes plain domains, or
+    /// `.all()`, and needs nothing from the picker. An Apple Frameworks Engineer states it
+    /// directly — you can block all web content this way (developer.apple.com/forums/thread/718251).
+    ///
+    /// Defaults to ON because it is what every parent who has asked for this meant, and because
+    /// the alternative they would otherwise reach for (ticking Utilities) is worse. It is a labelled
+    /// switch on the picker, counted in what's covered — never a silent default.
+    public var blocksAllWebBrowsing: Bool
+
     /// D-052 — the day a parent slid every restriction off, or nil.
     ///
     /// Stored as a DATE rather than a flag so it expires by itself at midnight: this is an evening
@@ -71,7 +87,9 @@ public struct ParentPickerPreferences: Codable, Equatable, Sendable {
                 activityOrder: [String] = [],
                 hiddenActivityIDs: [String] = [],
                 gate: ParentGatePreference = .default,
-                restrictionsClearedOn: Date? = nil) {
+                restrictionsClearedOn: Date? = nil,
+                blocksAllWebBrowsing: Bool = true) {
+        self.blocksAllWebBrowsing = blocksAllWebBrowsing
         self.gate = gate
         self.restrictionsClearedOn = restrictionsClearedOn
         self.customActivities = customActivities
@@ -161,6 +179,7 @@ public struct ParentPickerPreferences: Codable, Equatable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case customActivities, savedSelections
         case blockedWebsites, activityOrder, hiddenActivityIDs, gate, restrictionsClearedOn
+        case blocksAllWebBrowsing
     }
 
     public init(from decoder: Decoder) throws {
@@ -172,7 +191,8 @@ public struct ParentPickerPreferences: Codable, Equatable, Sendable {
             activityOrder: try c.decodeIfPresent([String].self, forKey: .activityOrder) ?? [],
             hiddenActivityIDs: try c.decodeIfPresent([String].self, forKey: .hiddenActivityIDs) ?? [],
             gate: try c.decodeIfPresent(ParentGatePreference.self, forKey: .gate) ?? .default,
-            restrictionsClearedOn: try c.decodeIfPresent(Date.self, forKey: .restrictionsClearedOn)
+            restrictionsClearedOn: try c.decodeIfPresent(Date.self, forKey: .restrictionsClearedOn),
+            blocksAllWebBrowsing: try c.decodeIfPresent(Bool.self, forKey: .blocksAllWebBrowsing) ?? true
         )
     }
 }

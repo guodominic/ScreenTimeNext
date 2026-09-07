@@ -20,6 +20,8 @@ struct SettingsView: View {
     @State private var picker = ContentPickerModel()
     @State private var pickerLoaded = false
     @State private var screenTimeApproved = false
+    @State private var isRequestingAccess = false
+    @State private var screenTimeDenied = false
     @State private var customActivities: [TransitionActivity] = []
     /// D-039 — built-ins the parent removed. Hidden, not deleted: they are `static let`s in code,
     /// and a family that drops "Bath" and wants it back should not have to retype it.
@@ -60,7 +62,7 @@ struct SettingsView: View {
             } header: {
                 Text("Child")
             } footer: {
-                Text("Only used to greet your child by name. It stays on this device, and the app works fine without it.")
+                Text("Only used to greet them. Optional.")
             }
 
             Section {
@@ -91,7 +93,7 @@ struct SettingsView: View {
                             // The whole decision, in the place where it is made. A parent who
                             // reads this and turns it on anyway has made an informed choice; one
                             // who is told nothing has had it made for them.
-                            Text("Only if this iPad recognises YOUR face. If it recognises your child's, this lets them straight through — your PIN still works either way.")
+                            Text("Only if this device recognises YOUR face — not your child's. Your PIN always works.")
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                     }
@@ -110,7 +112,7 @@ struct SettingsView: View {
                     .frame(maxWidth: .infinity)
                     .listRowBackground(Color.clear)
             } header: {
-                Text("Daily budget")
+                Text("Time budget")
             } footer: {
                 Text("Changes apply from the next session.")
             }
@@ -122,7 +124,7 @@ struct SettingsView: View {
             } header: {
                 Text("Reminders (minutes before the end)")
             } footer: {
-                Text("Two reminders, each a full-screen message inside whatever app your child is using. The first is a heads-up; the second asks them to pick what's next. Each must be shorter than the budget (up to \(ScreenTimeConfiguration.maxWarningOffset(forBudgetSeconds: budgetMinutes * 60) / 60) min); Off skips it. The end always interrupts, and is not a dial.")
+                Text("A heads-up, then the one that asks what's next. Up to \(ScreenTimeConfiguration.maxWarningOffset(forBudgetSeconds: budgetMinutes * 60) / 60) min each.")
             }
 
             // D-053 — choosing WHICH activities are offered lives here again. D-052 moved the
@@ -160,8 +162,8 @@ struct SettingsView: View {
                 // The order is load-bearing, not cosmetic: a system shield shows three (D-044) and
                 // takes them off the front of this list.
                 Text(activities.isEmpty
-                     ? "Nothing ticked, so your child is offered all of them. Swipe a row to rename or remove it; Reorder to arrange them — the first three are what the transition screen can show."
-                     : "\(activities.count) ticked. Swipe a row to rename or remove it; Reorder to arrange them — the first three ticked are what the transition screen can show.")
+                     ? "None ticked — all are offered. The first three reach the transition screen."
+                     : "\(activities.count) ticked. The first three reach the transition screen.")
             }
 
             Section {
@@ -172,7 +174,12 @@ struct SettingsView: View {
                 }
                 NavigationLink {
                     ContentPickerScreen(model: picker,
-                                        screenTimeAccessAvailable: screenTimeApproved) { selection = $0 }
+                                        screenTimeAccessAvailable: screenTimeApproved,
+                                        // D-058 — same fix as onboarding: a screen that names a
+                                        // prerequisite has to offer the way to meet it.
+                                        onRequestAccess: { requestScreenTimeAccess() },
+                                        isRequestingAccess: isRequestingAccess,
+                                        accessDenied: screenTimeDenied) { selection = $0 }
                 } label: {
                     Label(selection == nil ? "Pick apps and categories" : "Change what's covered",
                           systemImage: "square.grid.2x2.fill")
@@ -224,7 +231,11 @@ struct SettingsView: View {
             }
         }
         .onAppear(perform: load)
-        .task { screenTimeApproved = await services.authorization.status == .approved }
+        .task {
+            let status = await services.authorization.status
+            screenTimeApproved = status == .approved
+            screenTimeDenied = status == .denied
+        }
         .task { biometricKind = await services.unlock.available }
         .onChange(of: budgetMinutes) { _, newBudget in
             // A shorter budget can invalidate every reminder at once — re-clamp the whole set
@@ -279,21 +290,25 @@ struct SettingsView: View {
             }
             .onChange(of: showJournal) { _, open in if open { journal = MonitorJournal()?.entries() ?? [] } }
         } footer: {
-            Text("A record of what the background processes did. Useful when a transition screen behaves oddly — nothing here leaves the device.")
+            Text("What the background processes did. Nothing here leaves the device.")
         }
     }
 
     private static func describe(_ event: MonitorReport.Event) -> String {
         switch event {
         case .intervalDidStart:         return "A new day's window opened"
-        case .intervalDidEnd:           return "An alarm ended early — re-armed"
-        case .thresholdReached:         return "Time's up"
+        case .intervalDidEnd:           return "Alarm interval ended"
+        case .thresholdReached:         return "Budget spent / time's up"
         case .warningBeforeIntervalEnds: return "System warning before an interval ended"
         case .warningBeforeThreshold:   return "Reminder alarm — shield raised"
         case .shieldShownReminder:      return "Child saw: minutes left"
         case .shieldShownChooser:       return "Child saw: pick what's next"
         case .shieldShownFinished:      return "Child saw: screen time finished"
         case .shieldShownSpent:         return "Child saw: today's time is gone"
+        case .shieldExtensionEntered:   return "iOS asked us for a shield screen"
+        case .staleAlarmIgnored:        return "Stale alarm ignored — clock had moved"
+        case .shieldNotRaisedNothingCovered:
+            return "NO SHIELD — nothing is covered"
         }
     }
 
@@ -334,6 +349,20 @@ struct SettingsView: View {
                 Label("Rename", systemImage: "pencil")
             }
             .tint(Theme.sky)
+        }
+    }
+
+    /// D-058 — ask iOS for Screen Time access from here, so a parent who reaches the picker
+    /// through Settings is not stuck the same way onboarding left them.
+    private func requestScreenTimeAccess() {
+        guard !isRequestingAccess else { return }
+        isRequestingAccess = true
+        Task {
+            defer { isRequestingAccess = false }
+            _ = try? await services.authorization.requestAuthorization()
+            let status = await services.authorization.status
+            screenTimeApproved = status == .approved
+            screenTimeDenied = status == .denied
         }
     }
 

@@ -23,6 +23,12 @@ final class ParentDashboardViewModel {
     /// D-016 — the minutes shown on the idle hero; seeded from the saved budget so a repeat
     /// "fifteen minutes" is two taps from launch.
     var quickMinutes: Int = ScreenTimeConfiguration.defaultBudgetSeconds / 60
+    /// D-057 — true once the parent has moved the dial themselves since it was last seeded.
+    ///
+    /// The dial has two sources and they disagree: the saved budget, and a one-off number a parent
+    /// spun on the hero. This says which one is currently on screen, so a routine reload can leave
+    /// their number alone while a deliberate Settings save overrides it.
+    private var quickMinutesIsParentSet = false
     private(set) var authorization: ScreenTimeAuthorizationStatus = .notDetermined
     /// Task 004 — a request in flight, and whatever went wrong last time. Both are parent-facing.
     private(set) var isRequestingAuthorization = false
@@ -67,14 +73,35 @@ final class ParentDashboardViewModel {
         let storage = services.storage
         profile = try? storage.loadChildProfile()
         configuration = (try? storage.loadConfiguration()) ?? .default
-        if session.window == nil {
-            quickMinutes = configuration.dailyBudgetSeconds / 60
-        }
         selection = try? services.selection.loadSelection()
         selectionSummary = selection?.summary ?? .empty
         protectionState = (try? storage.loadProtectionState()) ?? .unshielded
         restrictionsAreCleared = ((try? storage.loadPickerPreferences()) ?? .default).restrictionsAreCleared()
         refreshSession()
+        // D-057 — seeded AFTER the session is refreshed, and gated on the session actually
+        // RUNNING. The old test was `session.window == nil`, read before the refresh — and a
+        // finished window survives until the day rolls over (Task 017), so after the first session
+        // of the day the dial silently stopped following the saved budget for good.
+        if !sessionIsRunning && !quickMinutesIsParentSet {
+            quickMinutes = configuration.dailyBudgetSeconds / 60
+        }
+    }
+
+    /// D-057 — Settings wrote a new budget, so the hero's dial follows it.
+    ///
+    /// A parent who has just set fifteen minutes in Settings and comes back to a dial still saying
+    /// thirty has been told two different things by the same app. An explicit save is the later and
+    /// more deliberate statement, so it wins over a number spun on the hero earlier.
+    func configurationChanged() {
+        quickMinutesIsParentSet = false
+        // D-019 / D-058 — a RUNNING session has to obey the new budget too, not just the next one.
+        // The child's timer screen has always done this; the dashboard only reloaded, so a parent
+        // who set three minutes mid-session went back to a card still counting down from thirty.
+        // Same event, same answer, wherever you are standing.
+        _ = try? controller.applyConfigurationChange()
+        reload()
+        // Re-derived windows move the end, so every wall-clock alarm moves with them (D-047).
+        enforce()
     }
 
     private func refreshSession() {
@@ -116,15 +143,34 @@ final class ParentDashboardViewModel {
         let range = ScreenTimeConfiguration.budgetRangeSeconds
         let step = ScreenTimeConfiguration.budgetStepSeconds / 60
         quickMinutes = min(max(quickMinutes + direction * step, range.lowerBound / 60), range.upperBound / 60)
+        quickMinutesIsParentSet = true
     }
 
     /// D-016 — set today's budget from the hero and open a session in one action.
+    // MARK: D-060 — what a parent should be told BEFORE the timer starts
+
+    /// D-061 — the copy and the cases live in `StartWarning.swift`, because onboarding needs the
+    /// same warning and a second copy of these words would drift within a week.
+    var startWarning: StartWarning? {
+        if restrictionsAreCleared { return .restrictionsCleared }
+        if selectionSummary.isEmpty { return .nothingCovered }
+        return nil
+    }
+
+    /// Put the restrictions back, then start — the "yes, I forgot" path.
+    func restoreRestrictionsAndStart() {
+        setRestrictionsCleared(false)
+        startSession()
+    }
+
     func startSession() {
         // Only the budget changes here — everything else the parent has arranged (reminders,
         // activities, saved sets, typed websites) is carried across untouched (D-024/D-035).
         var config = configuration
         config.dailyBudgetSeconds = quickMinutes * 60
         try? services.storage.save(config)
+        // The number is the saved budget again, so a later reload has nothing to override.
+        quickMinutesIsParentSet = false
         _ = try? controller.start()
         // A new session means time again, so anything left shielded from the last one comes down.
         enforce()
@@ -197,6 +243,20 @@ final class ParentDashboardViewModel {
         let picked = configuration.selectedActivities
         guard picked.isEmpty else { return picked }
         return ((try? services.storage.loadPickerPreferences()) ?? .default).allActivities
+    }
+
+    /// D-057 — the dashboard shows THESE and nothing else.
+    ///
+    /// A system shield fits three (D-044) and takes them off the front of the list. Showing the
+    /// whole list here and marking three of them was a list a parent had to read carefully to
+    /// learn one fact. Three rows say the same thing by being the only three rows.
+    var shieldActivities: [TransitionActivity] {
+        Array(offeredActivities.prefix(ShieldMomentResolver.maxChooserOptions))
+    }
+
+    /// How many more are in the list but cannot fit on the shield.
+    var activitiesBeyondTheShield: Int {
+        max(0, offeredActivities.count - ShieldMomentResolver.maxChooserOptions)
     }
 
     /// True when the parent has picked none, so the list above is a default rather than a choice.

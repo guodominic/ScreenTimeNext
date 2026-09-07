@@ -16,6 +16,7 @@
 //  §16: nothing here names a real app or brand.
 
 import SwiftUI
+import UIKit
 import Observation
 import ScreenTimeNextCore
 
@@ -34,6 +35,11 @@ final class ContentPickerModel {
     /// D-030 — whole selections the parent named, re-applied in one tap.
     var savedSelections: [SavedSelection] = []
 
+    /// D-064 — every browser, without ticking a category full of things a parent did not mean.
+    var blocksAllWebBrowsing = true {
+        didSet { saveLists() }
+    }
+
     /// D-027 — where a real selection is written the moment Apple's picker returns one.
     private let selectionStore: (any ScreenTimeSelectionService)?
     /// D-022 — where the parent's own lists are written the moment they change.
@@ -50,7 +56,9 @@ final class ContentPickerModel {
     /// True once the parent has picked through Apple's picker — i.e. once anything is enforceable.
     var hasRealSelection: Bool { !(realSelection?.summary.isEmpty ?? true) }
 
-    var isEmpty: Bool { !hasRealSelection && blockedWebsites.isEmpty }
+    /// D-064 — "nothing is covered" has to count the web filter, or the warning fires while the
+    /// whole internet is in fact covered.
+    var isEmpty: Bool { !hasRealSelection && blockedWebsites.isEmpty && !blocksAllWebBrowsing }
 
     // MARK: Selection
 
@@ -66,6 +74,7 @@ final class ContentPickerModel {
     /// Back to nothing — the picker's selection AND the typed sites, because "Clear" that leaves
     /// half the list behind is the kind of half-measure a parent finds out about at bedtime.
     func clearAll() {
+        blocksAllWebBrowsing = false
         blockedWebsites = []
         saveLists()
         applyRealSelection(nil)
@@ -118,6 +127,7 @@ final class ContentPickerModel {
         var merged = existing ?? .default
         merged.savedSelections = savedSelections
         merged.blockedWebsites = blockedWebsites
+        merged.blocksAllWebBrowsing = blocksAllWebBrowsing
         return merged
     }
 
@@ -133,6 +143,7 @@ final class ContentPickerModel {
         let model = ContentPickerModel(autosave: autosaving ? storage : nil, selectionStore: selection)
         model.savedSelections = preferences.savedSelections
         model.blockedWebsites = preferences.blockedWebsites
+        model.blocksAllWebBrowsing = preferences.blocksAllWebBrowsing
         model.realSelection = try? selection?.loadSelection()
         return model
     }
@@ -149,11 +160,25 @@ struct ContentPickerView: View {
     @Bindable var model: ContentPickerModel
     /// Without Screen Time access nothing here can be enforced, and the screen says so.
     var screenTimeAccessAvailable: Bool = false
+    /// D-058 — and now it can DO something about it.
+    ///
+    /// This screen used to say "Turn on Screen Time access first" and offer no way to turn it on.
+    /// On a fresh install that is every parent's first run: the row is disabled, the footer names a
+    /// prerequisite, and there is nothing on screen that satisfies it. Nothing gets picked — and a
+    /// selection of nothing is a shield that never rises, which is how this app came to have never
+    /// actually shielded anything on a real device.
+    var onRequestAccess: (() -> Void)?
+    var isRequestingAccess = false
+    /// D-063 — `.denied` means iOS will never show its dialog again, however often we ask. The row
+    /// has to stop asking and start pointing at the only place that can still change the answer.
+    var accessDenied = false
     /// Onboarding sets these; Settings leaves them nil and lets the navigation title do the work.
     var headline: String?
     var subheadline: String?
 
     @State private var showSystemPicker = false
+    @State private var hasAskedThisVisit = false
+    @Environment(\.openURL) private var openURL
     @State private var showCoveredContent = false
     @State private var showSaveSetSheet = false
     @State private var newWebsite = ""
@@ -169,6 +194,17 @@ struct ContentPickerView: View {
             countSection
             appSection
             websiteSection
+        }
+        // D-063 — every door into this screen asks, without waiting to be asked.
+        //
+        // iOS shows its dialog exactly once per install and never again, so "prompt every time"
+        // cannot mean the system dialog. It means: whenever this screen opens and access is still
+        // undecided, ask immediately; once it has been refused, stop asking and show the way to
+        // Settings instead. A button a parent has to notice is not a prompt.
+        .task {
+            guard !screenTimeAccessAvailable, !accessDenied, !hasAskedThisVisit else { return }
+            hasAskedThisVisit = true
+            onRequestAccess?()
         }
         .listSectionSpacing(12)
         .sheet(isPresented: $showSaveSetSheet) {
@@ -225,7 +261,7 @@ struct ContentPickerView: View {
             // gets asked rather than left for a parent to wonder about.
             VStack(alignment: .leading, spacing: 4) {
                 if model.summary.categoryCount > 0 {
-                    Text("Each category covers every app in it. iOS doesn't tell apps which apps those are, or how many — only Apple's picker knows, which is why the picking happens in there.")
+                    Text("A category covers every app in it. iOS never says which.")
                 }
                 if isEnforceable {
                     Text("Tap the numbers to see exactly what's covered.")
@@ -343,12 +379,34 @@ struct ContentPickerView: View {
             .disabled(!screenTimeAccessAvailable)
             .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
             .listRowBackground(Color.clear)
+            if !screenTimeAccessAvailable {
+                Button {
+                    if accessDenied { openSettings() } else { onRequestAccess?() }
+                } label: {
+                    HStack(spacing: 12) {
+                        IconChip(symbol: accessDenied ? "gear" : "lock.open.fill", color: Theme.mint, size: 34)
+                        Text(accessDenied ? "Open Settings › Screen Time" : "Turn on Screen Time access")
+                            .font(.system(.body, design: .rounded).weight(.semibold))
+                            .foregroundStyle(Color.primary)
+                        Spacer(minLength: 0)
+                        if isRequestingAccess { ProgressView() }
+                    }
+                }
+                .buttonStyle(.plain)
+                .disabled(isRequestingAccess)
+                .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
+            }
         } header: {
             Text("Apps and categories")
         } footer: {
+            // D-063 — ScreenTimeNext appears in Apple's picker under "Other", and a parent who
+            // ticks everything reasonably wonders whether they have just locked themselves out.
+            // We cannot remove ourselves from Apple's list — the picker is Apple's UI and its
+            // tokens are opaque, so there is nothing of ours to find and hide. What we can do is
+            // answer the question on the same screen that raises it.
             Text(screenTimeAccessAvailable
-                 ? "iOS keeps the list of installed apps private, so choosing happens inside Apple's own picker. Whole categories are in there too."
-                 : "Turn on Screen Time access first — without it nothing can be covered.")
+                 ? "ScreenTimeNext is never blocked, so you can always get back in."
+                 : "Nothing can be covered until this is on.")
         }
     }
 
@@ -393,8 +451,23 @@ struct ContentPickerView: View {
     /// Typed, not picked. `ManagedSettings` blocks a domain from a plain string, so this is the one
     /// part of "what's covered" that does not need Apple's picker — and the one place a parent can
     /// name a site the picker would never have offered them.
+    private func openSettings() {
+        if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
+    }
+
     private var websiteSection: some View {
         Section {
+            // D-064 — the answer to "cover every browser" that does not also cover the calculator.
+            Toggle(isOn: $model.blocksAllWebBrowsing) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Block all web browsing")
+                        .font(.system(.body, design: .rounded).weight(.semibold))
+                    Text("Every browser, Safari included.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            .tint(Theme.mint)
+
             ForEach(model.blockedWebsites, id: \.self) { domain in
                 HStack(spacing: 12) {
                     IconChip(symbol: "globe", color: Theme.mint, size: 30)
@@ -426,7 +499,9 @@ struct ContentPickerView: View {
         } header: {
             Text("Websites you type")
         } footer: {
-            Text("Type a site to block it in every browser, including private browsing. Swipe to remove.")
+            Text(model.blocksAllWebBrowsing
+                 ? "All browsing is blocked when time is up, so this list is not needed."
+                 : "Blocked in every browser.")
         }
     }
 
@@ -450,10 +525,17 @@ struct ContentPickerScreen: View {
     @Environment(\.dismiss) private var dismiss
     @Bindable var model: ContentPickerModel
     var screenTimeAccessAvailable: Bool = false
+    var onRequestAccess: (() -> Void)?
+    var isRequestingAccess = false
+    var accessDenied = false
     let onDone: (SelectionSnapshot?) -> Void
 
     var body: some View {
-        ContentPickerView(model: model, screenTimeAccessAvailable: screenTimeAccessAvailable)
+        ContentPickerView(model: model,
+                          screenTimeAccessAvailable: screenTimeAccessAvailable,
+                          onRequestAccess: onRequestAccess,
+                          isRequestingAccess: isRequestingAccess,
+                          accessDenied: accessDenied)
             .navigationTitle("Pick apps and categories")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -480,7 +562,7 @@ private struct SaveSelectionSetSheet: View {
                 Section {
                     TextField("School nights, weekend, holidays…", text: $name)
                 } footer: {
-                    Text("Saves everything currently picked — apps, categories and websites — so you can bring it all back with one tap.")
+                    Text("Bring this whole selection back with one tap.")
                 }
             }
             .navigationTitle("Name this set")

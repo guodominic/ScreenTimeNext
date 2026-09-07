@@ -81,7 +81,14 @@ public struct ShieldPresentation: Hashable, Sendable {
     public let subtitle: String
     /// SF Symbol name. The extension turns this into a UIImage; the preview into an Image.
     public let symbolName: String
-    public let primaryButtonLabel: String
+    /// D-056 — nil means the shield has NO primary button.
+    ///
+    /// `secondaryButtonSubmenuItems` opens only when the SECONDARY button is tapped (D-049); there
+    /// is no `ShieldActionResponse` that opens it, so a primary button cannot lead a child to the
+    /// choices. On the ask that insists, a primary button is therefore a button that cannot do the
+    /// one thing the screen is asking for — so it is removed, and the only control left is the one
+    /// that opens the list.
+    public let primaryButtonLabel: String?
     /// True when pressing the primary button should lift ScreenTimeNext's own shield and let the
     /// child continue. False means the button only closes the app — never a bypass (§17).
     public let primaryButtonContinues: Bool
@@ -98,7 +105,7 @@ public struct ShieldPresentation: Hashable, Sendable {
     public let urgency: ShieldUrgency
 
     public init(title: String, subtitle: String, symbolName: String,
-                primaryButtonLabel: String, primaryButtonContinues: Bool,
+                primaryButtonLabel: String?, primaryButtonContinues: Bool,
                 activity: TransitionActivity?,
                 urgency: ShieldUrgency,
                 secondaryButtonLabel: String? = nil,
@@ -166,7 +173,7 @@ public struct ShieldPresentation: Hashable, Sendable {
                 subtitle: options.isEmpty
                     ? "Time to start finishing up what you're doing."
                     : mustChoose
-                        ? "\(Self.list(options)) — pick one to keep playing. Tap “What's next?”."
+                        ? "\(Self.list(options)) — pick one and you can keep playing."
                         : "\(Self.list(options)) — which one? Tap “What's next?” to pick, then keep playing.",
                 symbolName: "hand.tap.fill",
                 // §17 — the primary button never buys more time. Choosing is the way onward, which
@@ -177,11 +184,16 @@ public struct ShieldPresentation: Hashable, Sendable {
                 // does nothing else, so the menu is the only way back into the app. The child can
                 // always leave for the Home Screen, which is a real choice and not our business to
                 // prevent — what we refuse is a way to carry on WITHOUT deciding.
-                primaryButtonLabel: mustChoose ? "Pick one first 👆" : "Not yet",
+                // D-056 — on the ask that insists there is NO primary button. "Pick one first 👆"
+                // was a button that did nothing, and a child who taps a button and gets nothing
+                // learns the screen is broken, not that they have a choice to make. Removing it
+                // leaves exactly one control, and it opens the list.
+                primaryButtonLabel: mustChoose ? nil : "Not yet",
                 primaryButtonContinues: false,
                 activity: nil,
                 urgency: urgency ?? .fromMinutesLeft(minutes),
-                secondaryButtonLabel: options.isEmpty ? nil : "What's next?",
+                secondaryButtonLabel: options.isEmpty ? nil
+                    : (mustChoose ? "Pick what's next 👆" : "What's next?"),
                 submenuItems: options.map(\.displayName)
             )
 

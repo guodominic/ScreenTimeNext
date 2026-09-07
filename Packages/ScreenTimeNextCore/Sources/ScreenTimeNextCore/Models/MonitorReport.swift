@@ -31,6 +31,18 @@ public struct MonitorReport: Codable, Equatable, Sendable {
         case shieldShownChooser
         case shieldShownFinished
         case shieldShownSpent
+
+        /// D-055 — iOS asked the configuration extension for a screen. Recorded before any work,
+        /// so its absence beside a raised shield means the extension never ran at all.
+        case shieldExtensionEntered
+
+        /// D-056 — an alarm arrived before its moment, because the window's end moved after it was
+        /// set. Recorded rather than acted on, so the drift is visible instead of silent.
+        case staleAlarmIgnored
+
+        /// D-058 — the alarm was due and we tried, but there was nothing to cover: no selection, no
+        /// Screen Time access, or a selection that would not decode. The shield did NOT go up.
+        case shieldNotRaisedNothingCovered
     }
 
     public let event: Event

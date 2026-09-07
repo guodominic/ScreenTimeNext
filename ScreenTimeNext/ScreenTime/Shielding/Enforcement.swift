@@ -79,15 +79,40 @@ enum Enforcement {
     /// straight back down. The shield is not the end here, it is the heads-up — and the child gets
     /// their remaining minutes back by pressing the button (`ShieldActionExtension`), which is what
     /// makes this a pause rather than a punishment (D-012).
-    static func raiseReminderShieldFromAppGroup() {
+    /// D-058 — returns whether a shield actually went up, and says so in the journal.
+    ///
+    /// This used to be silent about failing. The caller logged "Reminder alarm — shield raised"
+    /// BEFORE calling it, so an empty selection produced a log that read like a working app while
+    /// nothing whatsoever was shielded — which is exactly the state a first-run parent was left in
+    /// when the picker would not let them choose anything. A diagnostic that reports success it did
+    /// not verify is worse than no diagnostic: it sent me looking at the wrong process for days.
+    @discardableResult
+    static func raiseReminderShieldFromAppGroup() -> Bool {
+        let journal = MonitorJournal()
+        // D-060 — restrictions are off for the day, so there is no reminder to give: the child is
+        // not heading for anything. `reconcile` already knows this; the reminder path is the one
+        // place that deliberately bypasses `reconcile`, so it has to be told separately.
+        if let storage = try? FileStorageService.shared(),
+           ((try? storage.loadPickerPreferences()) ?? .default).restrictionsAreCleared() {
+            return false
+        }
         guard let storage = try? FileStorageService.shared(),
               let selectionService = AppGroupSelectionService(),
               let picked = (try? selectionService.loadSelection()) ?? nil,
-              !picked.summary.isEmpty else { return }
-        try? ManagedSettingsShieldService(storage: storage).applyShield(for: picked)
-        // D-050 — the clock stops here. The child cannot use the device while this is up, so
-        // charging them for the time would be charging them for our own interruption.
-        MonitorJournal()?.markShieldRaised()
+              !picked.summary.isEmpty else {
+            journal?.record(.shieldNotRaisedNothingCovered, activity: MonitoringName.sessionEnd)
+            return false
+        }
+        do {
+            try ManagedSettingsShieldService(storage: storage).applyShield(for: picked)
+        } catch {
+            journal?.record(.shieldNotRaisedNothingCovered, activity: MonitoringName.sessionEnd)
+            return false
+        }
+        // D-059 — the clock does NOT stop here. Arming a shield says nothing about where the
+        // child is: they may be in another app for the next ten minutes and never see this. The
+        // pause starts when the screen is actually drawn in front of them (`markShieldShown`).
+        return true
     }
 
     /// D-050 — re-arm this session's alarms from whatever the window says now.
@@ -118,3 +143,4 @@ enum Enforcement {
                          now: now)
     }
 }
+

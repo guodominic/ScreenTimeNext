@@ -258,6 +258,23 @@ public final class SessionController: @unchecked Sendable {
                                          budgetSecondsAtStart: window.budgetSecondsAtStart,
                                          pausedSeconds: window.pausedSeconds)
             try storage.save(adjusted)
+            // D-062 — taking time back takes it out of TODAY, not just out of this window.
+            //
+            // A parent who removes five minutes means "you get five minutes less today", not "five
+            // minutes less now and five more later". Leaving the daily budget alone meant the
+            // window ended early while the budget said there was time left — so `Enforcement`
+            // unshielded, the transition screen never came, Settings still showed the old number,
+            // and the restriction slide stayed grey because "time is up" was never true. One rule,
+            // four symptoms.
+            //
+            // ADDING is deliberately not symmetric: §15 calls an extension a grant BEYOND the
+            // budget, and `grantedSeconds` exists to keep it identifiable as one.
+            if seconds < 0 {
+                var configuration = try storage.loadConfiguration()
+                configuration.dailyBudgetSeconds = ScreenTimeConfiguration
+                    .clampBudget(configuration.dailyBudgetSeconds + seconds)
+                try storage.save(configuration)
+            }
             lastWindowEnd = adjusted.endsAt
             lastState = WarningStateEngine.start(remainingSeconds: adjusted.remainingSeconds(at: current),
                                                  warningOffsets: try offsetsLocked(for: adjusted))
@@ -306,17 +323,35 @@ public final class SessionController: @unchecked Sendable {
 
     /// Task 016 — (re)derive every pending notification from the window's absolute timestamps.
     private func scheduleNotificationsLocked(for window: SessionWindow) throws {
+        // D-060 — the parent slid every restriction off for today. Nothing will be blocked, so
+        // nothing should announce itself either: a reminder that "5 minutes left" when the end of
+        // those minutes changes nothing is the app talking for the sake of talking, and a Live
+        // Activity counting down to an event that will not happen is worse.
+        let preferences = (try? storage.loadPickerPreferences()) ?? .default
+        guard !preferences.restrictionsAreCleared(on: now()) else {
+            notifications?.cancelAll()
+            presence?.hide()
+            return
+        }
         let config = try storage.loadConfiguration()
         let name = try storage.loadChildProfile()?.name ?? ""
         if let notifications {
             let plan = NotificationPlan.make(for: window, configuration: config, childName: name, now: now())
             notifications.replaceAll(with: plan)
         }
-        presence?.show(SessionPresenceState(childName: name,
-                                            startedAt: window.startedAt,
-                                            endsAt: window.endsAt,
-                                            chosenActivity: window.chosenActivity,
-                                            stateName: lastState.rawValue))
+        presentLocked(for: window)
+    }
+
+    /// Hand the presenter the window as it stands now. Cheap and idempotent — the presenter itself
+    /// decides whether that means starting an activity or updating one.
+    private func presentLocked(for window: SessionWindow) {
+        guard let presence else { return }
+        let name = (try? storage.loadChildProfile())?.name ?? ""
+        presence.show(SessionPresenceState(childName: name,
+                                           startedAt: window.startedAt,
+                                           endsAt: window.endsAt,
+                                           chosenActivity: window.chosenActivity,
+                                           stateName: lastState.rawValue))
     }
 
     /// Hand the presenter a final state to show before it dismisses itself.
@@ -363,6 +398,12 @@ public final class SessionController: @unchecked Sendable {
         } else {
             lastState = WarningStateEngine.next(current: lastState, remainingSeconds: remaining, warningOffsets: offsets)
         }
+        // D-055 — the Live Activity holds a COPY of `endsAt` and counts to it on its own (Rule 4 is
+        // what makes that safe with no process running). When the end moves it is the one thing
+        // that cannot notice: the transition screen that paused the clock did so in an extension
+        // with no way to reach ActivityKit. So the first tick after the app is alive again pushes
+        // the new end — which is why the Dynamic Island and the timer disagreed.
+        if endMoved { presentLocked(for: window) }
         // D-021 — the moment the window runs out, retire the Live Activity. Once only: this runs
         // every second, and `finish` on every tick would restart the dismissal timer forever.
         if lastState == .finished && previous != .finished {

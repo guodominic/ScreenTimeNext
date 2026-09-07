@@ -25,6 +25,29 @@ final class ChooserPlacementTests: XCTestCase {
         XCTAssertTrue(WarningStateEngine.isChooser(warningAt: 2, count: 3))
     }
 
+    /// D-057 — the dashboard shows exactly what the shield can offer, so "the first three" has to
+    /// mean the same thing in both places.
+    func testTheShieldTakesTheFirstThreeOffTheFront() {
+        let all = TransitionActivity.allCases              // five, since D-052
+        let options = ShieldMomentResolver.chooserOptions(all)
+        XCTAssertEqual(options, Array(all.prefix(3)))
+        XCTAssertEqual(ShieldMomentResolver.maxChooserOptions, 3)
+    }
+
+    func testAShorterListIsOfferedWhole() {
+        let two = Array(TransitionActivity.allCases.prefix(2))
+        XCTAssertEqual(ShieldMomentResolver.chooserOptions(two), two)
+    }
+
+    /// Reordering in Settings is the only way to change what a child sees, so the order the parent
+    /// arranged has to survive all the way through.
+    func testReorderingChangesWhatTheChildIsOffered() {
+        let reversed = Array(TransitionActivity.allCases.reversed())
+        XCTAssertEqual(ShieldMomentResolver.chooserOptions(reversed), Array(reversed.prefix(3)))
+        XCTAssertNotEqual(ShieldMomentResolver.chooserOptions(reversed),
+                          ShieldMomentResolver.chooserOptions(TransitionActivity.allCases))
+    }
+
     /// End to end: with 10/5/1 the chooser appears at 5 minutes, not at 10, and stays available
     /// afterwards until the child picks.
     /// D-044 — the sequence a child actually meets: heads-up, then decide, then the end.

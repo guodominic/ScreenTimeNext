@@ -46,11 +46,15 @@ final class MonitorJournalTests: XCTestCase {
         XCTAssertEqual(reopened.latest(.thresholdReached)?.activity, MonitoringName.dailyActivity)
     }
 
+    /// D-059 — the activity name varies per entry on purpose. Recording the SAME event against the
+    /// SAME activity within five seconds is now collapsed to one line (that is what stopped an
+    /// alarm storm evicting every useful entry), so writing thirty identical rows a second apart
+    /// would test the collapse rule rather than the capacity trim. These are thirty distinct facts.
     func testTheLogTrimsToItsCapacityKeepingTheNewest() {
         let start = Date(timeIntervalSince1970: 1_700_000_000)
         for i in 0..<(MonitorJournal.capacity + 7) {
             journal().record(.intervalDidStart,
-                             activity: MonitoringName.dailyActivity,
+                             activity: MonitoringName.sessionWarning(index: i),
                              at: start.addingTimeInterval(Double(i)))
         }
         let entries = journal().entries()
@@ -58,6 +62,21 @@ final class MonitorJournalTests: XCTestCase {
         XCTAssertEqual(entries.last?.at, start.addingTimeInterval(Double(MonitorJournal.capacity + 6)),
                        "the newest entry is the one that must survive")
         XCTAssertEqual(entries.first?.at, start.addingTimeInterval(7), "the oldest are the ones dropped")
+    }
+
+    /// And the collapse itself, stated where someone reading this file will find it.
+    func testARepeatedEventIsCollapsedButNeverHidesSomethingNew() {
+        let start = Date(timeIntervalSince1970: 1_700_000_000)
+        let j = journal()
+        j.record(.staleAlarmIgnored, activity: MonitoringName.sessionEnd, at: start)
+        j.record(.staleAlarmIgnored, activity: MonitoringName.sessionEnd, at: start.addingTimeInterval(2))
+        XCTAssertEqual(j.entries().count, 1, "one burst is one fact")
+
+        j.record(.shieldExtensionEntered, activity: MonitoringName.sessionEnd, at: start.addingTimeInterval(3))
+        XCTAssertEqual(j.entries().count, 2, "a different event always lands")
+
+        j.record(.staleAlarmIgnored, activity: MonitoringName.sessionEnd, at: start.addingTimeInterval(30))
+        XCTAssertEqual(j.entries().count, 3, "and the same event later is a new fact")
     }
 
     func testLatestPicksTheRightKind() {

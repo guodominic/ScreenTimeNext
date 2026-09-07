@@ -99,6 +99,33 @@ resolver and both shield extensions without finding a cause; "Restricted" is App
 which would mean our configuration extension was not consulted at all. The enforcement log (D-054)
 is what settles it — one reproduction, then read it.
 
+## 2026-09-08 — the round that found out the shield had never run (D-055 … D-064)
+
+**The headline.** `ContentPickerView` disabled its app row without Screen Time access and offered no
+way to grant it — so on a fresh install nothing could be picked, an empty selection meant no shield
+ever rose, and the grey "Restricted" screen a child met was Apple's own Screen Time. **Task 011/012
+had never actually enforced anything on a device.** One missing button, days of looking at the wrong
+process, helped along by a log line that reported a success it had not verified (D-058).
+
+**Now working on device:** the selection saves, the shield rises, and our own transition screen
+appears with a minutes count — the first time that has been observed rather than inferred.
+
+**Also fixed:** an alarm feedback loop that dragged the session's end around (D-056); the pause
+credit, which was measuring a child playing in other apps rather than reading the screen (D-059); the
+hero dial silently detaching from the saved budget after the first session of the day (D-057); and
+taking time back not coming out of the daily budget, which broke enforcement, Settings and the
+restriction slide at once (D-062).
+
+**New capability:** all web browsing can be blocked with `webContent.blockedByFilter = .all()` —
+every browser, Safari included, no tokens, no picker, and without covering the rest of Utilities
+(D-064). Verified against the installed SDK, not assumed.
+
+**New app icon.**
+
+**Still unverified on a device:** QA-02, 03, 04, 09, 10 — `docs/tasks/device-qa-checklist.md`. QA-09
+and QA-10 are what decide whether Task 012 can be called done, and they are now worth running for
+the first time, because until this round there was nothing behind them to test.
+
 ## Critical path
 
 ```text

@@ -1807,6 +1807,155 @@ from the person debugging it.
 only instrumented — and its instrument is part of the feature, not scaffolding to tidy away once it
 works. Removing one is removing the ability to answer the next question.
 
+## D-055 — Instrument the extension's first line, and pause on what was read
+**Date:** 2026-09-08 · **Status:** accepted · continues D-054
+
+**Context.** Apple's own grey "Restricted" screen kept appearing instead of ours, with no
+`shieldShown…` line in the journal. Two very different faults look identical from outside: iOS never
+asked us, or it asked and the process died before answering.
+
+**Decision.** Record a line as the FIRST statement of each `configuration(shielding:)` override,
+before anything that can fail. Its absence beside a raised shield became a finding in its own right.
+
+**Also:** the dashboard card was rebuilt on a fixed three-band layout so it stops changing shape
+between "ready" and "in session"; both slide controls moved onto shared geometry; and the Live
+Activity now gets pushed the new `endsAt` whenever the window's end moves, because the extension
+that moved it has no way to reach ActivityKit.
+
+## D-056 — An alarm that arrives early must not act
+**Date:** 2026-09-08 · **Status:** accepted · fixes D-050
+
+**Context.** A device log showed three alarms firing in the same second, again and again, each burst
+dragging the session's end further out. Transition screens appeared at times matching no reminder,
+and countdowns changed when a screen was dismissed.
+
+**The loop.** An early end-alarm re-arms; re-arming stops and restarts every session activity; and
+stopping an active interval appears to report it as ended — which fires the callbacks that ask for a
+re-arm, including the reminders, which raise shields.
+
+**Decision.** Every session alarm is checked against the window as it stands now
+(`SessionMoments.isEarly`); early ones re-arm and get out of the way. And a re-arm cannot happen
+more than once every 30 seconds, which closes the loop whichever callback opens it.
+
+D-050's reasoning — "an early alarm is self-correcting" — was wrong, and it had been applied to the
+end alarm only. Nothing here is self-correcting. It has to be asked.
+
+## D-057 — The dial follows the saved budget, and the dashboard shows only what reaches the child
+**Date:** 2026-09-08 · **Status:** accepted
+
+`reload()` re-seeded the hero's dial only when `session.window == nil`, read before the refresh —
+and a finished window survives until the day rolls over (Task 017). So after the first session of
+the day the dial stopped following the saved budget **for good**: Settings said fifteen minutes and
+the dashboard said thirty. Now it is gated on the session actually RUNNING, and an explicit Settings
+save overrides a number spun on the hero, because a save is the later and more deliberate statement.
+
+What's-next was also cut to three rows — a shield fits three (D-044) and takes them off the front,
+so three rows say it by being the only three rows.
+
+## D-058 — A screen that names a prerequisite must offer the way to meet it
+**Date:** 2026-09-08 · **Status:** accepted
+
+**The bug that explained everything.** The picker's app row was `.disabled` without Screen Time
+access, with a footer saying "Turn on Screen Time access first" — and nothing on screen that could
+turn it on. On a fresh install that is every parent's first run. So nothing was ever picked; an empty
+selection is a shield that never rises; a shield that never rises is never drawn; and the grey screen
+a child met was Apple's own Screen Time, not ours. **This app had never actually shielded anything
+on a real device.**
+
+Made worse by a diagnostic that lied: "Reminder alarm — shield raised" was logged BEFORE the call,
+and the call failed silently. `raiseReminderShieldFromAppGroup` now returns whether a shield went up
+and records "NO SHIELD — nothing is covered" when it did not. **A diagnostic that reports success it
+did not verify is worse than no diagnostic** — it sent me looking at the wrong process for days.
+
+## D-059 — The pause measures reading, not waiting
+**Date:** 2026-09-08 · **Status:** accepted · corrects D-050
+
+D-050 credited "time since the shield was armed", on the premise that a child cannot use the device
+while a shield is up. **That premise is false**: our shield covers the apps the parent picked and
+nothing else, so a child meets it, presses Home, and plays elsewhere. Crediting that back moved the
+session's end, which moved every alarm.
+
+The clock now starts when the configuration extension DRAWS the screen — the only moment anything of
+ours knows the child is looking — and is refreshed on every redraw, so a child who wandered off and
+came back is credited for this visit, not the whole absence. The cap fell from ten minutes to two.
+
+The journal also collapses a repeated event within five seconds: capacity is twenty, so one alarm
+storm used to evict every useful line and leave a log that could only report the storm.
+
+## D-060 — A cleared day has no session experience, and a timer says so before it starts
+**Date:** 2026-09-08 · **Status:** accepted
+
+While restrictions are slid off for the day: no notifications, no reminder shields, no Live Activity.
+A reminder that "5 minutes left" when the end of those minutes changes nothing is the app talking for
+the sake of talking.
+
+And two states make a timer do nothing while looking exactly like a timer that works — restrictions
+cleared, and nothing ever picked. Both are now said BEFORE it starts, with the fix as the first
+button. Also: once the clock has run out the control is "+", not "±"; and the add-time sheet's button
+moved into a pinned bottom bar, because it could previously sit below the edge of a shorter screen
+with nothing to scroll — a parent could set the minutes and then not be able to apply them.
+
+## D-061 — Every door asks the same question
+**Date:** 2026-09-08 · **Status:** accepted · completes D-060
+
+D-060 put the empty-selection check on the dashboard's Start button. That missed the case that
+matters most: "Start over" routes to ONBOARDING, whose own start button had no check at all, and a
+fresh setup is exactly when nothing has been picked. The copy now lives in `StartWarning.swift`, and
+onboarding, the dashboard's Start, and the dashboard's arrival all use it.
+
+Onboarding's footer used to read "you can pick later in Settings" — telling a parent the empty state
+was fine. It is not fine; it is a timer that will do nothing.
+
+## D-062 — Taking time back comes out of today
+**Date:** 2026-09-08 · **Status:** accepted
+
+A parent removing five minutes means "five minutes less today", not "five now and five later".
+Leaving the daily budget alone meant the window ended early while the budget said there was time
+left — so nothing was shielded, no transition screen came, Settings showed the old number, and the
+restriction slide stayed grey because "time is up" was never true. One rule, four symptoms.
+
+ADDING stays asymmetric: §15 calls an extension a grant BEYOND the budget, and `grantedSeconds`
+exists to keep it identifiable as one.
+
+Also: "Pick apps now" opens the picker itself rather than Settings, and thirteen explanatory
+paragraphs were cut across the app. The one kept in full is the Face ID warning — that is not
+explanation, it is the only sentence stopping a parent handing their child the gate.
+
+## D-063 — Ask on arrival; when iOS will not ask again, point at Settings
+**Date:** 2026-09-08 · **Status:** accepted · supersedes D-058's button
+
+A button a parent has to notice is not a prompt. `ContentPickerView` now requests access the moment
+it opens with the status undecided, for every door into it. But iOS shows its dialog exactly once per
+install: after `.denied` it returns immediately with no dialog, however often we ask. So the row stops
+asking and becomes "Open Settings › Screen Time" — asking a second time is not asking, it is nagging.
+
+**ScreenTimeNext appears in Apple's picker under "Other"**, and a parent who ticks everything
+reasonably wonders whether they have locked themselves out. We cannot remove it: the picker is
+Apple's UI and its tokens are opaque, so there is nothing of ours to find and hide. What we can do is
+answer the question on the screen that raises it — "ScreenTimeNext is never blocked, so you can
+always get back in."
+
+## D-064 — Every browser, without covering the calculator
+**Date:** 2026-09-08 · **Status:** accepted · answers a question B-005 left open
+
+**Context.** A parent asks for browsers to be covered. Browsers are scattered — Safari under System,
+the rest under Utilities — so ticking categories also covers the calculator and the compass, and
+B-005 rules out naming a single app.
+
+**Decision.** `store.webContent.blockedByFilter = .all()`. It is a WEB CONTENT filter, not an app
+shield: it needs no token, no picker, and reaches every browser including Safari. An Apple Frameworks
+Engineer states it directly (developer.apple.com/forums/thread/718251), and it compiles against the
+installed SDK — verified, not assumed (Rule 8).
+
+Rule 7 is not in play: no phone call, message or camera is reachable through this surface. It ships
+as a labelled switch on the picker, **default on**, counted in what's covered — visible consent at
+setup, never a silent default. `privacy-audit.sh` gained a ninth rule confining `.all()` to the one
+adapter that reads that switch; the rule was verified by planting a violation.
+
+**Still impossible:** pre-selecting Social, Games and Entertainment. `ActivityCategoryToken` cannot
+be constructed from a name. Those stay a one-time tick in Apple's picker — but the hardest part,
+browsers, no longer needs one.
+
 <!-- Template for new entries:
 
 ## D-NNN — <short imperative title>

@@ -36,19 +36,45 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
     // opens a covered website are in the same moment, and giving them different screens would be
     // an implementation detail leaking into a six-year-old's evening.
     override func configuration(shielding application: Application) -> ShieldConfiguration {
-        current()
+        Self.enter("app")
+        return current()
     }
 
     override func configuration(shielding application: Application, in category: ActivityCategory) -> ShieldConfiguration {
-        current()
+        Self.enter("app-in-category")
+        return current()
     }
 
     override func configuration(shielding webDomain: WebDomain) -> ShieldConfiguration {
-        current()
+        Self.enter("web")
+        return current()
     }
 
     override func configuration(shielding webDomain: WebDomain, in category: ActivityCategory) -> ShieldConfiguration {
-        current()
+        Self.enter("web-in-category")
+        return current()
+    }
+
+    /// D-055 — the FIRST statement, before anything that can fail.
+    ///
+    /// A device test produced Apple's own "Restricted" screen and not one `shieldShown…` line in
+    /// the journal. Two very different things look like that: iOS never asked us, or it asked and
+    /// this process died before it could answer. Everything checkable statically — the Info.plist
+    /// principal class, the embed phase, the entitlements, the bundle-ID prefix, the deployment
+    /// target — is correct, so the difference has to be caught at runtime.
+    ///
+    /// A line here and no `shieldShown…` line means we were asked and something below threw or
+    /// crashed. No line at all means we were never asked, and the fault is in installation or
+    /// signing rather than in any of this code.
+    ///
+    /// §16 — the argument says which OVERRIDE ran. It is not the app, and it is not derived from
+    /// the token, which is never read.
+    private static func enter(_ kind: String) {
+        let journal = MonitorJournal()
+        journal?.record(.shieldExtensionEntered, activity: "shield." + kind)
+        // D-059 — this is the ONLY moment anything of ours knows the child is actually looking at
+        // the screen. The clock they are owed starts here, not when the shield was armed.
+        journal?.markShieldShown()
     }
 
     // MARK: What moment is this?
@@ -109,6 +135,10 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
         let secondary = p.secondaryButtonLabel.map {
             ShieldConfiguration.Label(text: $0, color: .label)
         }
+        // D-056 — nil is a shield with no primary button at all. See `ShieldPresentation`.
+        let primary = p.primaryButtonLabel.map {
+            ShieldConfiguration.Label(text: $0, color: .white)
+        }
 
         // D-044 — the second button exists for exactly one thing: choosing what comes next. §17
         // still holds; it never buys more time. The submenu is iOS 26.4+, and
@@ -121,7 +151,7 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
                 icon: Self.icon(for: p),
                 title: ShieldConfiguration.Label(text: p.title, color: .label),
                 subtitle: ShieldConfiguration.Label(text: p.subtitle, color: .secondaryLabel),
-                primaryButtonLabel: ShieldConfiguration.Label(text: p.primaryButtonLabel, color: .white),
+                primaryButtonLabel: primary,
                 primaryButtonBackgroundColor: tint,
                 secondaryButtonLabel: secondary,
                 secondaryButtonSubmenuItems: p.submenuItems
@@ -136,7 +166,7 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
             icon: Self.icon(for: p),
             title: ShieldConfiguration.Label(text: p.title, color: .label),
             subtitle: ShieldConfiguration.Label(text: p.subtitle, color: .secondaryLabel),
-            primaryButtonLabel: ShieldConfiguration.Label(text: p.primaryButtonLabel, color: .white),
+            primaryButtonLabel: primary,
             primaryButtonBackgroundColor: tint,
             secondaryButtonLabel: secondary
         )

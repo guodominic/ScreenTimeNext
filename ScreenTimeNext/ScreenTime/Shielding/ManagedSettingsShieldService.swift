@@ -94,7 +94,18 @@ final class ManagedSettingsShieldService: ScreenTimeShieldService, @unchecked Se
     /// need no token and no picker. Applied alongside the shield because a parent who typed a site
     /// meant it to be blocked while the budget is spent, not merely covered when tapped.
     private func applyTypedWebsites() {
-        let typed = preferences().blockedWebsites
+        let preferences = self.preferences()
+        // D-064 — the whole web, in every browser, with no tokens at all.
+        //
+        // This is the ONLY route to "cover browsers" that does not also cover the calculator:
+        // browsers are scattered across System and Utilities, and B-005 rules out naming a single
+        // app. `blockedByFilter` is a web-content filter rather than an app shield, so Rule 7 is
+        // not in play — no phone call, message or camera is reachable through it.
+        guard !preferences.blocksAllWebBrowsing else {
+            store.webContent.blockedByFilter = .all()
+            return
+        }
+        let typed = preferences.blockedWebsites
         guard !typed.isEmpty else {
             store.webContent.blockedByFilter = nil
             return

@@ -45,6 +45,13 @@ public final class MonitorJournal: @unchecked Sendable {
     /// be the reason a threshold callback fails to do its real work.
     public func record(_ event: MonitorReport.Event, activity: String, at date: Date = Date()) {
         var entries = self.entries()
+        // D-059 — a burst of the same event is one fact, not twenty. Twenty is the whole capacity,
+        // so an alarm storm used to evict every interesting line and leave a log that could only
+        // report the storm. Anything genuinely new still lands immediately.
+        if let last = entries.last, last.event == event, last.activity == activity,
+           date.timeIntervalSince(last.at) < 5 {
+            return
+        }
         entries.append(MonitorReport(event: event, activity: activity, at: date))
         if entries.count > Self.capacity { entries.removeFirst(entries.count - Self.capacity) }
         guard let data = try? JSONEncoder().encode(entries) else { return }
@@ -75,19 +82,61 @@ public final class MonitorJournal: @unchecked Sendable {
         defaults.removeObject(forKey: key)
     }
 
+    // MARK: D-056 — a re-arm cannot happen more often than this
+
+    private var lastRearmKey: String { "screentimenext.lastRearmAt" }
+
+    /// Longest a session's alarms can be left stale, and the shortest gap between two re-arms.
+    ///
+    /// Re-arming calls `stopMonitoring` on every session activity and registers them again. If
+    /// stopping an active interval reports it as ended — and the device log says something does —
+    /// then a re-arm triggers the very callbacks that ask for a re-arm, and the extension chases
+    /// its own tail: three alarms firing in the same second, over and over, dragging the window's
+    /// end along with them.
+    ///
+    /// A rate limit closes that loop no matter which callback opens it, and costs nothing when
+    /// nothing is wrong: a legitimate re-arm happens once per pause, not twice a second.
+    public static let minimumRearmIntervalSeconds: TimeInterval = 30
+
+    /// Claim the right to re-arm. Returns false when one happened too recently.
+    public func mayRearm(at date: Date = Date()) -> Bool {
+        if let last = defaults.object(forKey: lastRearmKey) as? Double,
+           date.timeIntervalSince1970 - last < Self.minimumRearmIntervalSeconds {
+            return false
+        }
+        defaults.set(date.timeIntervalSince1970, forKey: lastRearmKey)
+        return true
+    }
+
+    /// A session started or ended, so the last re-arm belongs to a window that no longer exists.
+    public func forgetRearm() {
+        defaults.removeObject(forKey: lastRearmKey)
+    }
+
     // MARK: D-050 — the clock stops while a transition screen is up
 
     private var pausedAtKey: String { "screentimenext.shieldRaisedAt" }
 
-    /// Longest pause we will give back. A child who walks away with the shield up has not been
-    /// robbed of screen time, and crediting an unbounded pause would leave a session that was
-    /// interrupted at 8pm still running at midnight — not what anyone meant by "fifteen minutes".
-    public static let maximumPauseSeconds = 10 * 60
+    /// Longest pause we will give back.
+    ///
+    /// D-059 — was ten minutes, on the premise that "the child cannot use the device while this is
+    /// up". That premise is FALSE, and it is the whole bug. Our shield covers the apps the parent
+    /// picked and nothing else: a child who meets it can press Home and use everything on the
+    /// device. So "time since the shield was armed" measured a child playing elsewhere, credited it
+    /// back as screen time they were denied, moved the session's end, and left every alarm and
+    /// every countdown pointing at a moment that no longer existed.
+    ///
+    /// What is actually owed is the interval between the screen APPEARING in front of them and
+    /// their tapping it — a few seconds of reading. Two minutes is generous for that and cheap to
+    /// be wrong about.
+    public static let maximumPauseSeconds = 2 * 60
 
-    /// Called when a shield goes up. Idempotent: a shield raised twice was still only raised once,
-    /// and overwriting would restart the clock the child is owed.
-    public func markShieldRaised(at date: Date = Date()) {
-        guard defaults.object(forKey: pausedAtKey) == nil else { return }
+    /// D-059 — the child is looking at the transition screen RIGHT NOW.
+    ///
+    /// Called from the configuration extension, which iOS asks each time it draws the screen, and
+    /// deliberately OVERWRITING: a child who wandered off and came back is reading it now, not
+    /// then. That single word is the difference between crediting five seconds and five minutes.
+    public func markShieldShown(at date: Date = Date()) {
         defaults.set(date.timeIntervalSince1970, forKey: pausedAtKey)
     }
 

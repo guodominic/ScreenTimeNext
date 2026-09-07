@@ -56,6 +56,14 @@ public enum MonitoringName {
         rawName.hasPrefix(sessionWarningPrefix)
     }
 
+    /// D-056 — WHICH reminder, so an alarm can be checked against the window it belongs to.
+    /// The name was previously only ever tested for "is this a warning at all", which is what let
+    /// a stale alarm raise a shield that was not due.
+    public static func warningIndex(of rawName: String) -> Int? {
+        guard rawName.hasPrefix(sessionWarningPrefix) else { return nil }
+        return Int(rawName.dropFirst(sessionWarningPrefix.count))
+    }
+
     /// Everything a session registers, for clearing it in one call. Generous on purpose: a name
     /// left behind counts against the 20-activity limit forever (D-037).
     public static var allSessionActivities: [String] {

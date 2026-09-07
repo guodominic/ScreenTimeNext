@@ -16,6 +16,9 @@ struct WhatCountsStepView: View {
     @Bindable var viewModel: OnboardingViewModel
     let onStart: () -> Void
 
+    /// D-061 — the door a parent comes through after "Start over", and the one that had no check.
+    @State private var warning: StartWarning?
+
     private var minutes: Int { viewModel.draft.dailyBudgetSeconds / 60 }
     private var picker: ContentPickerModel { viewModel.picker }
     private var hasSelection: Bool { !picker.isEmpty }
@@ -28,6 +31,12 @@ struct WhatCountsStepView: View {
 
             ContentPickerView(model: picker,
                               screenTimeAccessAvailable: viewModel.authorization == .approved,
+                              // D-058 — the row that asks. Without it this screen states a
+                              // prerequisite it gives no way to satisfy, which on a fresh install
+                              // is every parent's first run.
+                              onRequestAccess: { Task { await viewModel.requestAuthorization() } },
+                              isRequestingAccess: viewModel.isRequestingAuthorization,
+                              accessDenied: viewModel.authorization == .denied,
                               headline: "Pick apps and categories",
                               subheadline: "The \(minutes)-minute timer covers whatever you tick.")
                 .scrollContentBackground(.hidden)
@@ -36,19 +45,46 @@ struct WhatCountsStepView: View {
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
-        .task { await viewModel.loadAuthorizationStatus() }
+        // D-059 — ASK, don't wait to be asked.
+        //
+        // D-058 added a row a parent could tap to grant access. Better than nothing, but it still
+        // put the burden on them to notice a prerequisite and act on it, on the one screen where
+        // they are trying to do something else. iOS shows its own dialog and only ever asks once,
+        // so the honest place for it is the moment this screen opens: the parent sees the system
+        // prompt, allows, and the list underneath is live by the time they look at it.
+        //
+        // The row stays, for the parent who declined and later changed their mind — `.denied` is
+        // not `.notDetermined`, and re-prompting someone who said no is not asking, it is nagging.
+        .alert(item: $warning) { warning in
+            Alert(title: Text(warning.title),
+                  message: Text(warning.message),
+                  // The fix is right here on this screen, so the first button just closes the
+                  // alert and leaves them looking at the list they need.
+                  primaryButton: .default(Text(warning.fixLabel)),
+                  secondaryButton: .cancel(Text(warning.proceedLabel)) {
+                      if viewModel.startNow() { onStart() }
+                  })
+        }
+        .task {
+            // D-063 — `ContentPickerView` asks on arrival now, for every door into it. Asking
+            // here as well would be two requests racing for one system dialog.
+            await viewModel.loadAuthorizationStatus()
+        }
     }
 
     private var startBar: some View {
         VStack(spacing: 6) {
-            Button { if viewModel.startNow() { onStart() } } label: {
+            Button { attemptStart() } label: {
                 Label("Start \(minutes) minutes", systemImage: "play.fill")
             }
             .buttonStyle(PillButtonStyle(color: Theme.mint))
 
-            Text(hasSelection ? selectionLine : "Nothing ticked yet — you can pick later in Settings.")
+            // D-061 — this line used to read "you can pick later in Settings", which told a parent
+            // the empty state was fine. It is not fine: it is a timer that will do nothing. Saying
+            // so plainly here, and stopping once at the button, is the whole fix.
+            Text(hasSelection ? selectionLine : "Nothing ticked — the timer will not cover anything.")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(hasSelection ? .secondary : Color.orange)
 
             if let error = viewModel.commitError {
                 Text(error).font(.footnote).foregroundStyle(.red)
@@ -62,6 +98,15 @@ struct WhatCountsStepView: View {
         .padding(.bottom, 10)
         .frame(maxWidth: .infinity)
         .background(.ultraThinMaterial)
+    }
+
+    /// D-061 — the same question the dashboard asks, in the same words, at the other door.
+    private func attemptStart() {
+        guard hasSelection else {
+            warning = .nothingCovered
+            return
+        }
+        if viewModel.startNow() { onStart() }
     }
 
     /// "3 categories · 1 website · 3 apps" — only the parts that are non-zero.

@@ -15,8 +15,16 @@ struct ParentDashboardView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.openURL) private var openURL
     @State private var viewModel: ParentDashboardViewModel
-    @State private var confirmReset = false
     @State private var showExtend = false
+    /// D-060 — raised BEFORE a timer starts, when starting it would not do what it looks like.
+    @State private var startWarning: StartWarning?
+    @State private var showSettings = false
+    /// D-062 — the picker itself, reachable in one tap from the warning that needs it.
+    @State private var showPicker = false
+    @State private var picker = ContentPickerModel()
+    @State private var pickerLoaded = false
+    /// Once per visit, not once per redraw — the dashboard reloads on a timer.
+    @State private var hasWarnedThisVisit = false
     @State private var showCoveredContent = false
     let onOpenTimer: () -> Void
     let onReset: () -> Void
@@ -48,26 +56,80 @@ struct ParentDashboardView: View {
             .navigationTitle("ScreenTimeNext")
             .toolbar {
                 NavigationLink {
-                    SettingsView(services: services, onSaved: { viewModel.reload() })
+                    SettingsView(services: services, onSaved: { viewModel.configurationChanged() })
                 } label: {
                     Label("Settings", systemImage: "gearshape.fill")
                 }
             }
-            .onAppear { viewModel.appeared() }
+            .onAppear {
+                viewModel.appeared()
+                warnIfNothingIsCovered()
+            }
             .onDisappear { viewModel.disappeared() }
             .onChange(of: scenePhase) { _, phase in
-                if phase == .active { viewModel.reload() }
+                if phase == .active {
+                    viewModel.reload()
+                    warnIfNothingIsCovered()
+                } else if phase == .background {
+                    // A new visit is a new chance to have forgotten.
+                    hasWarnedThisVisit = false
+                }
             }
             // D-028 — the picker writes its selection the moment it closes, so the dashboard has
             // to hear about it then, not on the next foreground.
             .onReceive(NotificationCenter.default.publisher(for: .configurationDidChange)) { _ in
-                viewModel.reload()
+                viewModel.configurationChanged()
             }
             .sheet(isPresented: $showExtend) {
-                ExtendTimeSheet(childName: name) { minutes in
+                // D-060 — once the clock has run out there is nothing left to take back, so the
+                // sheet opens as "add" only. Offering a subtraction that cannot apply is a control
+                // that exists to be refused.
+                ExtendTimeSheet(childName: name, canTakeBack: viewModel.sessionIsRunning) { minutes in
                     viewModel.adjust(minutes: minutes)
                 }
-                .presentationDetents([.medium, .large])
+                .presentationDetents([.large])
+            }
+            .alert(item: $startWarning) { warning in
+                Alert(title: Text(warning.title),
+                      message: Text(warning.message),
+                      primaryButton: .default(Text(warning.fixLabel)) {
+                          switch warning {
+                          case .restrictionsCleared:
+                              viewModel.restoreRestrictionsAndStart()
+                              onOpenTimer()
+                          case .nothingCovered:
+                              // D-062 — straight to the list. Sending a parent to Settings to find
+                              // a row that opens the picker is two more decisions than the moment
+                              // needs; the warning already told them exactly what to do.
+                              showPicker = true
+                          }
+                      },
+                      secondaryButton: .cancel(Text(warning.proceedLabel)) {
+                          viewModel.startSession()
+                          onOpenTimer()
+                      })
+            }
+            .navigationDestination(isPresented: $showSettings) {
+                SettingsView(services: services, onSaved: { viewModel.configurationChanged() })
+            }
+            .sheet(isPresented: $showPicker) {
+                NavigationStack {
+                    ContentPickerScreen(model: picker,
+                                        screenTimeAccessAvailable: viewModel.authorization == .approved,
+                                        onRequestAccess: { viewModel.requestAuthorization() },
+                                        isRequestingAccess: viewModel.isRequestingAuthorization,
+                                        accessDenied: viewModel.authorization == .denied) { _ in
+                        picker.persist(to: services.storage)
+                        viewModel.configurationChanged()
+                    }
+                }
+                .task {
+                    guard !pickerLoaded else { return }
+                    picker = ContentPickerModel.loaded(from: services.storage,
+                                                       selection: services.selection,
+                                                       autosaving: true)
+                    pickerLoaded = true
+                }
             }
         }
     }
@@ -80,23 +142,22 @@ struct ParentDashboardView: View {
     /// because a Button inside a Button swallows the inner taps.
     private var heroSection: some View {
         Section {
-            VStack(spacing: 16) {
-                HStack(alignment: .top, spacing: 16) {
-                    Text(name.isEmpty ? "Today" : name)
-                        .font(.system(.title2, design: .rounded).bold())
-                    Spacer(minLength: 0)
-                    Mascot(mood: heroMood, size: 76, tint: .white, animated: false)
-                }
-
-                if viewModel.sessionIsRunning || viewModel.session.state == .finished {
-                    runningRing
-                } else {
-                    quickStart
-                }
+            VStack(spacing: 18) {
+                heroHeader
+                // A FIXED height for the middle band, whatever is in it. The card used to change
+                // shape between "ready" and "in session" — two different compositions in the same
+                // frame — and a card that jumps when the state changes reads as two screens rather
+                // than one thing in two moods.
+                heroCentre.frame(height: 150)
+                heroActions
             }
             .foregroundStyle(.white)
             .padding(20)
             .background(RoundedRectangle(cornerRadius: 28, style: .continuous).fill(Theme.heroGradient))
+            // A single hairline is the difference between a gradient that reads as a card and one
+            // that reads as a coloured area of the screen.
+            .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .strokeBorder(.white.opacity(0.14), lineWidth: 0.5))
             .contentShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
             .onTapGesture { onOpenTimer() }
             .accessibilityAddTraits(.isButton)
@@ -107,95 +168,156 @@ struct ParentDashboardView: View {
             .listRowBackground(Color.clear)
         } footer: {
             if viewModel.sessionIsRunning {
-                Text("Press and hold “Parents” in the timer to come back here.")
+                Text("Hold “Parents” in the timer to come back.")
             }
         }
     }
 
-    /// Mid-session: the ring, number unobstructed, and the two controls a parent actually uses.
+    /// D-055 — the name reads as a name, the state reads as a status field, and the mascot stops
+    /// competing with them. It was 76pt in the corner opposite a left-aligned title, with a
+    /// centred ring underneath: three anchors, no relationship between them.
+    private var heroHeader: some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(name.isEmpty ? "Today" : name)
+                    .font(.title3.weight(.semibold))
+                Text(viewModel.sessionStatusText.uppercased())
+                    .font(.system(size: 11, weight: .semibold))
+                    .tracking(0.9)
+                    .opacity(0.75)
+            }
+            Spacer(minLength: 0)
+            Mascot(mood: heroMood, size: 48, tint: .white, animated: false)
+        }
+    }
+
+    @ViewBuilder
+    private var heroCentre: some View {
+        if viewModel.sessionIsRunning || viewModel.session.state == .finished {
+            runningRing
+        } else {
+            quickStart
+        }
+    }
+
+    /// Mid-session: the ring alone in the middle band, centred, with nothing beside it to pull the
+    /// eye off the number. Rounded digits, everything else in the system face — a clock should look
+    /// friendly; a dashboard should not look like a toy.
     private var runningRing: some View {
-        VStack(spacing: 12) {
-            ZStack {
-                ProgressRing(fraction: viewModel.remainingFraction, lineWidth: 12, color: .white.opacity(0.95))
-                VStack(spacing: 0) {
-                    Text(ChildTimerView.clock(viewModel.session.window != nil ? viewModel.session.remainingSeconds : viewModel.remainingTodaySeconds))
-                        .font(.system(size: 34, weight: .bold, design: .rounded))
-                        .monospacedDigit()
-                        .contentTransition(.numericText())
-                    Text(viewModel.session.window != nil ? "in session" : "left today")
-                        .font(.caption2.weight(.semibold))
-                        .opacity(0.85)
-                }
-            }
-            .frame(width: 132, height: 132)
-
-            HStack(spacing: 12) {
-                if viewModel.sessionIsRunning {
-                    // D-036 — no "are you sure?". This button is already behind the parent PIN,
-                    // and the parent pressing it is usually standing next to a child who has just
-                    // been told the timer is stopping. A second tap turns a decision into a delay.
-                    Button(role: .destructive) { viewModel.endSession() } label: {
-                        heroChip("End", "stop.fill")
-                    }
-                    .buttonStyle(.plain)
-                }
-                if viewModel.canExtend {
-                    Button { showExtend = true } label: {
-                        heroChip("Time", "plusminus")
-                    }
-                    .buttonStyle(.plain)
-                }
+        ZStack {
+            ProgressRing(fraction: viewModel.remainingFraction, lineWidth: 10, color: .white.opacity(0.95))
+            VStack(spacing: 2) {
+                Text(ChildTimerView.clock(viewModel.session.window != nil
+                                          ? viewModel.session.remainingSeconds
+                                          : viewModel.remainingTodaySeconds))
+                    .font(.system(size: 38, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .contentTransition(.numericText())
+                Text(viewModel.session.window != nil ? "REMAINING" : "LEFT TODAY")
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(0.8)
+                    .opacity(0.75)
             }
         }
+        .frame(width: 150, height: 150)
     }
 
-    private func heroChip(_ title: String, _ symbol: String) -> some View {
-        Label(title, systemImage: symbol)
-            .font(.system(.subheadline, design: .rounded).bold())
-            .foregroundStyle(.white)
-            .padding(.horizontal, 16).padding(.vertical, 8)
-            .background(Capsule().fill(.white.opacity(0.22)))
-    }
-
-    /// Idle: the whole point of the app in two taps — set the minutes, hand it over.
+    /// Idle: the same band, the same weight of type — set the minutes, hand it over.
     private var quickStart: some View {
-        VStack(spacing: 12) {
-            HStack(spacing: 14) {
-                Button { viewModel.adjustQuickMinutes(-1) } label: {
-                    Image(systemName: "minus.circle.fill").font(.title)
-                }
-                .buttonStyle(.plain)
-                VStack(spacing: -2) {
-                    Text("\(viewModel.quickMinutes)")
-                        .font(.system(size: 52, weight: .heavy, design: .rounded))
-                        .monospacedDigit()
-                        .contentTransition(.numericText())
-                    Text("minutes").font(.caption.weight(.semibold)).opacity(0.85)
-                }
-                .frame(minWidth: 110)
-                Button { viewModel.adjustQuickMinutes(1) } label: {
-                    Image(systemName: "plus.circle.fill").font(.title)
-                }
-                .buttonStyle(.plain)
+        HStack(spacing: 18) {
+            stepper("minus", -1)
+            VStack(spacing: 0) {
+                Text("\(viewModel.quickMinutes)")
+                    .font(.system(size: 60, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .contentTransition(.numericText())
+                Text("MINUTES")
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(0.8)
+                    .opacity(0.75)
             }
-            .foregroundStyle(.white)
-            .sensoryFeedback(.selection, trigger: viewModel.quickMinutes)
-
-            Button {
-                viewModel.startSession()
-                onOpenTimer()
-            } label: {
-                Label("Start now", systemImage: "play.fill")
-                    .font(.system(.headline, design: .rounded).bold())
-                    .foregroundStyle(Theme.sky)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 13)
-                    .background(Capsule().fill(.white))
-            }
-            .buttonStyle(.plain)
-            .disabled(viewModel.remainingTodaySeconds == 0)
-            .opacity(viewModel.remainingTodaySeconds == 0 ? 0.5 : 1)
+            .frame(minWidth: 96)
+            stepper("plus", 1)
         }
+        .sensoryFeedback(.selection, trigger: viewModel.quickMinutes)
+    }
+
+    private func stepper(_ symbol: String, _ delta: Int) -> some View {
+        Button { viewModel.adjustQuickMinutes(delta) } label: {
+            Image(systemName: symbol)
+                .font(.system(size: 17, weight: .bold))
+                .frame(width: 42, height: 42)
+                .background(Circle().fill(.white.opacity(0.18)))
+                .overlay(Circle().strokeBorder(.white.opacity(0.24), lineWidth: 0.5))
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// One row of equal-width actions, edge to edge. The old chips were two different widths
+    /// floating under a centred ring, which is what made the card look unresolved.
+    @ViewBuilder
+    private var heroActions: some View {
+        HStack(spacing: 10) {
+            if viewModel.sessionIsRunning {
+                // D-036 — no "are you sure?". This is already behind the parent PIN, and the parent
+                // pressing it is usually standing next to a child who has just been told the timer
+                // is stopping. A second tap turns a decision into a delay.
+                heroButton("End", "stop.fill", filled: false) { viewModel.endSession() }
+                heroButton("Time", "plusminus", filled: false) { showExtend = true }
+            } else if viewModel.canExtend {
+                // D-060 — "plus", not "plusminus". The clock has run out; there is nothing under
+                // zero to take back, and an icon promising both is promising one that cannot work.
+                heroButton("Add time", "plus", filled: true) { showExtend = true }
+            } else {
+                heroButton("Start now", "play.fill", filled: true) { start() }
+                    .disabled(viewModel.remainingTodaySeconds == 0)
+                    .opacity(viewModel.remainingTodaySeconds == 0 ? 0.5 : 1)
+            }
+        }
+    }
+
+    /// D-060 — everything that starts a timer goes through here.
+    ///
+    /// Two states make a timer do nothing while looking exactly like a timer that works: every
+    /// restriction slid off for the day, and no apps ever picked. A parent finds out fifteen
+    /// minutes later, when the end arrives and nothing happens. So they are told at the one moment
+    /// the information is useful, with the fix offered as the first button.
+    /// D-061 — an empty selection is worth saying on ARRIVAL, not only when Start is pressed.
+    ///
+    /// A parent who has just finished Start over is looking at a dashboard that looks complete: a
+    /// dial, a ring, a green slide. The one thing missing is the thing the whole app rests on, and
+    /// the only sign of it was a grey "Nothing selected yet" three sections down.
+    ///
+    /// Once per visit. A dashboard that reloads every second must not raise an alert every second.
+    private func warnIfNothingIsCovered() {
+        guard !hasWarnedThisVisit, startWarning == nil,
+              viewModel.selectionSummary.isEmpty else { return }
+        hasWarnedThisVisit = true
+        startWarning = .nothingCovered
+    }
+
+    private func start() {
+        if let warning = viewModel.startWarning {
+            startWarning = warning
+            return
+        }
+        viewModel.startSession()
+        onOpenTimer()
+    }
+
+    private func heroButton(_ title: String, _ symbol: String, filled: Bool,
+                            action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: symbol)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(filled ? Theme.sky : .white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 46)
+                .background(Capsule().fill(filled ? AnyShapeStyle(Color.white)
+                                                  : AnyShapeStyle(Color.white.opacity(0.18))))
+                .overlay(filled ? nil : Capsule().strokeBorder(.white.opacity(0.24), lineWidth: 0.5))
+        }
+        .buttonStyle(.plain)
     }
 
     private var heroMood: MascotMood {
@@ -226,35 +348,27 @@ struct ParentDashboardView: View {
         } header: {
             Text("Protected content")
         } footer: {
-            Text("A full-screen message appears inside the app your child is using — at each reminder, and when time is up.")
+            Text("Covered apps show a full-screen message at each reminder, and when time is up.")
         }
     }
 
-    /// D-053 — a read-out, not a control.
+    /// D-053 — a read-out, not a control. D-057 — and only the three that reach the child.
     ///
     /// D-052 put the ticks here, and that was wrong twice over: choosing which activities are
-    /// offered is configuration a parent does once, and a tappable list sitting next to the ring
-    /// made the screen a parent opens every evening read like a settings page. What belongs here
-    /// is the answer to "what will my child be asked?" — so that is all it shows now. Editing is
-    /// back in Settings, next to the list it edits.
+    /// offered is configuration a parent does once, and a tappable list beside the ring made the
+    /// screen a parent opens every evening read like a settings page. Editing is back in Settings,
+    /// next to the list it edits.
+    ///
+    /// D-057 then cut it to three. A system shield fits three (D-044) and takes them off the front
+    /// of the list; showing all of them with three marked was a list a parent had to read carefully
+    /// to learn one fact. Three rows say it by being the only three rows.
     private var whatsNextSection: some View {
         Section {
-            let offered = viewModel.offeredActivities
-            // The order is the answer: a system shield can show three (D-044), and it takes them
-            // off the front. Marking the cut-off is the only way a parent can tell, from here,
-            // that reordering in Settings changes what their child sees.
-            ForEach(Array(offered.enumerated()), id: \.element.id) { index, activity in
+            ForEach(viewModel.shieldActivities) { activity in
                 HStack(spacing: 12) {
                     IconChip(symbol: activity.symbolName, color: Theme.color(for: activity), size: 30)
                     Text(activity.displayName).fontWeight(.medium)
                     Spacer(minLength: 0)
-                    if index < viewModel.shieldChoiceCount {
-                        Text("On the shield")
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(Theme.color(for: activity))
-                            .padding(.horizontal, 8).padding(.vertical, 3)
-                            .background(Capsule().fill(Theme.color(for: activity).opacity(0.14)))
-                    }
                 }
             }
         } header: {
@@ -262,16 +376,27 @@ struct ParentDashboardView: View {
                 Text("What's next")
                 Spacer()
                 NavigationLink {
-                    SettingsView(services: services, onSaved: { viewModel.reload() })
+                    SettingsView(services: services, onSaved: { viewModel.configurationChanged() })
                 } label: {
                     Text("Edit").font(.caption.weight(.bold)).textCase(nil)
                 }
             }
         } footer: {
-            Text(viewModel.offersEverything
-                 ? "Nothing picked yet, so your child is offered all of these. Choose in Settings."
-                 : "Your child sees the first \(viewModel.shieldChoiceCount) on the transition screen, in this order.")
+            Text(whatsNextFooter)
         }
+    }
+
+    private var whatsNextFooter: String {
+        let extra = viewModel.activitiesBeyondTheShield
+        let base = viewModel.offersEverything
+            ? "Nothing picked yet, so these are the first of the built-in list."
+            : "These are what your child can choose from on the transition screen."
+        // The platform limit is worth naming: a parent who added a fourth and cannot find it on
+        // their child's screen should not have to guess why.
+        let tail = extra == 0
+            ? " Reorder them in Settings."
+            : " A shield fits three, so \(extra) more in your list stay off it — reorder in Settings to swap them in."
+        return base + tail
     }
 
     /// D-053 — the slide that clears every restriction for the rest of today, and puts them back.
@@ -287,11 +412,11 @@ struct ParentDashboardView: View {
             .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
             .listRowBackground(Color.clear)
         } footer: {
+            // It ends by itself, which is the point: a parent who says yes to a film night
+            // should not have to remember to say no again in the morning.
             Text(viewModel.canClearRestrictions
-                 // It ends by itself, which is the point: a parent who says yes to a film night
-                 // should not have to remember to say no again in the morning.
-                 ? "Slide to unblock every app for the rest of today. Restrictions come back by themselves at midnight, or slide again to bring them back now."
-                 : "Available once today's time has run out — nothing is blocked while the timer is running.")
+                 ? "Comes back on its own at midnight."
+                 : "Available once today's time is up.")
         }
     }
 
@@ -328,24 +453,20 @@ struct ParentDashboardView: View {
         }
     }
 
+    /// D-055 — a slide, and no dialog behind it.
+    ///
+    /// The confirmation sheet was theatre: it always got the same answer, and a parent who has
+    /// already passed the gate and reached for a destructive row is not helped by being asked the
+    /// same question in different words. The travel is the confirmation; the footer is where the
+    /// consequences are actually read, which is why it says exactly what goes and what stays.
     private var dangerSection: some View {
         Section {
-            Button(role: .destructive) { confirmReset = true } label: {
-                HStack(spacing: 12) {
-                    IconChip(symbol: "arrow.counterclockwise", color: .red)
-                    Text("Start over").fontWeight(.semibold).foregroundStyle(.red)
-                }
-            }
-            // Anchored here, not on the List: on iPad an unanchored confirmationDialog drifts to
-            // the screen edge instead of pointing at the button.
-            .confirmationDialog("Start over?", isPresented: $confirmReset, titleVisibility: .visible) {
-                Button("Erase and start over", role: .destructive) { onReset() }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("Erases the profile, the budget and the reminders on this device. The websites you typed, your saved sets and your own activities are kept. This cannot be undone.")
-            }
+            ConfirmSlide(title: "Slide to erase and start over",
+                         symbol: "arrow.counterclockwise") { onReset() }
+                .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
+                .listRowBackground(Color.clear)
         } footer: {
-            Text("Erases the child profile, the budget and the reminders. What you made — saved sets, websites, your own activities — is kept.")
+            Text("Erases the profile, budget and reminders. Your sets, websites, activities and PIN are kept.")
         }
     }
 }
@@ -360,6 +481,8 @@ struct ParentDashboardView: View {
 struct ExtendTimeSheet: View {
     @Environment(\.dismiss) private var dismiss
     let childName: String
+    /// D-060 — false once the clock has run out: there is nothing under zero to take back.
+    var canTakeBack: Bool = true
     /// Positive adds, negative takes back.
     let onExtend: (Int) -> Void
 
@@ -370,27 +493,40 @@ struct ExtendTimeSheet: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 20) {
-                Mascot(mood: isAdding ? .cheering : .thinking, size: 84, tint: tint)
+            // D-060 — scrolling content, pinned button.
+            //
+            // The button used to be the last thing in a VStack, so on a shorter phone — or with
+            // larger text — it sat below the edge of the sheet with nothing to scroll. A parent
+            // could set the minutes and then not be able to apply them, which is the worst possible
+            // place for a layout to fail. The action is now in a bottom bar that cannot be pushed
+            // anywhere, and everything above it scrolls.
+            ScrollView {
+                VStack(spacing: 20) {
+                    Mascot(mood: isAdding ? .cheering : .thinking, size: 84, tint: tint)
 
-                Picker("", selection: $isAdding) {
-                    Text("Add time").tag(true)
-                    Text("Take back").tag(false)
+                    if canTakeBack {
+                        Picker("", selection: $isAdding) {
+                            Text("Add time").tag(true)
+                            Text("Take back").tag(false)
+                        }
+                        .pickerStyle(.segmented)
+                        .padding(.horizontal, 24)
+                        .readableWidth(460)
+                    }
+
+                    MinuteDial.budget($minutes, color: tint)
+
+                    Text(explanation)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 32)
                 }
-                .pickerStyle(.segmented)
-                .padding(.horizontal, 24)
-                .readableWidth(460)
-
-                MinuteDial.budget($minutes, color: tint)
-
-                Text(isAdding
-                     ? "Added from now, so it means the same whether the timer is still running or already finished."
-                     : "Taken off the end. The session never rewinds past this moment.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 32)
-
+                .padding(.top, 20)
+                .padding(.bottom, 12)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+            .safeAreaInset(edge: .bottom) {
                 Button {
                     onExtend(isAdding ? minutes : -minutes)
                     dismiss()
@@ -399,15 +535,33 @@ struct ExtendTimeSheet: View {
                 }
                 .buttonStyle(PillButtonStyle(color: tint))
                 .padding(.horizontal, 24)
+                .padding(.top, 10)
+                .padding(.bottom, 10)
                 .readableWidth(460)
+                .frame(maxWidth: .infinity)
+                .background(.ultraThinMaterial)
             }
-            .padding(.top, 20)
-            .navigationTitle(childName.isEmpty ? "Change time" : "Change \(childName)'s time")
+            .navigationTitle(navigationTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
             }
+            .onAppear { if !canTakeBack { isAdding = true } }
         }
+    }
+
+    private var navigationTitle: String {
+        if !canTakeBack { return childName.isEmpty ? "Add time" : "Add time for \(childName)" }
+        return childName.isEmpty ? "Change time" : "Change \(childName)'s time"
+    }
+
+    private var explanation: String {
+        if !canTakeBack {
+            return "The timer has finished, so these minutes start from now."
+        }
+        return isAdding
+            ? "Added from now, so it means the same whether the timer is still running or already finished."
+            : "Taken off the end. The session never rewinds past this moment."
     }
 }
 

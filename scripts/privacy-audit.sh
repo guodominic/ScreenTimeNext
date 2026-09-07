@@ -72,5 +72,14 @@ shieldall=$(grep -rnE 'shield\.[A-Za-z]+ *= *\.all\(' --include='*.swift' \
             | grep -vE '//.*shield\.' || true)
 [ -n "$shieldall" ] && report "shield set to .all(...) — rule 7 shields only the parent's selection" "$shieldall"
 
+# 9) D-064 — `.all()` web filtering is real power: it blocks every browser on the device. It is
+# the parent's own labelled switch, so it is allowed — but only from the one adapter that reads
+# that switch. Anywhere else it would be us deciding to block the web on a family's behalf.
+weball=$(grep -rn 'blockedByFilter *= *\.all(' --include='*.swift' \
+         ScreenTimeNext Packages DeviceActivityMonitorExtension \
+         ShieldConfigurationExtension ShieldActionExtension 2>/dev/null \
+         | grep -v '^ScreenTimeNext/ScreenTime/Shielding/ManagedSettingsShieldService.swift:' || true)
+[ -n "$weball" ] && report "blockedByFilter = .all() outside the shield adapter (D-064)" "$weball"
+
 if [ $fail -ne 0 ]; then exit 1; fi
 echo "privacy audit OK (no networking, no logging, no third-party SDKs, payload opaque, no global ManagedSettings clear)"

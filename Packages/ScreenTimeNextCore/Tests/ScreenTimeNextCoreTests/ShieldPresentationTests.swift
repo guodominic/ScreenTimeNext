@@ -56,15 +56,40 @@ final class ShieldPresentationTests: XCTestCase {
         }
         for moment in moments {
             let p = ShieldPresentation.make(for: moment, childName: "Ivy")
-            let text = (p.title + " " + p.subtitle + " " + p.primaryButtonLabel).lowercased()
+            let text = (p.title + " " + p.subtitle + " " + (p.primaryButtonLabel ?? "")).lowercased()
             for word in banned {
                 XCTAssertFalse(text.contains(word), "\(moment) says \(word)")
             }
             XCTAssertFalse(p.title.isEmpty)
             XCTAssertFalse(p.subtitle.isEmpty)
-            XCTAssertFalse(p.primaryButtonLabel.isEmpty)
+            XCTAssertFalse((p.primaryButtonLabel ?? "").isEmpty, "every moment here still has a button")
             XCTAssertFalse(p.symbolName.isEmpty)
         }
+    }
+
+    /// D-056 — on the last ask there is no button that fails to offer the choices.
+    ///
+    /// "Pick one first 👆" was a primary button that did nothing: `secondaryButtonSubmenuItems`
+    /// opens only from the SECONDARY button (D-049) and no `ShieldActionResponse` can open it. A
+    /// child who taps a button and gets nothing learns the screen is broken.
+    func testTheInsistingAskHasOnlyTheChooserButton() {
+        let options = Array(TransitionActivity.allCases.prefix(3))
+        let p = ShieldPresentation.make(for: .chooseNext(minutesLeft: 1, options: options, mustChoose: true),
+                                        childName: "Ivy")
+        XCTAssertNil(p.primaryButtonLabel, "no button that cannot lead anywhere")
+        XCTAssertEqual(p.secondaryButtonLabel, "Pick what's next 👆")
+        XCTAssertEqual(p.submenuItems, options.map(\.displayName))
+    }
+
+    /// The gentler ask keeps its way out — a child who does not want to choose still has minutes,
+    /// and taking them away for declining a menu would punish a UI decision.
+    func testTheGentleAskStillOffersNotYet() {
+        let options = Array(TransitionActivity.allCases.prefix(3))
+        let p = ShieldPresentation.make(for: .chooseNext(minutesLeft: 5, options: options, mustChoose: false),
+                                        childName: "Ivy")
+        XCTAssertEqual(p.primaryButtonLabel, "Not yet")
+        XCTAssertEqual(p.secondaryButtonLabel, "What's next?")
+        XCTAssertFalse(p.primaryButtonContinues, "§17 — the primary never buys time")
     }
 
     func testLowercasedFirstLeavesTheRestAlone() {

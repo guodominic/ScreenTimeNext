@@ -46,26 +46,41 @@ class DeviceActivityMonitorExtension: DeviceActivityMonitor {
         super.intervalDidEnd(for: activity)
         let name = activity.rawValue
 
-        if name == MonitoringName.sessionEnd {
-            // D-050 — a transition screen may have paused the clock after this alarm was set, in a
-            // process with no way to move it. So the end arriving is a question, not an answer:
-            // if there is time left, this alarm is early and re-arms itself from the new end.
+        // D-056 — EVERY session alarm is now checked against the window as it stands right now.
+        //
+        // D-050 gave this check to the end alarm alone and left the reminders unguarded, on the
+        // reasoning that "an early alarm is self-correcting". A device log settled that: three
+        // alarms firing in the same second, again and again, each burst dragging the session's end
+        // further out. A reminder made early by a paused clock raised a shield that was not due;
+        // dismissing it paid back more paused time; the end moved; the next alarm was early too.
+        // Nothing here is self-correcting — it has to be asked.
+        if name == MonitoringName.sessionEnd || MonitoringName.isSessionWarning(name) {
             let storage = try? FileStorageService.shared()
-            if let window = (try? storage?.loadSessionWindow()) ?? nil,
-               window.remainingSeconds(at: Date()) > 0 {
-                journal?.record(.intervalDidEnd, activity: name)
-                Enforcement.rearmSessionAlarmsFromAppGroup()
+            let window = (try? storage?.loadSessionWindow()) ?? nil
+            let configuration = ((try? storage?.loadConfiguration()) ?? nil) ?? .default
+
+            guard let window else {
+                // No session behind this alarm at all — it belongs to one that has ended.
+                journal?.record(.staleAlarmIgnored, activity: name)
                 return
             }
-            journal?.record(.thresholdReached, activity: name)
-            Enforcement.reconcileFromAppGroup()
-            return
-        }
 
-        if MonitoringName.isSessionWarning(name) {
-            // Still time left, so the rule would take this straight back down — raise it directly.
-            journal?.record(.warningBeforeThreshold, activity: name)
-            Enforcement.raiseReminderShieldFromAppGroup()
+            if SessionMoments.isEarly(name, window: window, configuration: configuration) {
+                journal?.record(.staleAlarmIgnored, activity: name)
+                rearm()
+                return
+            }
+
+            if name == MonitoringName.sessionEnd {
+                journal?.record(.thresholdReached, activity: name)
+                journal?.forgetRearm()          // this window is over; the next one starts clean
+                Enforcement.reconcileFromAppGroup()
+            } else {
+                // Due, and there is still time left — so the ordinary rule would take this shield
+                // straight back down. Raise it directly: it is the heads-up, not the end.
+                journal?.record(.warningBeforeThreshold, activity: name)
+                Enforcement.raiseReminderShieldFromAppGroup()
+            }
             return
         }
 
@@ -78,6 +93,15 @@ class DeviceActivityMonitorExtension: DeviceActivityMonitor {
         super.eventDidReachThreshold(event, activity: activity)
         journal?.record(.thresholdReached, activity: activity.rawValue)
         Enforcement.reconcileFromAppGroup()
+    }
+
+    /// D-056 — re-arm, but never faster than the journal allows. Re-arming stops and restarts
+    /// every session activity, and if stopping an active interval reports it as ended then a
+    /// re-arm summons the callback that asks for a re-arm. The rate limit closes that loop no
+    /// matter which callback opens it.
+    private func rearm() {
+        guard journal?.mayRearm() ?? false else { return }
+        Enforcement.rearmSessionAlarmsFromAppGroup()
     }
 
     override func intervalWillEndWarning(for activity: DeviceActivityName) {

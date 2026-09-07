@@ -70,7 +70,7 @@ struct CoveredContentSheet: View {
                     } footer: {
                         // B-005 — a category covers apps we are not allowed to enumerate, so this
                         // says what it means rather than pretending to a number we cannot know.
-                        Text("A category covers every app on this device that belongs to it. iOS doesn't tell apps which ones those are, so they can't be listed here.")
+                        Text("Covers every app in it. iOS never says which. ScreenTimeNext is never blocked.")
                     }
                 }
                 if !selection.applicationTokens.isEmpty {
