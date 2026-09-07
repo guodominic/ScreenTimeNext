@@ -2054,11 +2054,34 @@ to fail. A clean local Archive would have hit the same wall, at the worst possib
 * `figure` — a `ZStack` of eight opaque children (an eight-element `TupleView` the builder solves
   as one problem), split into a back half and a front half. Same drawing order, same picture.
 
-**Consequences.** The rule this leaves behind is about verification, not about SwiftUI: a green
-incremental build is not evidence that a file compiles, only that it did not need to. The file that
-breaks the release is the one nobody has touched. Before an Archive that matters, the build that
-counts is a clean one — which is exactly what Archive does, and why it is worth running early
-rather than as the last step before submitting.
+**Second pass (same day).** The first pass fixed five expressions and the file failed again, on
+`headShape` — a `Circle()` carrying eight generic modifiers, two `overlay`s with their own chains,
+and four `CGFloat` products written inline. It was the longest expression in the file and the first
+pass walked past it, because that pass was looking for *suspicious* expressions rather than
+measuring anything.
+
+Worse, the failure was misread in between. Xcode Cloud's log showed the compile sub-task with a
+green check while its parent exited 65, and that green was taken as evidence the file now compiled.
+It was not: the real error was one level down, and only the failure EMAIL stated it — with the line
+number, which no view in the web UI ever showed. This project has already written down that a
+diagnostic reporting success it did not verify is worse than none (see the shield that logged
+"shield raised" before the call that failed). The same mistake was made again, on a green tick.
+
+The second pass stopped guessing which expressions were expensive and defused all of them: every
+inline numeric product in the file is now a named `let` with an explicit type (66 of them), every
+chain longer than about four modifiers is split at a named intermediate, and the idle animation —
+built inline in three separate chains — is one `idleLoop` property.
+
+**Consequences.** Two rules, and the second matters more than the SwiftUI one.
+
+A green incremental build is not evidence that a file compiles, only that it did not need to. The
+file that breaks the release is the one nobody has touched, so the build that counts before a
+submission is a clean one.
+
+And when a build system reports a failure, the error is whatever the system SAYS it is — not what
+can be inferred from the shape of a collapsed log tree. The email had the file and the line in it
+the whole time. Read the thing that states the error before theorising from the thing that hints
+at it.
 
 <!-- Template for new entries:
 

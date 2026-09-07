@@ -49,6 +49,16 @@ struct Mascot: View {
 
     private var bobbing: Bool { motionOK && phase }
 
+    /// D-073 — built once, named, reused. It appeared inline in three chains, and each one made
+    /// the checker solve it again as part of a larger system.
+    private var idleLoop: Animation {
+        .easeInOut(duration: loopDuration).repeatForever(autoreverses: true)
+    }
+
+    private var antennaLoop: Animation {
+        .easeInOut(duration: loopDuration * 1.1).repeatForever(autoreverses: true)
+    }
+
     /// Vertical travel of the idle loop; `.cheering` and `.excited` are springier.
     private var lift: CGFloat {
         switch mood {
@@ -91,7 +101,7 @@ struct Mascot: View {
             animatedFigure
         }
         .frame(width: size, height: size)
-        .animation(.easeInOut(duration: loopDuration).repeatForever(autoreverses: true), value: phase)
+        .animation(idleLoop, value: phase)
         .onAppear {
             guard motionOK else { return }
             phase = true
@@ -133,24 +143,32 @@ struct Mascot: View {
     }
 
     private var groundShadow: some View {
-        let shadowW: CGFloat = size * (bobbing ? 0.34 : 0.44)
+        let spread: CGFloat = bobbing ? 0.34 : 0.44
+        let shadowW: CGFloat = size * spread
+        let shadowH: CGFloat = size * 0.055
+        let softness: CGFloat = size * 0.012
+        let below: CGFloat = size * 0.46
         return Ellipse()
             .fill(Color.black.opacity(0.10))
-            .frame(width: shadowW, height: size * 0.055)
-            .blur(radius: size * 0.012)
-            .offset(y: size * 0.46)
-            .animation(.easeInOut(duration: loopDuration).repeatForever(autoreverses: true), value: phase)
+            .frame(width: shadowW, height: shadowH)
+            .blur(radius: softness)
+            .offset(y: below)
+            .animation(idleLoop, value: phase)
     }
 
     private var legs: some View {
-        HStack(spacing: size * 0.10) {
+        let gap: CGFloat = size * 0.10
+        let legW: CGFloat = size * 0.085
+        let legH: CGFloat = size * 0.11
+        let down: CGFloat = size * 0.40
+        return HStack(spacing: gap) {
             ForEach(0..<2, id: \.self) { _ in
                 Capsule()
                     .fill(tint.opacity(0.85))
-                    .frame(width: size * 0.085, height: size * 0.11)
+                    .frame(width: legW, height: legH)
             }
         }
-        .offset(y: size * 0.40)
+        .offset(y: down)
     }
 
     private var bodyGradient: LinearGradient {
@@ -160,18 +178,23 @@ struct Mascot: View {
 
     /// A little belly patch, so the body isn't a flat slab.
     private var bellyPatch: some View {
-        Ellipse()
+        let w: CGFloat = bodyW * 0.55
+        let h: CGFloat = bodyH * 0.55
+        let down: CGFloat = bodyH * 0.10
+        return Ellipse()
             .fill(Color.white.opacity(0.22))
-            .frame(width: bodyW * 0.55, height: bodyH * 0.55)
-            .offset(y: bodyH * 0.10)
+            .frame(width: w, height: h)
+            .offset(y: down)
     }
 
     private var bodyShape: some View {
-        RoundedRectangle(cornerRadius: size * 0.16, style: .continuous)
+        let corner: CGFloat = size * 0.16
+        let down: CGFloat = size * 0.26
+        return RoundedRectangle(cornerRadius: corner, style: .continuous)
             .fill(bodyGradient)
             .frame(width: bodyW, height: bodyH)
             .overlay(bellyPatch)
-            .offset(y: size * 0.26)
+            .offset(y: down)
     }
 
     private var headGradient: LinearGradient {
@@ -183,22 +206,40 @@ struct Mascot: View {
     private var headGloss: some View {
         let w: CGFloat = head * 0.34
         let h: CGFloat = head * 0.20
+        let dx: CGFloat = -head * 0.19
+        let dy: CGFloat = -head * 0.26
         return Ellipse()
             .fill(Color.white.opacity(0.32))
             .frame(width: w, height: h)
             .rotationEffect(.degrees(-22))
-            .offset(x: -head * 0.19, y: -head * 0.26)
+            .offset(x: dx, y: dy)
     }
 
+    /// D-073 (revised) — THIS is the expression the compiler gave up on, twice.
+    ///
+    /// Eight generic modifiers on one `Circle()`, two of them `overlay`s carrying their own
+    /// chains, and four `CGFloat` products written inline. Every modifier returns a fresh opaque
+    /// type, so the checker was solving one system with a dozen unknowns in it. The first D-073
+    /// pass fixed five other expressions in this file and missed the longest one — which is the
+    /// argument for naming every number rather than trimming until it happens to pass.
+    ///
+    /// Same circle, same order, same picture.
     private var headShape: some View {
         let d: CGFloat = head
-        return Circle()
+        let ring: CGFloat = size * 0.014
+        let glow: CGFloat = size * 0.07
+        let glowDrop: CGFloat = size * 0.035
+        let raise: CGFloat = -size * 0.08
+        let outline = Circle().stroke(Color.white.opacity(0.35), lineWidth: ring)
+        let ball = Circle()
             .fill(headGradient)
             .frame(width: d, height: d)
+
+        return ball
             .overlay(headGloss)
-            .overlay(Circle().stroke(Color.white.opacity(0.35), lineWidth: size * 0.014))
-            .shadow(color: tint.opacity(0.35), radius: size * 0.07, y: size * 0.035)
-            .offset(y: -size * 0.08)
+            .overlay(outline)
+            .shadow(color: tint.opacity(0.35), radius: glow, y: glowDrop)
+            .offset(y: raise)
             .rotationEffect(.degrees(headTilt), anchor: .bottom)
     }
 
@@ -211,61 +252,85 @@ struct Mascot: View {
     }
 
     private var ears: some View {
-        HStack(spacing: head * 0.86) {
+        let gap: CGFloat = head * 0.86
+        let earD: CGFloat = size * 0.09
+        let raise: CGFloat = -size * 0.08
+        return HStack(spacing: gap) {
             ForEach(0..<2, id: \.self) { _ in
                 Circle()
                     .fill(tint.opacity(0.88))
-                    .frame(width: size * 0.09, height: size * 0.09)
+                    .frame(width: earD, height: earD)
             }
         }
-        .offset(y: -size * 0.08)
+        .offset(y: raise)
         .rotationEffect(.degrees(headTilt), anchor: .bottom)
     }
 
     private var antenna: some View {
-        VStack(spacing: -size * 0.005) {
-            Circle()
-                .fill(Theme.sun)
-                .frame(width: size * 0.075, height: size * 0.075)
-                .overlay(Circle().stroke(.white.opacity(0.6), lineWidth: size * 0.008))
-                .shadow(color: Theme.sun.opacity(0.6), radius: size * 0.03)
-            Capsule()
-                .fill(tint.opacity(0.9))
-                .frame(width: size * 0.022, height: size * 0.10)
+        let overlap: CGFloat = -size * 0.005
+        let bulbD: CGFloat = size * 0.075
+        let bulbRing: CGFloat = size * 0.008
+        let bulbGlow: CGFloat = size * 0.03
+        let stalkW: CGFloat = size * 0.022
+        let stalkH: CGFloat = size * 0.10
+        let raise: CGFloat = -size * 0.42
+        let tilt: Double = bobbing ? 7 : -7
+        let bulb = Circle()
+            .fill(Theme.sun)
+            .frame(width: bulbD, height: bulbD)
+        let stalk = Capsule()
+            .fill(tint.opacity(0.9))
+            .frame(width: stalkW, height: stalkH)
+
+        return VStack(spacing: overlap) {
+            bulb
+                .overlay(Circle().stroke(.white.opacity(0.6), lineWidth: bulbRing))
+                .shadow(color: Theme.sun.opacity(0.6), radius: bulbGlow)
+            stalk
         }
-        .offset(y: -size * 0.42)
-        .rotationEffect(.degrees(bobbing ? 7 : -7), anchor: .bottom)
-        .animation(.easeInOut(duration: loopDuration * 1.1).repeatForever(autoreverses: true), value: phase)
+        .offset(y: raise)
+        .rotationEffect(.degrees(tilt), anchor: .bottom)
+        .animation(antennaLoop, value: phase)
     }
 
     // MARK: Face
 
     private var face: some View {
-        VStack(spacing: head * 0.055) {
+        let rowGap: CGFloat = head * 0.055
+        let eyeGap: CGFloat = head * 0.24
+        let raise: CGFloat = -size * 0.07
+        let eyes = HStack(spacing: eyeGap) {
+            eye
+            eye
+        }
+        return VStack(spacing: rowGap) {
             brows
-            HStack(spacing: head * 0.24) {
-                eye
-                eye
-            }
-            .overlay(cheeks)
+            eyes.overlay(cheeks)
             mouth
         }
-        .offset(y: -size * 0.07)
+        .offset(y: raise)
         .rotationEffect(.degrees(headTilt), anchor: .bottom)
     }
 
-    @ViewBuilder
+    /// D-073 — no longer `@ViewBuilder`: the body is one expression with an explicit `return`,
+    /// which disables the builder anyway. Keeping the attribute earned a warning and nothing else.
     private var brows: some View {
-        HStack(spacing: head * 0.22) {
+        let gap: CGFloat = head * 0.22
+        let browW: CGFloat = head * 0.20
+        let browH: CGFloat = head * 0.045
+        let rowH: CGFloat = head * 0.05
+        let dimmed: Double = mood == .sleepy ? 0.4 : 1
+        return HStack(spacing: gap) {
             ForEach(0..<2, id: \.self) { i in
+                let mirror: Double = i == 0 ? 1 : -1
                 Capsule()
                     .fill(.white.opacity(0.85))
-                    .frame(width: head * 0.20, height: head * 0.045)
-                    .rotationEffect(.degrees(browAngle * (i == 0 ? 1 : -1)))
+                    .frame(width: browW, height: browH)
+                    .rotationEffect(.degrees(browAngle * mirror))
             }
         }
-        .opacity(mood == .sleepy ? 0.4 : 1)
-        .frame(height: head * 0.05)
+        .opacity(dimmed)
+        .frame(height: rowH)
     }
 
     /// Brows always read as friendly: raised and open, never drawn together (which reads as worry).
@@ -328,29 +393,40 @@ struct Mascot: View {
     }
 
     private var cheeks: some View {
-        HStack(spacing: head * 0.46) {
+        let gap: CGFloat = head * 0.46
+        let cheekW: CGFloat = head * 0.16
+        let cheekH: CGFloat = head * 0.10
+        let softness: CGFloat = head * 0.012
+        let down: CGFloat = head * 0.16
+        return HStack(spacing: gap) {
             ForEach(0..<2, id: \.self) { _ in
                 Ellipse()
                     .fill(Theme.coral.opacity(0.42))
-                    .frame(width: head * 0.16, height: head * 0.10)
-                    .blur(radius: head * 0.012)
+                    .frame(width: cheekW, height: cheekH)
+                    .blur(radius: softness)
             }
         }
-        .offset(y: head * 0.16)
+        .offset(y: down)
         .allowsHitTesting(false)
     }
 
     private var openMouth: some View {
-        let mw: CGFloat = head * (mood == .cheering ? 0.30 : 0.24)
-        let mh: CGFloat = head * (mood == .cheering ? 0.24 : 0.20)
+        let wide: Bool = mood == .cheering
+        let wRatio: CGFloat = wide ? 0.30 : 0.24
+        let hRatio: CGFloat = wide ? 0.24 : 0.20
+        let mw: CGFloat = head * wRatio
+        let mh: CGFloat = head * hRatio
+        let tongueW: CGFloat = head * 0.14
+        let tongueH: CGFloat = head * 0.08
+        let tongueDrop: CGFloat = head * 0.06
         return ZStack {
             Ellipse()
                 .fill(Color(red: 0.34, green: 0.15, blue: 0.21))
                 .frame(width: mw, height: mh)
             Ellipse()                       // tongue
                 .fill(Theme.coral.opacity(0.85))
-                .frame(width: head * 0.14, height: head * 0.08)
-                .offset(y: head * 0.06)
+                .frame(width: tongueW, height: tongueH)
+                .offset(y: tongueDrop)
         }
     }
 
@@ -379,22 +455,30 @@ struct Mascot: View {
 
     private func hand(far: Bool) -> some View {
         let d: CGFloat = size * 0.085
+        let down: CGFloat = size * 0.10
+        let shade: Double = far ? 0.72 : 0.95
         return Circle()
-            .fill(tint.opacity(far ? 0.72 : 0.95))
+            .fill(tint.opacity(shade))
             .frame(width: d, height: d)
-            .offset(y: size * 0.10)
+            .offset(y: down)
     }
 
     private func arm(side: CGFloat, far: Bool) -> some View {
         let w: CGFloat = size * 0.075
         let h: CGFloat = size * 0.24
-        return Capsule()
-            .fill(tint.opacity(far ? 0.72 : 0.92))
+        let shade: Double = far ? 0.72 : 0.92
+        let dx: CGFloat = side * size * 0.24
+        let dy: CGFloat = size * 0.20
+        let angle: Double = armAngle(side: side)
+        let limb = Capsule()
+            .fill(tint.opacity(shade))
             .frame(width: w, height: h)
             .overlay(hand(far: far))
-            .offset(x: side * size * 0.24, y: size * 0.20)
-            .rotationEffect(.degrees(armAngle(side: side)), anchor: .top)
-            .animation(.easeInOut(duration: loopDuration).repeatForever(autoreverses: true), value: phase)
+
+        return limb
+            .offset(x: dx, y: dy)
+            .rotationEffect(.degrees(angle), anchor: .top)
+            .animation(idleLoop, value: phase)
     }
 
     /// D-073 — every literal spelled `Double`. They were untyped integers inside ternaries inside
