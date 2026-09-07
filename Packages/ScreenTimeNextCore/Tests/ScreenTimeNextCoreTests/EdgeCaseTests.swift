@@ -148,13 +148,14 @@ final class EdgeCaseTests: XCTestCase {
         XCTAssertEqual(try c.start().remainingSeconds, 3500, "next session sees the new budget")
     }
 
+    /// D-072 — a parent who decides mid-session is obeyed by the next tick, not the next launch.
     func testActivityChangeMidSessionIsLive() throws {
         let (c, storage) = try boot()
         try c.start()
         var config = try storage.loadConfiguration()
-        config.selectedActivities = [.freeTime]
+        config.parentChosenActivity = .freeTime
         try storage.save(config)
-        XCTAssertEqual(try c.availableActivities(), [.freeTime])
+        XCTAssertEqual(try c.tick().chosenActivity, .freeTime)
     }
 
     // MARK: QA-14 — authorization revoked (Phase 0 scope)

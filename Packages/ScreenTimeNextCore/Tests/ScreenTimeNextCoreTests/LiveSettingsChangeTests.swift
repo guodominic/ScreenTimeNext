@@ -135,14 +135,21 @@ final class LiveSettingsChangeTests: XCTestCase {
         XCTAssertTrue(try controller.tick().state.isWarning, "the new 5-minute reminder is already due")
     }
 
+    /// D-072 — reordering in Settings reaches a running session at once, and so does the
+    /// parent's override.
     func testChangedActivitiesAreVisibleImmediately() throws {
         _ = try controller.start()
         XCTAssertEqual(try controller.availableActivities(), TransitionActivity.allCases)
 
+        var preferences = try storage.loadPickerPreferences()
+        preferences.activityOrder = [TransitionActivity.outside.id, TransitionActivity.cleanUp.id]
+        try storage.save(preferences)
+        XCTAssertEqual(Array(try controller.availableActivities().prefix(2)), [.outside, .cleanUp])
+
         var config = try storage.loadConfiguration()
-        config.selectedActivities = [.cleanUp, .outside]
+        config.parentChosenActivity = .cleanUp
         try storage.save(config)
-        XCTAssertEqual(try controller.availableActivities(), [.cleanUp, .outside])
+        XCTAssertEqual(try controller.tick().chosenActivity, .cleanUp)
     }
 
     // MARK: Nothing running

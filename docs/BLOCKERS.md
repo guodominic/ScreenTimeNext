@@ -12,7 +12,26 @@ workaround or silently change the architecture around it.
 ---
 
 ## B-001 — Family Controls entitlement
-**Status:** in progress · **Owner:** Dominic · **Raised:** 2026-09-04 · **Blocks:** 004, 005, 010, 011, 012, 019 (distribution/TestFlight only — development entitlement is immediate)
+**Status:** **RESOLVED 2026-09-08** · **Owner:** Dominic · **Raised:** 2026-09-04 · **Blocked:** 019, 020
+
+**Family Controls (Distribution) shows `Assigned`.** Submitted and approved the same day — the risk
+this file called "the largest schedule risk in V1" turned out to cost hours, not weeks. Recorded
+plainly because the estimate was wrong in a useful direction, and the next person reading this
+should not delay a submission for weeks of imagined queue.
+
+The entitlement is account-level (see below), so it covers all four targets at once. Nothing is
+waiting on Apple any more: what remains before submission is screenshots, store copy, the privacy
+label, and the device QA in `docs/tasks/device-qa-checklist.md`.
+
+**Next mechanical step:** the App IDs now offer Family Controls (Distribution). With automatic
+signing and the development capability already in place, Apple says Xcode switches to the
+distribution capability by itself — but B-006 on this machine says automatic signing does not always
+negotiate cleanly, so if archiving fails, generate a distribution profile by hand and double-click
+it before spending time on Try Again.
+
+---
+
+### Original entry (kept — the reasoning was sound even where the estimate was not)
 
 Family Controls distribution requires an Apple entitlement and approval process (§18). Without it,
 TestFlight and App Store builds cannot ship. **Development entitlement is immediate** and unblocks
@@ -49,10 +68,50 @@ it. Full material package, paste-ready form answers and the ordered checklist ar
 a physical device with the development entitlement. Remember §22: the experience half alone is a
 prototype.
 
-**Enrollment date:** —
-**Request submitted (main app):** —
-**Request submitted (extension):** —
-**Response date:** —
+### Progress
+
+| Step | State |
+|---|---|
+| 1. Paid membership | **done** — Family Controls (Development) signing since 2026-09-06 (B-006) |
+| 2. Repo public as the "developer website" | **done** — github.com/guodominic/ScreenTimeNext |
+| 3. Four App IDs registered, Family Controls (Development) ticked | **done, verified 2026-09-08** |
+| 4. App Store Connect record | **done 2026-09-08** — Apple ID 6809499502, SKU SCREENTIMENEXT-001, Utilities / Productivity, age rating 4+ |
+| 5. Distribution request | **done 2026-09-08** — one request, account-level (see below) |
+| 6. Family Controls (Distribution) shows Assigned | **done 2026-09-08 — approved same day** |
+
+**Corrected 2026-09-08, before anything was submitted:** the form answers in
+`docs/entitlement-request.md` carried the extensions' PLANNED bundle IDs (`.monitor`,
+`.shieldconfig`, `.shieldaction`) rather than the ones Xcode actually generated
+(`.DeviceActivityMonitorExtension`, `.ShieldConfigurationExtension`, `.ShieldActionExtension`).
+Submitting those would have requested three identifiers that do not exist — approved or not, the
+result is useless and a re-request goes to the back of the queue. The descriptions were also
+rewritten: they still described 10/5/1 reminders, choosing at the 10-minute mark, and activities
+the app no longer has. **A request that does not describe the app is a documented rejection
+reason**, and this one would not have described it.
+
+### The request is ONE request, not four (verified 2026-09-08)
+
+The form at developer.apple.com/contact/request/family-controls-distribution now has three
+read-only fields (Name / Email / Team ID), the terms, and a **Get Entitlement** button. **No bundle
+ID field and no description field** — pressing it goes straight to "Thank you for your submission".
+
+The form's own wording settles it: *"Once assigned to your developer **account**, you can build apps
+that use the capabilities of the Family Controls Framework."* Apple's documentation agrees on the
+mechanism — *"adds the entitlement to your developer account using managed capabilities"* — while
+still carrying the older instruction to submit again per extension, which the form no longer has any
+way to express.
+
+**So one submission covers all four targets.** The four descriptions written for the old form are
+not wasted: they are what App Review Information → Notes wants at submission time.
+
+**Enrollment date:** 2026-09-06 (approx.)
+**Distribution request submitted:** 2026-09-08 (account-level; submitted twice, duplicates merge)
+**Response date:** 2026-09-08 — **Assigned**, same day
+**Status check:** the Capability Requests tab is NOT in the left sidebar — it lives on each App ID's
+own page. Identifiers → `io.github.guodominic.screentimenext` → **Capability Requests** tab →
+**Status** button. Approved shows **Assigned**; the info button then lists Provisioning Support.
+Requires the Account Holder role. Check weekly; after 10 working days with no reply, post on the
+developer forums with the case ID.
 
 ---
 

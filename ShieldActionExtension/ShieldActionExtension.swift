@@ -66,10 +66,14 @@ class ShieldActionExtension: ShieldActionDelegate {
             // Mid-session: acknowledge and continue. Ended: close, and the shield stays up, so the
             // next tap on the same app shows the same screen rather than letting them back in.
             //
-            // On the "pick what's next" shield the primary button is "Not yet", which is this same
-            // path with `shouldContinue()` irrelevant — no, it is not: a child who does not want to
-            // choose still has their minutes, and taking them away for declining a menu would be a
-            // punishment for a UI decision. So they continue, and are asked again next time.
+            // D-067 — and on the ask, the primary CLOSES, however many minutes are left. The
+            // screen says "Close the app" and this is what makes that true.
+            //
+            // This is the one place the shield's words and its behaviour could drift apart: the
+            // configuration extension draws the buttons and this one decides what they do, in two
+            // processes that never meet. They agree because they ask the same resolver the same
+            // question — not because two people remembered to change two files.
+            guard !isAsking() else { return .close }
             guard shouldContinue() else { return .close }
             resumeClock()          // D-050 — pay back the time the shield was up, first
             liftShield()
@@ -101,9 +105,9 @@ class ShieldActionExtension: ShieldActionDelegate {
     /// (`ShieldMomentResolver.chooserOptions`) — otherwise a child could tap "LEGO" and get "Bath".
     private func choose(index: Int) -> ShieldActionResponse {
         guard let storage = try? FileStorageService.shared() else { return .close }
-        let all = ((try? storage.loadPickerPreferences()) ?? .default).allActivities
-        let picked = ((try? storage.loadConfiguration()) ?? .default).selectedActivities
-        let available = picked.isEmpty ? all : all.filter { picked.contains($0) }
+        // D-072 — the parent's list, in the parent's order, exactly as the configuration extension
+        // built it when it drew this menu.
+        let available = ((try? storage.loadPickerPreferences()) ?? .default).allActivities
 
         if let activity = ShieldMomentResolver.activity(forSubmenuIndex: index,
                                                         availableActivities: available) {
@@ -115,6 +119,17 @@ class ShieldActionExtension: ShieldActionDelegate {
         guard shouldContinue() else { return .close }
         liftShield()
         return .defer
+    }
+
+    /// D-067 — is this the screen that asks? Same resolver, same inputs as the one that drew it.
+    private func isAsking() -> Bool {
+        guard let storage = try? FileStorageService.shared() else { return false }
+        let moment = ShieldMomentResolver.moment(
+            window: (try? storage.loadSessionWindow()) ?? nil,
+            configuration: (try? storage.loadConfiguration()) ?? .default,
+            availableActivities: ((try? storage.loadPickerPreferences()) ?? .default).allActivities)
+        if case .chooseNext = moment { return true }
+        return false
     }
 
     /// True only while there is time left on the stored window. Read from absolute timestamps, so

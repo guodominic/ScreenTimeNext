@@ -13,15 +13,17 @@ struct SettingsView: View {
     let onSaved: () -> Void
 
     @State private var childName = ""
-    @State private var budgetMinutes = ScreenTimeConfiguration.defaultBudgetSeconds / 60
-    @State private var warningMinutes: [Int] = [10, 5, 1]
-    @State private var activities: Set<TransitionActivity> = []
+    /// D-072 — the parent's own answer to "what's next", or nil while the child still decides.
+    /// One, not a set: see the note on `ScreenTimeConfiguration.parentChosenActivity`.
+    @State private var parentChoice: TransitionActivity?
     @State private var selection: SelectionSnapshot?
     @State private var picker = ContentPickerModel()
     @State private var pickerLoaded = false
     @State private var screenTimeApproved = false
     @State private var isRequestingAccess = false
     @State private var screenTimeDenied = false
+    /// D-068 — chosen now, honoured when the translation lands.
+    @State private var languageCode = ParentPickerPreferences.defaultLanguageCode
     @State private var customActivities: [TransitionActivity] = []
     /// D-039 — built-ins the parent removed. Hidden, not deleted: they are `static let`s in code,
     /// and a family that drops "Bath" and wants it back should not have to retype it.
@@ -106,27 +108,6 @@ struct SettingsView: View {
                 Text("Parent gate")
             }
 
-            Section {
-                // D-020 — the same dial as setup: 1–120, one-minute steps under fifteen.
-                MinuteDial.budget($budgetMinutes, color: Theme.mint, baseSize: 200)
-                    .frame(maxWidth: .infinity)
-                    .listRowBackground(Color.clear)
-            } header: {
-                Text("Time budget")
-            } footer: {
-                Text("Changes apply from the next session.")
-            }
-
-            Section {
-                WarningDials(minutes: $warningMinutes, budgetMinutes: budgetMinutes)
-                    .listRowInsets(EdgeInsets())
-                    .listRowBackground(Color.clear)
-            } header: {
-                Text("Reminders (minutes before the end)")
-            } footer: {
-                Text("A heads-up, then the one that asks what's next. Up to \(ScreenTimeConfiguration.maxWarningOffset(forBudgetSeconds: budgetMinutes * 60) / 60) min each.")
-            }
-
             // D-053 — choosing WHICH activities are offered lives here again. D-052 moved the
             // ticks to the dashboard on the theory that it was a weekly decision; it is not, and a
             // tappable list beside the ring turned the evening screen into a settings page. The
@@ -152,18 +133,18 @@ struct SettingsView: View {
                 }
             } header: {
                 HStack {
-                    Text("Edit the what's-next list")
+                    Text("What's next")
                     Spacer()
                     Button(isReorderingActivities ? "Done" : "Reorder") { isReorderingActivities.toggle() }
                         .font(.caption.weight(.bold))
                         .textCase(nil)
                 }
             } footer: {
-                // The order is load-bearing, not cosmetic: a system shield shows three (D-044) and
-                // takes them off the front of this list.
-                Text(activities.isEmpty
-                     ? "None ticked — all are offered. The first three reach the transition screen."
-                     : "\(activities.count) ticked. The first three reach the transition screen.")
+                // D-072 — two rules, and the footer says whichever one is currently in force.
+                // The ORDER is load-bearing: a system shield shows three (D-044) and takes them
+                // off the front of this list. The TICK overrides the whole question.
+                Text(parentChoice.map { "\($0.displayName) — your child won't be asked. Cleared when you start a new session." }
+                     ?? "The first three reach the transition screen. Tick one to decide for them.")
             }
 
             Section {
@@ -195,6 +176,19 @@ struct SettingsView: View {
                 Text("Protected content")
             }
 
+            Section {
+                Picker("Language", selection: $languageCode) {
+                    ForEach(ParentPickerPreferences.supportedLanguages, id: \.code) { language in
+                        Text(language.name).tag(language.code)
+                    }
+                }
+                .onChange(of: languageCode) { _, _ in persistLanguage() }
+            } footer: {
+                // D-068 — says what is true. A setting that quietly does nothing teaches a parent
+                // that settings in this app are decorative, which is a hard thing to un-teach.
+                Text("Your choice is saved. The app is still English everywhere — translation is coming.")
+            }
+
             enforcementLogSection
 
             if let errorText {
@@ -224,8 +218,9 @@ struct SettingsView: View {
                 } else if let index = customActivities.firstIndex(of: saved) {
                     customActivities[index] = saved          // same id — a rename, not a new one
                 } else {
+                    // D-072 — added, not decided. Adding an activity puts it on the list; it does
+                    // not announce that tonight is that activity.
                     customActivities.append(saved)
-                    activities.insert(saved)                 // a parent who adds one means to use it
                 }
                 persistCustomActivities()
             }
@@ -237,12 +232,6 @@ struct SettingsView: View {
             screenTimeDenied = status == .denied
         }
         .task { biometricKind = await services.unlock.available }
-        .onChange(of: budgetMinutes) { _, newBudget in
-            // A shorter budget can invalidate every reminder at once — re-clamp the whole set
-            // rather than each dial on its own, so the descending rule survives (D-019).
-            let cap = ScreenTimeConfiguration.maxWarningOffset(forBudgetSeconds: newBudget * 60) / 60
-            warningMinutes = ScreenTimeConfiguration.clampedDescendingMinutes(warningMinutes, capMinutes: cap)
-        }
     }
 
     /// D-054 — what the invisible processes actually did, in order.
@@ -318,23 +307,29 @@ struct SettingsView: View {
     }
 
     @ViewBuilder
-    /// D-053 — the tick is back. Tapping the row offers or withdraws the activity; swiping it
-    /// renames or removes it from the family's list altogether. Two different verbs, and keeping
-    /// them on one row is fine because the gestures are not the same gesture.
+    /// D-072 — the tick is a DECISION now, not a permission.
+    ///
+    /// It used to mean "this one is offered", which is what the order already means. It now means
+    /// "this is what's happening after screen time", one activity at most, and a parent who sets
+    /// it has taken the question away from their child deliberately. Tapping the ticked row again
+    /// gives it back — without that there is no way to undo a decision, and a parent should never
+    /// have to reinstall an app to change their mind.
+    ///
+    /// Swiping still renames or removes. Two verbs on one row is fine: the gestures differ.
     private func activityRow(_ activity: TransitionActivity) -> some View {
-        let isOffered = activities.contains(activity)
+        let isChosen = parentChoice == activity
         HStack {
             Label(activity.displayName, systemImage: activity.symbolName)
                 .foregroundStyle(Theme.color(for: activity))
                 .fontWeight(.medium)
             Spacer()
-            Image(systemName: isOffered ? "checkmark.circle.fill" : "circle")
-                .foregroundStyle(isOffered ? Theme.color(for: activity) : Color.secondary.opacity(0.4))
+            Image(systemName: isChosen ? "checkmark.circle.fill" : "circle")
+                .foregroundStyle(isChosen ? Theme.color(for: activity) : Color.secondary.opacity(0.4))
         }
         .contentShape(Rectangle())
         .onTapGesture {
             withAnimation(.snappy(duration: 0.18)) {
-                if isOffered { activities.remove(activity) } else { activities.insert(activity) }
+                parentChoice = isChosen ? nil : activity
             }
         }
         // D-039 — every row, ours included. "What my child does after screen time" is the one
@@ -350,6 +345,13 @@ struct SettingsView: View {
             }
             .tint(Theme.sky)
         }
+    }
+
+    /// D-022 — written the moment it is tapped, like every other preference on this screen.
+    private func persistLanguage() {
+        guard var preferences = try? services.storage.loadPickerPreferences() else { return }
+        preferences.languageCode = languageCode
+        try? services.storage.save(preferences)
     }
 
     /// D-058 — ask iOS for Screen Time access from here, so a parent who reaches the picker
@@ -389,7 +391,7 @@ struct SettingsView: View {
         } else {
             hiddenActivityIDs.append(activity.id)
         }
-        activities.remove(activity)
+        if parentChoice == activity { parentChoice = nil }
         activityOrder.removeAll { $0 == activity.id }
         persistCustomActivities()
     }
@@ -414,10 +416,7 @@ struct SettingsView: View {
             ids[slot] = replacement.id
             activityOrder = ids
         }
-        if activities.contains(builtIn) {
-            activities.remove(builtIn)
-            activities.insert(replacement)
-        }
+        if parentChoice == builtIn { parentChoice = replacement }
         hiddenActivityIDs.append(builtIn.id)
         persistCustomActivities()
     }
@@ -449,15 +448,12 @@ struct SettingsView: View {
             existingProfileID = profile.id
         }
         let config = (try? storage.loadConfiguration()) ?? .default
-        budgetMinutes = config.dailyBudgetSeconds / 60
-        var mins = config.warningOffsetsSeconds.map { $0 / 60 }
-        while mins.count < ScreenTimeConfiguration.maxWarnings { mins.append(0) }
-        warningMinutes = mins
-        activities = Set(config.selectedActivities)
+        parentChoice = config.parentChosenActivity
         let preferences = (try? services.storage.loadPickerPreferences()) ?? .default
         customActivities = preferences.customActivities
         hiddenActivityIDs = preferences.hiddenActivityIDs
         usesBiometrics = preferences.gate.usesBiometrics
+        languageCode = preferences.languageCode
         activityOrder = preferences.activityOrder
         parentPIN = try? services.storage.loadParentPIN()
         selection = try? services.selection.loadSelection()
@@ -475,11 +471,18 @@ struct SettingsView: View {
     private func save() {
         let name = childName.trimmingCharacters(in: .whitespacesAndNewlines)
         let profile = ChildProfile(id: existingProfileID ?? UUID(), name: name)   // empty name is fine (D-016)
-        let config = ScreenTimeConfiguration(
-            dailyBudgetSeconds: budgetMinutes * 60,
-            warningOffsetsSeconds: warningMinutes.map { min($0 * 60, ScreenTimeConfiguration.maxWarningOffset(forBudgetSeconds: budgetMinutes * 60)) },
-            selectedActivities: allActivities.filter { activities.contains($0) }
-        )
+        // D-066 — Settings no longer sets the time.
+        //
+        // The budget is dialled on the dashboard, where a parent is already standing when they
+        // decide how long; a second dial two screens away could only disagree with the first, and
+        // for a while it did (D-057). The reminders follow from the budget — a heads-up and the one
+        // that asks — so they are derived rather than dialled, and the screen that had two dials
+        // for numbers most parents never touched now has none.
+        //
+        // Load-and-amend, not construct: whatever the clock is doing right now must survive
+        // pressing Save on a screen that has nothing to say about it.
+        var config = (try? services.storage.loadConfiguration()) ?? .default
+        config.parentChosenActivity = parentChoice
         do {
             try services.storage.save(profile)
             try services.storage.save(config)

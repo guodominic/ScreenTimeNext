@@ -42,6 +42,14 @@ public struct ParentPickerPreferences: Codable, Equatable, Sendable {
     /// row.
     public var activityOrder: [String]
 
+    /// D-068 — the language the parent chose, as a BCP-47 code. "en" until they say otherwise.
+    ///
+    /// Stored now, honoured later. The app's ~300 user-facing strings are still hardcoded English;
+    /// localising them is its own task, and half a translation is worse than none. What this buys
+    /// today is that the choice survives — a parent who sets it once will not be asked again when
+    /// the translation lands.
+    public var languageCode: String
+
     /// D-064 — block ALL web browsing when time is up, in every browser, with no tokens.
     ///
     /// This is the one thing a parent asks for that Apple's picker cannot give them. Browsers are
@@ -88,7 +96,9 @@ public struct ParentPickerPreferences: Codable, Equatable, Sendable {
                 hiddenActivityIDs: [String] = [],
                 gate: ParentGatePreference = .default,
                 restrictionsClearedOn: Date? = nil,
-                blocksAllWebBrowsing: Bool = true) {
+                blocksAllWebBrowsing: Bool = true,
+                languageCode: String = ParentPickerPreferences.defaultLanguageCode) {
+        self.languageCode = languageCode
         self.blocksAllWebBrowsing = blocksAllWebBrowsing
         self.gate = gate
         self.restrictionsClearedOn = restrictionsClearedOn
@@ -174,12 +184,26 @@ public struct ParentPickerPreferences: Codable, Equatable, Sendable {
         return calendar.isDate(granted, inSameDayAs: day)
     }
 
+    /// D-068 — English, deliberately, rather than following the device.
+    ///
+    /// Following the system language would be the usual choice, but it would also mean a family
+    /// whose iPad is set to Chinese silently gets a half-translated app the day translation ships.
+    /// An explicit default is one a parent can see and change.
+    public static let defaultLanguageCode = "en"
+
+    /// The languages offered. Two, because two are translated — a list that offers more than the
+    /// app can actually speak is a list of disappointments.
+    public static let supportedLanguages: [(code: String, name: String)] = [
+        ("en", "English"),
+        ("zh-Hans", "简体中文"),
+    ]
+
     public static let `default` = ParentPickerPreferences()
 
     private enum CodingKeys: String, CodingKey {
         case customActivities, savedSelections
         case blockedWebsites, activityOrder, hiddenActivityIDs, gate, restrictionsClearedOn
-        case blocksAllWebBrowsing
+        case blocksAllWebBrowsing, languageCode
     }
 
     public init(from decoder: Decoder) throws {
@@ -192,7 +216,9 @@ public struct ParentPickerPreferences: Codable, Equatable, Sendable {
             hiddenActivityIDs: try c.decodeIfPresent([String].self, forKey: .hiddenActivityIDs) ?? [],
             gate: try c.decodeIfPresent(ParentGatePreference.self, forKey: .gate) ?? .default,
             restrictionsClearedOn: try c.decodeIfPresent(Date.self, forKey: .restrictionsClearedOn),
-            blocksAllWebBrowsing: try c.decodeIfPresent(Bool.self, forKey: .blocksAllWebBrowsing) ?? true
+            blocksAllWebBrowsing: try c.decodeIfPresent(Bool.self, forKey: .blocksAllWebBrowsing) ?? true,
+            languageCode: try c.decodeIfPresent(String.self, forKey: .languageCode)
+                ?? ParentPickerPreferences.defaultLanguageCode
         )
     }
 }

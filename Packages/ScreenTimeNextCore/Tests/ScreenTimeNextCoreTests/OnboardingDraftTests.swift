@@ -16,7 +16,6 @@ final class OnboardingDraftTests: XCTestCase {
         let draft = OnboardingDraft()
         XCTAssertEqual(draft.dailyBudgetSeconds, 900)
         XCTAssertEqual(draft.warningMinutes, [5, 1], "D-044 — two reminders")
-        XCTAssertTrue(draft.selectedActivities.isEmpty)
         XCTAssertNil(draft.selection)
         XCTAssertFalse(draft.hasChildName)
         XCTAssertFalse(draft.hasSelection)
@@ -61,12 +60,6 @@ final class OnboardingDraftTests: XCTestCase {
         XCTAssertEqual(draft.configuration.warningOffsetsSeconds, [420, 300], "10 → 7")
     }
 
-    func testActivitiesAreStoredInCanonicalOrder() {
-        var draft = OnboardingDraft()
-        draft.selectedActivities = [.familyTime, .cleanUp, .mealTime]
-        XCTAssertEqual(draft.configuration.selectedActivities, [.familyTime, .cleanUp, .mealTime])
-    }
-
     func testCommitWritesProfileConfigurationAndSelection() throws {
         let storage = InMemoryScreenTimeStorageService()
         let selection = MockScreenTimeSelectionService()
@@ -76,7 +69,6 @@ final class OnboardingDraftTests: XCTestCase {
         draft.childName = "Athan"
         draft.dailyBudgetSeconds = 1800
         draft.warningMinutes = [10, 0, 1]   // middle reminder off
-        draft.selectedActivities = [.freeTime]
         draft.selection = MockScreenTimeSelectionService.sampleSnapshot()
 
         try draft.commit(using: services)
@@ -85,7 +77,8 @@ final class OnboardingDraftTests: XCTestCase {
         let config = try storage.loadConfiguration()
         XCTAssertEqual(config.dailyBudgetSeconds, 1800)
         XCTAssertEqual(config.warningOffsetsSeconds, [600, 60])
-        XCTAssertEqual(config.selectedActivities, [.freeTime])
+        // D-072 — onboarding never asked for an activity list and no longer carries one.
+        XCTAssertNil(config.parentChosenActivity)
         XCTAssertEqual(try selection.loadSelection(), draft.selection)
     }
 

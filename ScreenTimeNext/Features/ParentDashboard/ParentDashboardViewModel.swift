@@ -166,8 +166,9 @@ final class ParentDashboardViewModel {
     func startSession() {
         // Only the budget changes here — everything else the parent has arranged (reminders,
         // activities, saved sets, typed websites) is carried across untouched (D-024/D-035).
-        var config = configuration
-        config.dailyBudgetSeconds = quickMinutes * 60
+        // D-066 — the dial is the only place a budget is set now, and setting one re-derives the
+        // reminders that belong to it.
+        let config = configuration.settingBudget(quickMinutes * 60)
         try? services.storage.save(config)
         // The number is the saved budget again, so a later reload has nothing to override.
         quickMinutesIsParentSet = false
@@ -228,43 +229,22 @@ final class ParentDashboardViewModel {
 
     var canExtend: Bool { session.window != nil }
 
-    // MARK: D-053 — what's next, SHOWN here and chosen in Settings
+    // MARK: D-072 — what's next: the answer, not the menu
 
-    /// What the child will actually be offered, in the order they will see it.
+    /// What actually happens after this session, or nil while nobody has said yet.
     ///
-    /// D-053 — the dashboard shows this and no longer edits it. Ticking boxes is configuration a
-    /// parent does once; putting it on the screen they open every evening made the dashboard read
-    /// like a settings page, and put a tappable control next to the ring where a mis-tap costs
-    /// something. Which activities are offered is back in Settings, beside the list they belong to.
+    /// D-053 put the list of offered activities here; D-057 cut it to the three a shield fits.
+    /// Both were still a list of POSSIBILITIES on a screen a parent opens to learn one fact, and
+    /// the fact they came for is which one it turned out to be. The menu is arranged in Settings,
+    /// beside the rows that reorder it. This is the answer.
     ///
-    /// Empty picks mean "no preference", which offers everything (D-009) — so that is what is
-    /// shown, rather than an empty row that looks like a mistake.
-    var offeredActivities: [TransitionActivity] {
-        let picked = configuration.selectedActivities
-        guard picked.isEmpty else { return picked }
-        return ((try? services.storage.loadPickerPreferences()) ?? .default).allActivities
-    }
+    /// Reads the snapshot rather than combining the parent's override and the child's pick here:
+    /// the shield, the timer and the Live Activity all read that same property, so none of the
+    /// four can show a different answer from the others.
+    var whatsNextActivity: TransitionActivity? { session.chosenActivity }
 
-    /// D-057 — the dashboard shows THESE and nothing else.
-    ///
-    /// A system shield fits three (D-044) and takes them off the front of the list. Showing the
-    /// whole list here and marking three of them was a list a parent had to read carefully to
-    /// learn one fact. Three rows say the same thing by being the only three rows.
-    var shieldActivities: [TransitionActivity] {
-        Array(offeredActivities.prefix(ShieldMomentResolver.maxChooserOptions))
-    }
-
-    /// How many more are in the list but cannot fit on the shield.
-    var activitiesBeyondTheShield: Int {
-        max(0, offeredActivities.count - ShieldMomentResolver.maxChooserOptions)
-    }
-
-    /// True when the parent has picked none, so the list above is a default rather than a choice.
-    var offersEverything: Bool { configuration.selectedActivities.isEmpty }
-
-    /// D-044 — a system shield can show at most three. Which three is worth saying out loud,
-    /// because reordering in Settings is the only way to change it.
-    var shieldChoiceCount: Int { min(ShieldMomentResolver.maxChooserOptions, offeredActivities.count) }
+    /// True when the answer above is the parent's override rather than the child's own pick.
+    var whatsNextByParent: Bool { session.chosenByParent }
 
     /// D-052 — only once the budget is gone. While a session runs nothing is shielded, so there is
     /// nothing for this to release.

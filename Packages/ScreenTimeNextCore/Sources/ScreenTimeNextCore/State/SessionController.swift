@@ -23,20 +23,35 @@ public struct ChildSessionSnapshot: Equatable, Sendable {
     /// D-016 — true while the child should be asked what to do next (second-to-last reminder).
     public let isChoosingMoment: Bool
     public let window: SessionWindow?
+    /// D-072 — the parent's override for this session, when they set one in Settings.
+    public let parentChoice: TransitionActivity?
 
     public init(state: ScreenTimeState, remainingSeconds: Int, activeWarningSeconds: Int? = nil,
-                isChoosingMoment: Bool = false, window: SessionWindow?) {
+                isChoosingMoment: Bool = false, window: SessionWindow?,
+                parentChoice: TransitionActivity? = nil) {
         self.state = state
         self.remainingSeconds = remainingSeconds
         self.activeWarningSeconds = activeWarningSeconds
         self.isChoosingMoment = isChoosingMoment
         self.window = window
+        self.parentChoice = parentChoice
     }
 
     public static let idle = ChildSessionSnapshot(state: .idle, remainingSeconds: 0, window: nil)
 
-    /// PRD §6.11–§6.14: the child's pick, if any, for this session.
-    public var chosenActivity: TransitionActivity? { window?.chosenActivity }
+    /// PRD §6.11–§6.14 / D-072 — what happens after this session: the parent's decision if they
+    /// made one, otherwise the child's.
+    ///
+    /// Every screen reads this one property — the dashboard, the timer, the Live Activity, the
+    /// Time's Up screen — which is why none of them can end up showing a different answer. The
+    /// alternative was five places each combining two fields their own way, and the two that
+    /// disagreed would be found by a child.
+    public var chosenActivity: TransitionActivity? { parentChoice ?? window?.chosenActivity }
+
+    /// D-072 — true when the answer above is the parent's. It changes the words, not the value:
+    /// telling a child "you picked Meal time" when they picked nothing is a small lie, and small
+    /// lies are what a child stops believing the screen with.
+    public var chosenByParent: Bool { parentChoice != nil }
 
     /// Whole minutes of the active warning, e.g. 5 for a 300-second offset.
     public var activeWarningMinutes: Int? { activeWarningSeconds.map { max(1, $0 / 60) } }
@@ -121,6 +136,14 @@ public final class SessionController: @unchecked Sendable {
                 lastState = .finished
                 return ChildSessionSnapshot(state: .finished, remainingSeconds: 0, window: nil)
             }
+            // D-072 — the parent's override lasts one session. Cleared HERE, at the start of the
+            // next one, rather than when the previous session ended: "what's next" is still the
+            // true answer while the child is standing on the Time's Up screen reading it, and only
+            // stops being true when a new session begins.
+            if var configuration = try? storage.loadConfiguration(), configuration.parentChosenActivity != nil {
+                configuration.parentChosenActivity = nil
+                try? storage.save(configuration)
+            }
             let window = SessionWindow(startedAt: current, budgetSeconds: remaining)
             try storage.save(window)
             lastState = WarningStateEngine.start(remainingSeconds: remaining, warningOffsets: try offsetsLocked(for: window))
@@ -142,11 +165,13 @@ public final class SessionController: @unchecked Sendable {
     /// PRD §6.7 / D-009: the activities offered to the child — the parent's picks, or the whole
     /// fixed set when the parent picked none ("no preference" rather than "nothing").
     public func availableActivities() throws -> [TransitionActivity] {
-        let chosen = try storage.loadConfiguration().selectedActivities
-        guard chosen.isEmpty else { return chosen }
-        // D-029 — "no preference" means everything on offer, which now includes whatever the
-        // parent invented, not just our eight.
-        return (try? storage.loadPickerPreferences().allActivities) ?? TransitionActivity.allCases
+        // D-072 — the parent's list, in the parent's order, and nothing else filters it.
+        //
+        // This used to intersect the list with `selectedActivities`, a second control that decided
+        // the same thing the order decides. One list, arranged once, is now the whole answer: the
+        // first three of it are what a shield can show (D-044), which is what the drag handles in
+        // Settings are for.
+        (try? storage.loadPickerPreferences().allActivities) ?? TransitionActivity.allCases
     }
 
     /// The child picks what to do next (PRD §6.11). Persists on the current window.
@@ -270,10 +295,8 @@ public final class SessionController: @unchecked Sendable {
             // ADDING is deliberately not symmetric: §15 calls an extension a grant BEYOND the
             // budget, and `grantedSeconds` exists to keep it identifiable as one.
             if seconds < 0 {
-                var configuration = try storage.loadConfiguration()
-                configuration.dailyBudgetSeconds = ScreenTimeConfiguration
-                    .clampBudget(configuration.dailyBudgetSeconds + seconds)
-                try storage.save(configuration)
+                let configuration = try storage.loadConfiguration()
+                try storage.save(configuration.settingBudget(configuration.dailyBudgetSeconds + seconds))
             }
             lastWindowEnd = adjusted.endsAt
             lastState = WarningStateEngine.start(remainingSeconds: adjusted.remainingSeconds(at: current),
@@ -380,11 +403,15 @@ public final class SessionController: @unchecked Sendable {
         let remaining = try remainingBudgetSecondsLocked()
         // No budget left today: the idle screen should say so rather than offer a Start that fails.
         let state: ScreenTimeState = remaining > 0 ? .idle : .finished
-        return ChildSessionSnapshot(state: state, remainingSeconds: remaining, window: nil)
+        return ChildSessionSnapshot(state: state, remainingSeconds: remaining, window: nil,
+                                    parentChoice: (try? storage.loadConfiguration())?.parentChosenActivity)
     }
 
     private func snapshotLocked(for window: SessionWindow, at current: Date) throws -> ChildSessionSnapshot {
         let remaining = window.remainingSeconds(at: current)
+        // D-072 — read once, used twice below: what is shown, and whether there is still anything
+        // to ask. Reading it in both places from two loads is how they would come to disagree.
+        let parentChoice = (try? storage.loadConfiguration())?.parentChosenActivity
         let offsets = try offsetsLocked(for: window)
         let previous = lastState
         // D-053 — the window's end moved (a parent added or took back time, or a transition screen
@@ -420,9 +447,12 @@ public final class SessionController: @unchecked Sendable {
             // so a child who ignored it still has a way to pick.
             isChoosingMoment: {
                 guard let reached, let chooser = WarningStateEngine.chooserIndex(warningCount: offsets.count) else { return false }
-                return reached >= chooser && window.chosenActivity == nil
+                // D-072 — a parent who has decided has ended the question. Asking anyway would be
+                // asking a child for an answer we intend to ignore.
+                return reached >= chooser && parentChoice == nil && window.chosenActivity == nil
             }(),
-            window: window
+            window: window,
+            parentChoice: parentChoice
         )
     }
 

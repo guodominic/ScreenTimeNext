@@ -56,40 +56,49 @@ final class ShieldPresentationTests: XCTestCase {
         }
         for moment in moments {
             let p = ShieldPresentation.make(for: moment, childName: "Ivy")
-            let text = (p.title + " " + p.subtitle + " " + (p.primaryButtonLabel ?? "")).lowercased()
+            let text = (p.title + " " + p.subtitle + " " + p.primaryButtonLabel).lowercased()
             for word in banned {
                 XCTAssertFalse(text.contains(word), "\(moment) says \(word)")
             }
             XCTAssertFalse(p.title.isEmpty)
             XCTAssertFalse(p.subtitle.isEmpty)
-            XCTAssertFalse((p.primaryButtonLabel ?? "").isEmpty, "every moment here still has a button")
+            XCTAssertFalse(p.primaryButtonLabel.isEmpty, "every moment must name its button (D-065)")
             XCTAssertFalse(p.symbolName.isEmpty)
         }
     }
 
-    /// D-056 — on the last ask there is no button that fails to offer the choices.
+    /// D-065 — the ask ALWAYS has both buttons, whichever ask it is.
     ///
-    /// "Pick one first 👆" was a primary button that did nothing: `secondaryButtonSubmenuItems`
-    /// opens only from the SECONDARY button (D-049) and no `ShieldActionResponse` can open it. A
-    /// child who taps a button and gets nothing learns the screen is broken.
-    func testTheInsistingAskHasOnlyTheChooserButton() {
+    /// D-056 removed the primary button on the last ask. That handed iOS a `ShieldConfiguration`
+    /// with a primary button colour and no primary button, and iOS answered with its own grey
+    /// "Restricted" screen — silently, on the moment that mattered most. A field left unfilled in a
+    /// process we cannot see costs the whole screen, so every field is filled.
+    func testEveryAskOffersBothButtons() {
         let options = Array(TransitionActivity.allCases.prefix(3))
-        let p = ShieldPresentation.make(for: .chooseNext(minutesLeft: 1, options: options, mustChoose: true),
-                                        childName: "Ivy")
-        XCTAssertNil(p.primaryButtonLabel, "no button that cannot lead anywhere")
-        XCTAssertEqual(p.secondaryButtonLabel, "Pick what's next 👆")
-        XCTAssertEqual(p.submenuItems, options.map(\.displayName))
+        for minutes in [1, 5] {
+            let p = ShieldPresentation.make(for: .chooseNext(minutesLeft: minutes, options: options),
+                                            childName: "Ivy")
+            XCTAssertEqual(p.primaryButtonLabel, "Close the app",
+                           "D-067 — it insists, and D-065 — it still names its button")
+            XCTAssertFalse(p.primaryButtonContinues, "the only way back INTO the app is to choose")
+            XCTAssertEqual(p.secondaryButtonLabel, "What's next?")
+            XCTAssertEqual(p.submenuItems, options.map(\.displayName))
+        }
     }
 
-    /// The gentler ask keeps its way out — a child who does not want to choose still has minutes,
-    /// and taking them away for declining a menu would punish a UI decision.
-    func testTheGentleAskStillOffersNotYet() {
+    /// What the child sees is decided by whether they have chosen, and nothing else:
+    /// not chosen → the minutes AND the list; chosen → just the minutes.
+    func testTheChooserAppearsOnlyWhileNothingIsChosen() {
         let options = Array(TransitionActivity.allCases.prefix(3))
-        let p = ShieldPresentation.make(for: .chooseNext(minutesLeft: 5, options: options, mustChoose: false),
-                                        childName: "Ivy")
-        XCTAssertEqual(p.primaryButtonLabel, "Not yet")
-        XCTAssertEqual(p.secondaryButtonLabel, "What's next?")
-        XCTAssertFalse(p.primaryButtonContinues, "§17 — the primary never buys time")
+        let asking = ShieldPresentation.make(for: .chooseNext(minutesLeft: 2, options: options),
+                                             childName: "Ivy")
+        XCTAssertFalse(asking.submenuItems.isEmpty)
+        XCTAssertTrue(asking.title.contains("2 minutes left"))
+
+        let told = ShieldPresentation.make(for: .reminder(minutesLeft: 2, activity: .outside), childName: "Ivy")
+        XCTAssertTrue(told.submenuItems.isEmpty, "chosen already — re-asking reads as \"that wasn\'t good enough\"")
+        XCTAssertNil(told.secondaryButtonLabel)
+        XCTAssertTrue(told.title.contains("2 minutes left"))
     }
 
     func testLowercasedFirstLeavesTheRestAlone() {

@@ -352,22 +352,26 @@ struct ParentDashboardView: View {
         }
     }
 
-    /// D-053 — a read-out, not a control. D-057 — and only the three that reach the child.
+    /// D-072 — ONE row: what is actually happening after this session.
     ///
-    /// D-052 put the ticks here, and that was wrong twice over: choosing which activities are
-    /// offered is configuration a parent does once, and a tappable list beside the ring made the
-    /// screen a parent opens every evening read like a settings page. Editing is back in Settings,
-    /// next to the list it edits.
+    /// D-052 put ticks here; D-053 moved them to Settings and left a read-out; D-057 cut that
+    /// read-out to the three a shield fits. Each step was smaller than the last and none of them
+    /// answered the question a parent opens this screen with, which is not "what could my child
+    /// pick" but "what did they pick". Three rows that never change say nothing on a dashboard.
     ///
-    /// D-057 then cut it to three. A system shield fits three (D-044) and takes them off the front
-    /// of the list; showing all of them with three marked was a list a parent had to read carefully
-    /// to learn one fact. Three rows say it by being the only three rows.
+    /// So: the answer, or an honest blank until there is one. The list itself is in Settings.
     private var whatsNextSection: some View {
         Section {
-            ForEach(viewModel.shieldActivities) { activity in
+            if let activity = viewModel.whatsNextActivity {
                 HStack(spacing: 12) {
                     IconChip(symbol: activity.symbolName, color: Theme.color(for: activity), size: 30)
                     Text(activity.displayName).fontWeight(.medium)
+                    Spacer(minLength: 0)
+                }
+            } else {
+                HStack(spacing: 12) {
+                    IconChip(symbol: "questionmark", color: Color.secondary, size: 30)
+                    Text("Not chosen yet").foregroundStyle(.secondary)
                     Spacer(minLength: 0)
                 }
             }
@@ -386,17 +390,14 @@ struct ParentDashboardView: View {
         }
     }
 
+    /// D-072 — says who decided, because that is the part a parent cannot see from the name.
     private var whatsNextFooter: String {
-        let extra = viewModel.activitiesBeyondTheShield
-        let base = viewModel.offersEverything
-            ? "Nothing picked yet, so these are the first of the built-in list."
-            : "These are what your child can choose from on the transition screen."
-        // The platform limit is worth naming: a parent who added a fourth and cannot find it on
-        // their child's screen should not have to guess why.
-        let tail = extra == 0
-            ? " Reorder them in Settings."
-            : " A shield fits three, so \(extra) more in your list stay off it — reorder in Settings to swap them in."
-        return base + tail
+        guard viewModel.whatsNextActivity != nil else {
+            return "Your child picks on the transition screen. Tick one in Settings to decide for them."
+        }
+        return viewModel.whatsNextByParent
+            ? "You decided this. Starting a new session clears it."
+            : "Your child picked this."
     }
 
     /// D-053 — the slide that clears every restriction for the rest of today, and puts them back.
@@ -572,8 +573,6 @@ struct ExtendTimeSheet: View {
 private func dashboardPreviewStorage() -> InMemoryScreenTimeStorageService {
     let s = InMemoryScreenTimeStorageService()
     try? s.save(ChildProfile(name: "Ivy"))
-    var c = ScreenTimeConfiguration.default
-    c.selectedActivities = [.familyTime, .outside, .cleanUp]
-    try? s.save(c)
+    try? s.save(ScreenTimeConfiguration.default)
     return s
 }

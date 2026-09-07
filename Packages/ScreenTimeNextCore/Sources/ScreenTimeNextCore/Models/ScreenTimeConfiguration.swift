@@ -28,8 +28,22 @@ public struct ScreenTimeConfiguration: Codable, Equatable, Sendable {
     private var storedBudgetSeconds: Int
     private var storedWarningOffsets: [Int]
 
-    /// The activities the parent approved for the child to choose from. PRD §6.7.
-    public var selectedActivities: [TransitionActivity]
+    /// D-072 — the parent's own answer to "what's next", which OVERRIDES the child's.
+    ///
+    /// This slot used to hold `selectedActivities`: the subset of the list the child was offered.
+    /// It was doing the same job the ORDER already does — a shield shows the first three either
+    /// way — and two controls for one outcome is how a parent ends up with a list they arranged
+    /// and a child who sees something else. The order now decides what is offered, on its own,
+    /// and the tick beside it says something a parent could not say before: not "this is allowed"
+    /// but "this is what's happening".
+    ///
+    /// Nil is the normal state and the child chooses. Set, and there is nothing to choose: the
+    /// transition screen tells them, the timer shows it, the dashboard says who decided.
+    ///
+    /// Cleared by `SessionController.start()`, so it lasts exactly one session. A parent who
+    /// means "every evening" says it again; a parent who meant "tonight, we're eating" is not
+    /// still saying it on Thursday.
+    public var parentChosenActivity: TransitionActivity?
 
     // MARK: Ranges (D-013)
 
@@ -57,16 +71,30 @@ public struct ScreenTimeConfiguration: Codable, Equatable, Sendable {
     public init(
         dailyBudgetSeconds: Int = ScreenTimeConfiguration.defaultBudgetSeconds,
         warningOffsetsSeconds: [Int] = ScreenTimeConfiguration.defaultWarningOffsets,
-        selectedActivities: [TransitionActivity] = []
+        parentChosenActivity: TransitionActivity? = nil
     ) {
         self.storedBudgetSeconds = Self.clampBudget(dailyBudgetSeconds)
         self.storedWarningOffsets = Self.normalizedOffsets(warningOffsetsSeconds)
-        self.selectedActivities = selectedActivities
+        self.parentChosenActivity = parentChosenActivity
     }
 
     public static let `default` = ScreenTimeConfiguration()
 
     // MARK: Normalization
+
+    /// D-066 — the budget moved, so the reminders move with it.
+    ///
+    /// Settings no longer has reminder dials: a heads-up and the one that asks are what every
+    /// budget wants, and their spacing is a function of the budget rather than a decision. Deriving
+    /// them here means the two can never disagree — which they could, and did, while two screens
+    /// each held their own copy.
+    public func settingBudget(_ seconds: Int) -> ScreenTimeConfiguration {
+        let budget = Self.clampBudget(seconds)
+        return ScreenTimeConfiguration(
+            dailyBudgetSeconds: budget,
+            warningOffsetsSeconds: Self.defaultWarningOffsets(forBudgetSeconds: budget),
+            parentChosenActivity: parentChosenActivity)
+    }
 
     public static func clampBudget(_ seconds: Int) -> Int {
         min(max(seconds, budgetRangeSeconds.lowerBound), budgetRangeSeconds.upperBound)
@@ -168,14 +196,18 @@ public struct ScreenTimeConfiguration: Codable, Equatable, Sendable {
     // MARK: Codable — tolerant of the pre-D-013 shape (warning10Enabled / warning5Enabled / warning1Enabled)
 
     private enum CodingKeys: String, CodingKey {
-        case dailyBudgetSeconds, warningOffsetsSeconds, selectedActivities
+        case dailyBudgetSeconds, warningOffsetsSeconds, parentChosenActivity
         case warning10Enabled, warning5Enabled, warning1Enabled
     }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let budget = try c.decodeIfPresent(Int.self, forKey: .dailyBudgetSeconds) ?? Self.defaultBudgetSeconds
-        let activities = try c.decodeIfPresent([TransitionActivity].self, forKey: .selectedActivities) ?? []
+        // D-072 — a record written by an older build still carries `selectedActivities`, the
+        // list of activities the child was offered. It is ignored rather than migrated: the
+        // parent's ORDER is what decides that now, and reading an old three-item list into the
+        // single-choice slot would announce a decision the parent never made.
+        let parentChoice = try c.decodeIfPresent(TransitionActivity.self, forKey: .parentChosenActivity)
         let offsets: [Int]
         if let stored = try c.decodeIfPresent([Int].self, forKey: .warningOffsetsSeconds) {
             offsets = stored
@@ -189,13 +221,13 @@ public struct ScreenTimeConfiguration: Codable, Equatable, Sendable {
         }
         // D-035 — a record written by an older build may still carry `selectedCategories`. It is
         // ignored: those were our own catalogue rows, and rows that shield nothing are not setup.
-        self.init(dailyBudgetSeconds: budget, warningOffsetsSeconds: offsets, selectedActivities: activities)
+        self.init(dailyBudgetSeconds: budget, warningOffsetsSeconds: offsets, parentChosenActivity: parentChoice)
     }
 
     public func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(dailyBudgetSeconds, forKey: .dailyBudgetSeconds)
         try c.encode(warningOffsetsSeconds, forKey: .warningOffsetsSeconds)
-        try c.encode(selectedActivities, forKey: .selectedActivities)
+        try c.encodeIfPresent(parentChosenActivity, forKey: .parentChosenActivity)
     }
 }

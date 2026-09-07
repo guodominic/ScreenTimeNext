@@ -1956,6 +1956,76 @@ adapter that reads that switch; the rule was verified by planting a violation.
 be constructed from a name. Those stay a one-time tick in Apple's picker — but the hardest part,
 browsers, no longer needs one.
 
+## D-069 — V1 ships iPhone only
+**Date:** 2026-09-08 · **Status:** accepted
+
+**Context.** App Store Connect requires a 13-inch iPad screenshot from any app that runs on iPad;
+an 11-inch one is not a substitute (Apple scales the 13-inch down, not the other way up). Dominic
+has an 11-inch iPad, so the required screenshots could only have come from a simulator — and the two
+that matter most, the transition screen and Apple's picker, cannot be captured there at all, because
+both need real Family Controls authorization.
+
+**The bigger reason.** This app has never been run on an iPad, once. Declaring a device family is
+declaring that it works there, and App Review tests what you declare. A first submission rejected
+for an untested iPad layout costs a review cycle over something that has nothing to do with the
+product.
+
+**Decision.** `TARGETED_DEVICE_FAMILY = "1"` on all ten build configurations. iPad returns in 1.1,
+after someone has actually used it on one. Adding a device family later is a build setting;
+withdrawing a broken iPad version is a support problem.
+
+**Consequences.** One screenshot set (6.9"), one QA pass, one layout to be sure of. The code is
+unchanged and remains device-agnostic — nothing in it assumes a phone — so 1.1 is a setting and a
+test pass, not a rewrite.
+
+## D-072 — One list, arranged once; one tick that decides
+
+**Date:** 2026-09-07 · **Status:** accepted
+
+**Context.** "What's next" was configured by two controls that decided the same thing. The parent
+could tick a SUBSET of activities (`ScreenTimeConfiguration.selectedActivities`) and, separately,
+drag the list into an ORDER (`ParentPickerPreferences.activityOrder`). A system shield shows three
+(D-044) and takes them off the front of the list — so the order already determined what a child
+saw, and the ticks could only agree with it or contradict it. A parent who arranged their five and
+then ticked three got a child's screen assembled from both rules, and no screen in the app said
+which one had won.
+
+Meanwhile the thing a parent actually opens the dashboard to learn — what is happening after screen
+time — was not on it. D-053 put the offered list there, D-057 cut it to the three a shield fits.
+Both were lists of possibilities on a screen whose one question is "which one turned out to be
+true?". And a parent who needed the answer to be dinner had no way to say so.
+
+**Decision.** The tick changes meaning: it is no longer "this activity is offered" but "this is what
+is happening". One activity at most (`parentChosenActivity`), and it OVERRIDES the child's own pick
+wherever both exist. The order, alone, decides what the child is offered when nobody has overridden.
+
+Concretely:
+
+* `ScreenTimeConfiguration.selectedActivities` is gone; `parentChosenActivity: TransitionActivity?`
+  takes its slot. Old records carrying the key decode with it ignored — reading a three-item
+  offered-list into a single-choice slot would announce a decision the parent never made.
+* `ChildSessionSnapshot.chosenActivity` is now `parentChoice ?? window.chosenActivity`, so the
+  dashboard, the timer, the Live Activity and the Time's Up screen all read one property and none
+  of them can show a different answer. `chosenByParent` says whose it is.
+* The shield gains two moments: `.parentChoseNext` and `.finishedParentChose`. They exist as
+  separate cases rather than a flag because they are different screens — `.reminder` says "you
+  picked Outside", and to a child who picked nothing that is a small lie. The new copy states
+  ("Next is Meal time") and offers no menu.
+* The chooser is suppressed everywhere at once: the shield resolver checks the override before the
+  chooser branch, and `isChoosingMoment` checks it too, so the in-app chooser goes with it. Asking
+  a child for an answer we intend to discard is worse than not asking.
+* `SessionController.start()` clears it. It lasts one session, per Dominic: a parent who means
+  "every evening" says it again; a parent who meant "tonight, we're eating" is not still saying it
+  on Thursday.
+* The dashboard's What's next is one row — the answer, or "Not chosen yet" — with a footer that
+  names who decided.
+
+**Consequences.** The order is now load-bearing on its own, which is worth remembering the next time
+someone wants to "just add a filter": that is exactly what this removed. The override is cleared at
+Start, so a parent who sets it while nothing is running loses it on the next Start — the Settings
+footer says so out loud rather than leaving it to be discovered. Reversing this means restoring a
+second control over the same outcome, which is the state that produced the bug.
+
 <!-- Template for new entries:
 
 ## D-NNN — <short imperative title>

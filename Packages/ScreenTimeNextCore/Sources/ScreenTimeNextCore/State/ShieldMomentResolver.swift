@@ -61,19 +61,34 @@ public enum ShieldMomentResolver {
             return .spentForToday
         }
 
+        // D-072 — the parent's own answer, which outranks the child's wherever both exist.
+        let parentChoice = configuration.parentChosenActivity
+
         let remaining = window.remainingSeconds(at: now)
-        guard remaining > 0 else { return .finished(activity: window.chosenActivity) }
+        guard remaining > 0 else {
+            if let parentChoice { return .finishedParentChose(activity: parentChoice) }
+            return .finished(activity: window.chosenActivity)
+        }
 
         // Round UP: with 61 seconds left a child should be told "2 minutes", not "1" — the number
         // has to still be true a moment after they read it.
         let minutesLeft = max(1, Int((Double(remaining) / 60).rounded(.up)))
 
+        // D-065 — WHICH reminder this is no longer changes the screen, only whether one is due.
         let offsets = configuration.effectiveWarningOffsets(forWindowSeconds: window.totalSeconds)
-        guard let index = WarningStateEngine.reachedWarningIndex(remainingSeconds: remaining,
-                                                                 warningOffsets: offsets) else {
+        guard WarningStateEngine.reachedWarningIndex(remainingSeconds: remaining,
+                                                     warningOffsets: offsets) != nil else {
             // Shielded between reminders — the parent raised it, or a reminder shield was never
             // dismissed. Treat it as a plain heads-up rather than inventing a fourth kind.
+            if let parentChoice { return .parentChoseNext(minutesLeft: minutesLeft, activity: parentChoice) }
             return .reminder(minutesLeft: minutesLeft, activity: window.chosenActivity)
+        }
+
+        // D-072 — the parent decided, so there is nothing to ask and nothing to offer. This is
+        // checked BEFORE the chooser on purpose: a menu whose result would be discarded is worse
+        // than no menu, because the child spends a decision on it.
+        if let parentChoice {
+            return .parentChoseNext(minutesLeft: minutesLeft, activity: parentChoice)
         }
 
         // D-050 — ask from the FIRST reminder, and keep asking until they answer.
@@ -87,15 +102,10 @@ public enum ShieldMomentResolver {
         if window.chosenActivity == nil,
            supportsChooserMenu,
            !chooserOptions(availableActivities).isEmpty {
+            // D-065 — every ask looks the same, and asks again until they answer. Insisting cost
+            // more than it bought: see `ShieldMoment.chooseNext`.
             return .chooseNext(minutesLeft: minutesLeft,
-                               options: chooserOptions(availableActivities),
-                               // D-053 — the FIRST ask is an invitation; every one after it
-                               // insists. A child who let the first screen go by has already had
-                               // the gentle version, and the point of asking early was never to
-                               // make the question optional.
-                               mustChoose: index > 0
-                                   || WarningStateEngine.isChooser(warningAt: index,
-                                                                   count: offsets.count))
+                               options: chooserOptions(availableActivities))
         }
         return .reminder(minutesLeft: minutesLeft, activity: window.chosenActivity)
     }

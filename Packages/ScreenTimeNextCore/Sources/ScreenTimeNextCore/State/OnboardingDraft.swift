@@ -45,9 +45,6 @@ public struct OnboardingDraft: Equatable, Sendable {
         return mins
     }
 
-    /// §6.7 — activities the child may choose from.
-    public var selectedActivities: Set<TransitionActivity> = []
-
     public init() {}
 
     // MARK: Validation
@@ -68,15 +65,16 @@ public struct OnboardingDraft: Equatable, Sendable {
         hasChildName ? ChildProfile(name: trimmedChildName) : nil
     }
 
-    /// Activities are stored in the canonical `TransitionActivity.allCases` order, not set order.
+    /// D-072 — onboarding no longer carries an activity list. It never asked for one (no
+    /// onboarding screen ever set it), and the list it would have written is the parent's order in
+    /// `ParentPickerPreferences`, which onboarding does not touch either.
     public var configuration: ScreenTimeConfiguration {
         // A reminder can never be as long as the budget (D-013): clamp, so going back to lower
         // the budget after setting reminders cannot leave an impossible combination behind.
         let cap = ScreenTimeConfiguration.maxWarningOffset(forBudgetSeconds: dailyBudgetSeconds)
         return ScreenTimeConfiguration(
             dailyBudgetSeconds: dailyBudgetSeconds,
-            warningOffsetsSeconds: warningMinutes.map { min($0 * 60, cap) },
-            selectedActivities: TransitionActivity.allCases.filter { selectedActivities.contains($0) }
+            warningOffsetsSeconds: warningMinutes.map { min($0 * 60, cap) }
         )
     }
 

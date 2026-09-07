@@ -13,8 +13,31 @@ import ActivityKit
 
 nonisolated final class LiveActivityPresenter: SessionPresenting, @unchecked Sendable {
 
+    /// D-066 — which push is the newest, decided synchronously at the call.
+    ///
+    /// Every push hops to the main actor in its own `Task`, and **`Task` start order is not
+    /// guaranteed**. Add three minutes, then take three minutes back, and the two hops race: if the
+    /// ADD lands second it wins, and the Dynamic Island sits there showing time the parent already
+    /// took away. Nothing in the code looks wrong — both pushes are correct, they just arrive in
+    /// the wrong order.
+    ///
+    /// The ticket is claimed under a lock BEFORE the hop, so the ordering is fixed at the moment
+    /// of the call rather than by whichever task the scheduler happens to start. Anything overtaken
+    /// is dropped: the window has one current shape, and only the newest push describes it.
+    private let ticketLock = NSLock()
+    private var issued: UInt64 = 0
+
+    private func claimTicket() -> UInt64 {
+        ticketLock.withLock { issued += 1; return issued }
+    }
+
+    private func isNewest(_ ticket: UInt64) -> Bool {
+        ticketLock.withLock { ticket == issued }
+    }
+
     func show(_ state: SessionPresenceState) {
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+        let ticket = claimTicket()
         let content = ScreenTimeActivityAttributes.ContentState(
             startedAt: state.startedAt,
             endsAt: state.endsAt,
@@ -25,6 +48,7 @@ nonisolated final class LiveActivityPresenter: SessionPresenting, @unchecked Sen
         )
         // ActivityKit asserts "Call must be made on main thread" — hop to the main actor.
         Task { @MainActor in
+            guard self.isNewest(ticket) else { return }
             // D-053 — `finish` ends the activity, and `end` is ONE-WAY: the card lingers in
             // `activities` for ten more minutes but no longer accepts updates. Updating it there
             // is a silent no-op, which is exactly what a parent saw when they added three minutes
@@ -61,6 +85,7 @@ nonisolated final class LiveActivityPresenter: SessionPresenting, @unchecked Sen
             stateName: state.stateName
         )
         let dismissAt = Date().addingTimeInterval(Self.finishedLingerSeconds)
+        _ = claimTicket()      // any push still in flight is now out of date
         Task { @MainActor in
             for activity in Activity<ScreenTimeActivityAttributes>.activities {
                 await activity.end(ActivityContent(state: content, staleDate: nil),
@@ -70,6 +95,7 @@ nonisolated final class LiveActivityPresenter: SessionPresenting, @unchecked Sen
     }
 
     func hide() {
+        _ = claimTicket()
         Task { @MainActor in
             for activity in Activity<ScreenTimeActivityAttributes>.activities {
                 await activity.end(nil, dismissalPolicy: .immediate)

@@ -39,10 +39,12 @@ final class CustomActivityTests: XCTestCase {
         XCTAssertTrue(decoded.isCustom)
     }
 
+    /// D-072 — the bare-string form still decodes wherever an activity is still read; in a
+    /// configuration the old `selectedActivities` key is simply ignored.
     func testAConfigurationOfBareStringsStillDecodes() throws {
-        let json = #"{"dailyBudgetSeconds":900,"warningOffsetsSeconds":[60],"selectedActivities":["cleanUp","outside"]}"#
+        let json = #"{"dailyBudgetSeconds":900,"warningOffsetsSeconds":[60],"parentChosenActivity":"cleanUp"}"#
         let config = try JSONDecoder().decode(ScreenTimeConfiguration.self, from: Data(json.utf8))
-        XCTAssertEqual(config.selectedActivities, [.cleanUp, .outside])
+        XCTAssertEqual(config.parentChosenActivity, .cleanUp)
     }
 
     func testASessionWindowOfBareStringsStillDecodes() throws {
@@ -123,12 +125,12 @@ final class CustomActivityTests: XCTestCase {
         let storage = InMemoryScreenTimeStorageService()
         let piano = TransitionActivity.custom(displayName: "Piano", symbolName: "music.note")
         try storage.save(ParentPickerPreferences(customActivities: [piano]))
-        try storage.save(ScreenTimeConfiguration(selectedActivities: [piano]))
+        try storage.save(ScreenTimeConfiguration(parentChosenActivity: piano))
 
         try storage.eraseAll()
 
         XCTAssertEqual(try storage.loadPickerPreferences().customActivities, [piano])
-        XCTAssertEqual(try storage.loadConfiguration().selectedActivities, [], "the child's setup goes")
+        XCTAssertNil(try storage.loadConfiguration().parentChosenActivity, "the child's setup goes")
     }
 
     func testSavedSelectionSubtitleCountsOnly() {

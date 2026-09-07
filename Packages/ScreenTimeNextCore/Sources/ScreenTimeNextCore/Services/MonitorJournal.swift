@@ -131,12 +131,24 @@ public final class MonitorJournal: @unchecked Sendable {
     /// be wrong about.
     public static let maximumPauseSeconds = 2 * 60
 
-    /// D-059 — the child is looking at the transition screen RIGHT NOW.
+    /// D-071 — the child started looking at the transition screen.
     ///
-    /// Called from the configuration extension, which iOS asks each time it draws the screen, and
-    /// deliberately OVERWRITING: a child who wandered off and came back is reading it now, not
-    /// then. That single word is the difference between crediting five seconds and five minutes.
+    /// D-059 made this overwrite on every draw, so that a child who wandered off and came back was
+    /// credited for this visit rather than the whole absence. That was right about the goal and
+    /// wrong about the mechanism: **iOS redraws the shield while the child is still standing there**
+    /// — opening the submenu is a redraw — and each redraw restarted the clock. A screen that was up
+    /// for forty seconds credited the two since the last repaint, which is why the timer looked like
+    /// it had given nothing back.
+    ///
+    /// So the mark is set ONCE per visit and left alone. What stops an abandoned screen crediting
+    /// hours is not the refresh — it is `maximumPauseSeconds`, which was always the real guard. A
+    /// mark older than the cap could only have come from a child who left, so it starts over.
     public func markShieldShown(at date: Date = Date()) {
+        if let startedAt = defaults.object(forKey: pausedAtKey) as? Double {
+            let elapsed = date.timeIntervalSince1970 - startedAt
+            // Still the same visit: keep the clock where it started.
+            if elapsed >= 0 && elapsed <= Double(Self.maximumPauseSeconds) { return }
+        }
         defaults.set(date.timeIntervalSince1970, forKey: pausedAtKey)
     }
 

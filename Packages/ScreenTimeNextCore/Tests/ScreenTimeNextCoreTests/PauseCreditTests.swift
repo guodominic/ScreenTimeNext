@@ -36,13 +36,23 @@ final class PauseCreditTests: XCTestCase {
         XCTAssertEqual(journal.claimPausedSeconds(at: start.addingTimeInterval(6)), 6)
     }
 
-    /// The one that mattered. A child meets the screen, leaves for another app, comes back later
-    /// and taps. Only the second visit is owed — the minutes in between were theirs to spend.
-    func testComingBackLaterCreditsOnlyTheSecondVisit() {
-        journal.markShieldShown(at: start)                       // seen, then walked away
-        journal.markShieldShown(at: start.addingTimeInterval(300))  // drawn again on return
-        XCTAssertEqual(journal.claimPausedSeconds(at: start.addingTimeInterval(304)), 4,
-                       "five minutes in another app is not a pause")
+    /// D-071 — the reported bug. iOS repaints the shield while the child is still looking at it
+    /// (opening the submenu is a repaint), and D-059 restarted the clock on every repaint. Forty
+    /// seconds of reading credited the two since the last one.
+    func testARepaintDoesNotRestartTheClock() {
+        journal.markShieldShown(at: start)
+        journal.markShieldShown(at: start.addingTimeInterval(20))   // submenu opened — a repaint
+        journal.markShieldShown(at: start.addingTimeInterval(38))   // and another
+        XCTAssertEqual(journal.claimPausedSeconds(at: start.addingTimeInterval(40)), 40,
+                       "the whole visit is owed, not the moment since the last repaint")
+    }
+
+    /// A child who left and came back much later starts a new visit. The cap is what makes this
+    /// safe, not the repaint.
+    func testAVisitOlderThanTheCapStartsOver() {
+        journal.markShieldShown(at: start)
+        journal.markShieldShown(at: start.addingTimeInterval(600))  // ten minutes later
+        XCTAssertEqual(journal.claimPausedSeconds(at: start.addingTimeInterval(604)), 4)
     }
 
     func testTheCreditIsCapped() {

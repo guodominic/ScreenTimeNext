@@ -44,3 +44,6 @@ Secrets.xcconfig
 .vscode/
 .idea/
 *.swp
+
+# Files handed back by Claude, kept outside the repo history
+Claude outputs/

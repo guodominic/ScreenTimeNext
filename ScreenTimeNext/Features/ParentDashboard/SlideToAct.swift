@@ -150,6 +150,9 @@ struct ConfirmSlide: View {
                 .mask(alignment: .leading) {
                     Rectangle().frame(width: SlideMetrics.inset * 2 + SlideMetrics.knob + dragX)
                 }
+                // D-070 — same reason as RestrictionSlide: a circular knob cannot mask a
+                // rectangular reveal, so at rest there must be nothing to mask.
+                .opacity(min(1, dragX / 20))
 
                 SlideKnob(symbol: symbol, tint: tint, isDragging: isDragging)
                     .offset(x: SlideMetrics.inset + dragX)

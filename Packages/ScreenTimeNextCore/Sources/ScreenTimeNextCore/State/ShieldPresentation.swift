@@ -19,11 +19,24 @@ public enum ShieldMoment: Hashable, Sendable {
     /// D-044 / D-050 — the reminder that asks. Same shield, plus a menu of what to do after;
     /// picking one IS the "OK", and it lifts the shield for the minutes that remain.
     ///
-    /// `mustChoose` is the LAST reminder with nothing chosen yet: there is no "not yet" left,
-    /// because after this one there is no more asking — the next screen is the end.
-    case chooseNext(minutesLeft: Int, options: [TransitionActivity], mustChoose: Bool)
+    /// D-065 — there was a `mustChoose` flag here, for the last ask that refused to let a child
+    /// past without deciding. It is gone: enforcing it meant a shield with no primary button, and
+    /// that shield was rejected by iOS in favour of its own grey screen. What a child sees is now
+    /// decided by one thing — have they chosen? Not chosen: the minutes AND the list. Chosen: the
+    /// minutes. A rule with one input cannot produce a screen nobody predicted.
+    case chooseNext(minutesLeft: Int, options: [TransitionActivity])
+    /// D-072 — the parent decided, so this is a reminder that TELLS rather than asks. No menu, no
+    /// list, nothing to pick: the screen states what is happening after and lets the child carry
+    /// on with the minutes they have left.
+    ///
+    /// It is a separate case rather than a flag on `.reminder` because it is a different screen
+    /// with different words. `.reminder` says "you picked Outside"; this one cannot, because they
+    /// did not, and reusing the case would have meant one of the two moments lying.
+    case parentChoseNext(minutesLeft: Int, activity: TransitionActivity)
     /// The session just ended. The button sends the child to the Home Screen; it never lifts.
     case finished(activity: TransitionActivity?)
+    /// D-072 — the end, when the parent chose. Same button, honest copy.
+    case finishedParentChose(activity: TransitionActivity)
     /// A protected app opened later in the day with the budget already spent.
     case spentForToday
 }
@@ -81,14 +94,17 @@ public struct ShieldPresentation: Hashable, Sendable {
     public let subtitle: String
     /// SF Symbol name. The extension turns this into a UIImage; the preview into an Image.
     public let symbolName: String
-    /// D-056 — nil means the shield has NO primary button.
+    /// D-065 — always present again.
     ///
-    /// `secondaryButtonSubmenuItems` opens only when the SECONDARY button is tapped (D-049); there
-    /// is no `ShieldActionResponse` that opens it, so a primary button cannot lead a child to the
-    /// choices. On the ask that insists, a primary button is therefore a button that cannot do the
-    /// one thing the screen is asking for — so it is removed, and the only control left is the one
-    /// that opens the list.
-    public let primaryButtonLabel: String?
+    /// D-056 made this optional so the insisting ask could have NO primary button. That produced a
+    /// `ShieldConfiguration` with a primary button COLOUR and no primary button, and the screen a
+    /// child got was Apple's own grey "Restricted" — iOS appears to reject the configuration and
+    /// fall back, silently, exactly on the moment that matters most.
+    ///
+    /// The lesson is narrower than "don't remove buttons": a shield is a set of values handed to a
+    /// process we cannot see, and a combination we have not seen work is a combination we do not
+    /// know works. Every field is filled or the whole screen is forfeit.
+    public let primaryButtonLabel: String
     /// True when pressing the primary button should lift ScreenTimeNext's own shield and let the
     /// child continue. False means the button only closes the app — never a bypass (§17).
     public let primaryButtonContinues: Bool
@@ -105,7 +121,7 @@ public struct ShieldPresentation: Hashable, Sendable {
     public let urgency: ShieldUrgency
 
     public init(title: String, subtitle: String, symbolName: String,
-                primaryButtonLabel: String?, primaryButtonContinues: Bool,
+                primaryButtonLabel: String, primaryButtonContinues: Bool,
                 activity: TransitionActivity?,
                 urgency: ShieldUrgency,
                 secondaryButtonLabel: String? = nil,
@@ -162,7 +178,7 @@ public struct ShieldPresentation: Hashable, Sendable {
                 urgency: urgency ?? .fromMinutesLeft(minutes)
             )
 
-        case let .chooseNext(minutes, options, mustChoose):
+        case let .chooseNext(minutes, options):
             let left = minutes == 1 ? "1 minute left" : "\(minutes) minutes left"
             return ShieldPresentation(
                 title: "\(left)\(addressed)",
@@ -172,9 +188,7 @@ public struct ShieldPresentation: Hashable, Sendable {
                 // anything to choose, which is the same as there being nothing.
                 subtitle: options.isEmpty
                     ? "Time to start finishing up what you're doing."
-                    : mustChoose
-                        ? "\(Self.list(options)) — pick one and you can keep playing."
-                        : "\(Self.list(options)) — which one? Tap “What's next?” to pick, then keep playing.",
+                    : "\(Self.list(options)) — pick one and keep playing.",
                 symbolName: "hand.tap.fill",
                 // §17 — the primary button never buys more time. Choosing is the way onward, which
                 // is the point: the child decides what comes next while the screen time is still
@@ -184,17 +198,46 @@ public struct ShieldPresentation: Hashable, Sendable {
                 // does nothing else, so the menu is the only way back into the app. The child can
                 // always leave for the Home Screen, which is a real choice and not our business to
                 // prevent — what we refuse is a way to carry on WITHOUT deciding.
-                // D-056 — on the ask that insists there is NO primary button. "Pick one first 👆"
-                // was a button that did nothing, and a child who taps a button and gets nothing
-                // learns the screen is broken, not that they have a choice to make. Removing it
-                // leaves exactly one control, and it opens the list.
-                primaryButtonLabel: mustChoose ? nil : "Not yet",
+                // D-067 — the ask insists, from the very first one, and it does so WITHOUT
+                // removing a button (D-065: a shield with a button colour and no button is a
+                // shield iOS replaces with its own grey screen).
+                //
+                // So the primary button stays and says exactly what it does: it closes the app.
+                // That is a real choice and an honest one — the child can always leave, and
+                // leaving is not something we get to prevent. What we refuse is a way to carry on
+                // INSIDE the app without deciding. The way back in is the list.
+                primaryButtonLabel: "Close the app",
                 primaryButtonContinues: false,
                 activity: nil,
                 urgency: urgency ?? .fromMinutesLeft(minutes),
-                secondaryButtonLabel: options.isEmpty ? nil
-                    : (mustChoose ? "Pick what's next 👆" : "What's next?"),
+                secondaryButtonLabel: options.isEmpty ? nil : "What's next?",
                 submenuItems: options.map(\.displayName)
+            )
+
+        case let .parentChoseNext(minutes, activity):
+            let left = minutes == 1 ? "1 minute left" : "\(minutes) minutes left"
+            return ShieldPresentation(
+                title: "\(left)\(addressed)",
+                // Stated, not sold. A child who is told what happens next can get ready for it;
+                // a child who is asked a question whose answer is already fixed learns that the
+                // asking is theatre.
+                subtitle: "Next is \(activity.displayName). Finish up, then \(activity.invitation.lowercasedFirst)",
+                symbolName: activity.symbolName,
+                primaryButtonLabel: minutes == 1 ? "OK, one more minute" : "OK, \(minutes) more minutes",
+                primaryButtonContinues: true,
+                activity: activity,
+                urgency: urgency ?? .fromMinutesLeft(minutes)
+            )
+
+        case let .finishedParentChose(activity):
+            return ShieldPresentation(
+                title: "Screen time is finished ❤️",
+                subtitle: "Next is \(activity.displayName)\(addressed). \(activity.invitation)",
+                symbolName: activity.symbolName,
+                primaryButtonLabel: "Let's go!",
+                primaryButtonContinues: false,
+                activity: activity,
+                urgency: .finished
             )
 
         case let .finished(activity):

@@ -93,7 +93,9 @@ struct RestrictionSlide: View {
                 .mask(alignment: .leading) {
                     Rectangle().frame(width: SlideMetrics.inset * 2 + SlideMetrics.knob + dragX)
                 }
-                .opacity(isEnabled ? 1 : 0)
+                // D-070 — invisible until the thumb actually moves. A circular knob cannot mask a
+                // rectangular reveal, so the reveal must not be there to mask.
+                .opacity(isEnabled ? min(1, dragX / 20) : 0)
 
                 SlideKnob(symbol: progress > 0.5 ? nextSymbol : currentSymbol,
                           tint: isEnabled ? (progress > 0.5 ? nextColor : currentColor) : .secondary,

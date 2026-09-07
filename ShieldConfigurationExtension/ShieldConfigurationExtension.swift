@@ -111,21 +111,24 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
 
     private static func journalEvent(for moment: ShieldMoment) -> MonitorReport.Event {
         switch moment {
-        case .reminder:      return .shieldShownReminder
-        case .chooseNext:    return .shieldShownChooser
-        case .finished:      return .shieldShownFinished
-        case .spentForToday: return .shieldShownSpent
+        case .reminder:            return .shieldShownReminder
+        // D-072 — the told-not-asked reminder is still a reminder as far as the log's question
+        // goes ("did the child get OUR screen?"); who decided is answerable from the record.
+        case .parentChoseNext:     return .shieldShownReminder
+        case .chooseNext:          return .shieldShownChooser
+        case .finished:            return .shieldShownFinished
+        case .finishedParentChose: return .shieldShownFinished
+        case .spentForToday:       return .shieldShownSpent
         }
     }
 
-    /// What the child may choose from: the parent's picks, in the parent's order (D-039). Both
-    /// extensions build this the same way — the action extension's copy is the same three lines,
-    /// against the same records.
+    /// What the child may choose from: the parent's list, in the parent's order (D-039).
+    ///
+    /// D-072 — one line now, where it used to be three. The second filter it applied
+    /// (`selectedActivities`) decided the same thing the order decides, and two rules for one
+    /// outcome in a process with no console is a bug nobody can watch happen.
     static func activities(storage: any ScreenTimeStorageService) -> [TransitionActivity] {
-        let all = ((try? storage.loadPickerPreferences()) ?? .default).allActivities
-        let picked = ((try? storage.loadConfiguration()) ?? .default).selectedActivities
-        // D-009 — picking none means "no preference", which is everything, not nothing.
-        return picked.isEmpty ? all : all.filter { picked.contains($0) }
+        ((try? storage.loadPickerPreferences()) ?? .default).allActivities
     }
 
     // MARK: Presentation → UIKit
@@ -135,10 +138,9 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
         let secondary = p.secondaryButtonLabel.map {
             ShieldConfiguration.Label(text: $0, color: .label)
         }
-        // D-056 — nil is a shield with no primary button at all. See `ShieldPresentation`.
-        let primary = p.primaryButtonLabel.map {
-            ShieldConfiguration.Label(text: $0, color: .white)
-        }
+        // D-065 — every field filled. A primary button colour with no primary button made iOS
+        // fall back to its own grey screen, on the one moment the child most needed ours.
+        let primary = ShieldConfiguration.Label(text: p.primaryButtonLabel, color: .white)
 
         // D-044 — the second button exists for exactly one thing: choosing what comes next. §17
         // still holds; it never buys more time. The submenu is iOS 26.4+, and

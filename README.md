@@ -1,6 +1,6 @@
 # ScreenTimeNext
 
-**Screen Time Transition Assistant + Parental Control** · iOS / iPadOS
+**Screen Time Transition Assistant + Parental Control** · iOS
 
 > Make screen time end peacefully.
 
@@ -11,6 +11,14 @@ using Apple's Screen Time frameworks.
 
 It is not another countdown timer. The product thesis is that a child who **chooses what happens
 next** transitions with less conflict — and that enforcement has to be real for a parent to trust it.
+
+## V1 is iPhone only
+
+D-069 — the app builds and would run on iPad, but it has never been tested on one, and claiming a
+device family means App Review tests it there. Shipping a layout nobody has looked at is how a first
+submission gets rejected for something that has nothing to do with the product. iPad returns in 1.1,
+after it has been used on one. Adding a device family later is easy; withdrawing a broken iPad
+version is not.
 
 ## V1 scope
 - Family Controls authorization
@@ -81,7 +89,7 @@ a Mac with Xcode 26 or newer and a free Apple ID:
 2. Xcode › Settings › Accounts › add your Apple ID (free "Personal Team" is enough).
 3. Select the `ScreenTimeNext` target › Signing & Capabilities › choose your Personal Team.
    Do the same for the `ScreenTimeNextWidgetsExtension` target.
-4. Plug in your iPhone/iPad, unlock it, trust the computer, and turn on
+4. Plug in your iPhone, unlock it, trust the computer, and turn on
    Settings › Privacy & Security › Developer Mode (the device restarts).
 5. Pick your device at the top of Xcode and press ⌘R. On the device, trust the developer
    certificate under Settings › General › VPN & Device Management the first time.

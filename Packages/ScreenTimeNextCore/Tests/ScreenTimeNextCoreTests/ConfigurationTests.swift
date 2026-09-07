@@ -15,7 +15,7 @@ final class ConfigurationTests: XCTestCase {
         // they open this app, not a number they then have to dial down from.
         XCTAssertEqual(c.dailyBudgetSeconds, 900)
         XCTAssertEqual(c.warningOffsetsSeconds, [300, 60], "D-044 — two reminders, not three")
-        XCTAssertTrue(c.selectedActivities.isEmpty)
+        XCTAssertNil(c.parentChosenActivity, "D-072 — nobody has decided yet; the child chooses")
     }
 
     func testInitNormalizes() {
@@ -32,7 +32,7 @@ final class ConfigurationTests: XCTestCase {
     func testRoundTrip() throws {
         var c = ScreenTimeConfiguration.default
         c.warningOffsetsSeconds = [420, 60]
-        c.selectedActivities = [.cleanUp]
+        c.parentChosenActivity = .cleanUp
         let data = try JSONEncoder().encode(c)
         XCTAssertEqual(try JSONDecoder().decode(ScreenTimeConfiguration.self, from: data), c)
     }
@@ -45,7 +45,10 @@ final class ConfigurationTests: XCTestCase {
         let c = try JSONDecoder().decode(ScreenTimeConfiguration.self, from: Data(legacy.utf8))
         XCTAssertEqual(c.dailyBudgetSeconds, 1800)
         XCTAssertEqual(c.warningOffsetsSeconds, [600, 60])
-        XCTAssertEqual(c.selectedActivities, [.mealTime])
+        // D-072 — the old key held the list the child was OFFERED. It is ignored rather than
+        // migrated: reading it into the single-choice slot would announce a decision on behalf of
+        // a parent who never made one, on the first launch after an update.
+        XCTAssertNil(c.parentChosenActivity, "an old offered-list is not a decision")
     }
 
     func testEffectiveOffsetsAreStrictlyShorterThanTheWindow() {
