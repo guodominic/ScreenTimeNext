@@ -2026,6 +2026,40 @@ Start, so a parent who sets it while nothing is running loses it on the next Sta
 footer says so out loud rather than leaving it to be discovered. Reversing this means restoring a
 second control over the same outcome, which is the state that produced the bug.
 
+## D-073 — Break up the expressions the type-checker gave up on
+
+**Date:** 2026-09-07 · **Status:** accepted
+
+**Context.** The first clean build of `Mascot.swift` in a while failed:
+
+> The compiler is unable to type-check this expression in reasonable time; try breaking up the
+> expression into distinct sub-expressions
+
+It surfaced on an Xcode Cloud runner rather than locally, and the reason is worth writing down:
+local builds are incremental, and `Mascot.swift` had not changed in weeks, so nothing on this Mac
+had recompiled it. The file was already sitting at the edge of the type-checker's budget and no
+local build could have told us — the first machine to compile it from scratch was the first machine
+to fail. A clean local Archive would have hit the same wall, at the worst possible moment.
+
+**Decision.** Five expressions were split, none of them changing a pixel:
+
+* The `#Preview` gallery — one expression nesting ScrollView ▸ LazyVGrid ▸ ForEach ▸ VStack around
+  the array literal `[MascotMood.happy, .playing, …]`. Every leading dot stays an open question
+  until the whole nest resolves. Hoisted into a `MascotMoodGallery` view with the array and the
+  columns as typed stored properties, and the cell as its own method.
+* `armAngle(side:)` — eleven untyped integer literals inside ternaries inside a `Double` return.
+  Each is now a named `Double`.
+* `pupilOffset` — a ternary inside a tuple element inside a switch; the ternary is now a `CGFloat`.
+* `openEye` — `let w = eyeW` and friends annotated, and the two `.offset` products lifted out.
+* `figure` — a `ZStack` of eight opaque children (an eight-element `TupleView` the builder solves
+  as one problem), split into a back half and a front half. Same drawing order, same picture.
+
+**Consequences.** The rule this leaves behind is about verification, not about SwiftUI: a green
+incremental build is not evidence that a file compiles, only that it did not need to. The file that
+breaks the release is the one nobody has touched. Before an Archive that matters, the build that
+counts is a clean one — which is exactly what Archive does, and why it is worth running early
+rather than as the last step before submitting.
+
 <!-- Template for new entries:
 
 ## D-NNN — <short imperative title>

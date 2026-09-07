@@ -102,12 +102,29 @@ struct Mascot: View {
 
     // MARK: Figure
 
+    /// D-073 — two groups of four rather than one of eight.
+    ///
+    /// A `ZStack` of eight children is a `TupleView` of eight distinct opaque types, and the
+    /// builder has to solve all of them together. The drawing order is unchanged — back half,
+    /// then front half — so the picture is identical.
     private var figure: some View {
+        ZStack {
+            behindTheFace
+            theFace
+        }
+    }
+
+    private var behindTheFace: some View {
         ZStack {
             legs
             bodyShape
             arm(side: -1, far: true)
             headShape
+        }
+    }
+
+    private var theFace: some View {
+        ZStack {
             ears
             face
             arm(side: 1, far: false)
@@ -266,15 +283,17 @@ struct Mascot: View {
     private var eyesClosed: Bool { mood == .sleepy || blink }
 
     private var openEye: some View {
-        let w = eyeW
-        let p = pupilW
-        let shine = w * 0.20
+        let w: CGFloat = eyeW
+        let p: CGFloat = pupilW
+        let shine: CGFloat = w * 0.20
+        let dx: CGFloat = pupilOffset.x * w
+        let dy: CGFloat = pupilOffset.y * w
         return ZStack {
             Circle().fill(Color.white).frame(width: w, height: w)
             Circle()
                 .fill(Color(red: 0.15, green: 0.18, blue: 0.27))
                 .frame(width: p, height: p)
-                .offset(x: pupilOffset.x * w, y: pupilOffset.y * w)
+                .offset(x: dx, y: dy)
             Circle().fill(Color.white)
                 .frame(width: shine, height: shine)
                 .offset(x: w * 0.14, y: -w * 0.16)
@@ -297,10 +316,14 @@ struct Mascot: View {
     /// Pupils drift: up-and-aside when thinking, a slow glance the rest of the time.
     private var pupilOffset: (x: CGFloat, y: CGFloat) {
         switch mood {
-        case .thinking: return (0.14, -0.16)
-        case .excited: return (0, -0.06)
-        case .cheering: return (0, -0.04)
-        default:        return (glance ? 0.10 : -0.06, 0.06)
+        case .thinking:  return (x: 0.14, y: -0.16)
+        case .excited:   return (x: 0, y: -0.06)
+        case .cheering:  return (x: 0, y: -0.04)
+        default:
+            // D-073 — pulled out of the tuple: a ternary inside a tuple element inside a switch
+            // is three nested inference problems for one number.
+            let drift: CGFloat = glance ? 0.10 : -0.06
+            return (x: drift, y: 0.06)
         }
     }
 
@@ -374,21 +397,29 @@ struct Mascot: View {
             .animation(.easeInOut(duration: loopDuration).repeatForever(autoreverses: true), value: phase)
     }
 
+    /// D-073 — every literal spelled `Double`. They were untyped integers inside ternaries inside
+    /// a `Double` return, which is eleven separate little inference problems in one function.
     private func armAngle(side: CGFloat) -> Double {
         let outward = Double(side)
+        let up: Bool = bobbing
+        let leading: Bool = side > 0
         switch mood {
         case .cheering:
-            return outward * (bobbing ? 155 : 140)
+            let sweep: Double = up ? 155 : 140
+            return outward * sweep
         case .happy:
             // One arm waves, the other rests.
-            return side > 0 ? (bobbing ? 145 : 115) : 12
+            let wave: Double = up ? 145 : 115
+            return leading ? wave : 12
         case .playing:
-            return outward * (bobbing ? 28 : 12)
+            let swing: Double = up ? 28 : 12
+            return outward * swing
         case .excited:
             // Arms swinging up — eagerness, not panic.
-            return outward * (bobbing ? 95 : 60)
+            let swing: Double = up ? 95 : 60
+            return outward * swing
         case .thinking:
-            return side > 0 ? 128 : 10          // hand up near the chin
+            return leading ? 128 : 10           // hand up near the chin
         case .sleepy:
             return outward * 6
         }
@@ -434,16 +465,35 @@ private struct Smile: Shape {
     }
 }
 
-#Preview("Moods") {
-    ScrollView {
-        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 28) {
-            ForEach([MascotMood.happy, .playing, .thinking, .excited, .cheering, .sleepy], id: \.self) { mood in
-                VStack(spacing: 8) {
-                    Mascot(mood: mood, size: 140, tint: Theme.sky)
-                    Text(String(describing: mood)).font(.caption.weight(.semibold))
+/// D-073 — the preview's own view, hoisted out of the `#Preview` expression.
+///
+/// It was one expression: a ScrollView around a LazyVGrid around a ForEach over an array literal
+/// of implicit members. Every leading dot in `[MascotMood.happy, .playing, …]` stays an open
+/// question until the whole nest resolves, and the nest is five levels deep — which is how a file
+/// that draws a cartoon ends up being the one the type-checker gives up on.
+private struct MascotMoodGallery: View {
+    private let moods: [MascotMood] = [.happy, .playing, .thinking, .excited, .cheering, .sleepy]
+    private let columns: [GridItem] = [GridItem(.flexible()), GridItem(.flexible())]
+
+    var body: some View {
+        ScrollView {
+            LazyVGrid(columns: columns, spacing: 28) {
+                ForEach(moods, id: \.self) { mood in
+                    cell(for: mood)
                 }
             }
+            .padding(28)
         }
-        .padding(28)
     }
+
+    private func cell(for mood: MascotMood) -> some View {
+        VStack(spacing: 8) {
+            Mascot(mood: mood, size: 140, tint: Theme.sky)
+            Text(String(describing: mood)).font(.caption.weight(.semibold))
+        }
+    }
+}
+
+#Preview("Moods") {
+    MascotMoodGallery()
 }
