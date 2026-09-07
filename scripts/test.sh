@@ -12,7 +12,10 @@ set -uo pipefail
 "$(dirname "$0")/privacy-audit.sh" || exit 1
 cd "$(dirname "$0")/../Packages/ScreenTimeNextCore"
 
-XCODE="/Users/apple/Downloads/Xcode-beta.app"
+# Prefer the RELEASE Xcode: App Store submissions must be built with the public (GM)
+# toolchain, and tests that run on a different one are testing a different compiler.
+XCODE="/Applications/Xcode.app"
+if [ ! -d "$XCODE" ]; then XCODE="/Users/apple/Downloads/Xcode-beta.app"; fi
 if [ ! -d "$XCODE" ]; then
   XCODE="$(mdfind "kMDItemCFBundleIdentifier == 'com.apple.dt.Xcode'" | head -1)"
 fi
